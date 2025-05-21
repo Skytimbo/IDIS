@@ -1,0 +1,142 @@
+Replit Agent Instruction Set: Context Store Module (IDIS Phase 1 MVP)
+Objective:
+Create the core Context Store module for IDIS. This module will manage an SQLite database containing all persistent data for the system, including documents, patients, sessions, agent outputs, and an audit trail.
+
+Files to Create:
+
+context_store.py: Contains the ContextStore class and all related logic.
+tests/test_context_store.py: Contains unit tests for the ContextStore class.
+Key Requirements & Specifications:
+
+1. Database Engine:
+* Use SQLite. The database file should be configurable (e.g., idis_context.db).
+
+2. Python Module (context_store.py):
+* Import necessary libraries (sqlite3, datetime, json, uuid).
+* Define a class named ContextStore.
+* Primary Keys: Unless specified as INTEGER PRIMARY KEY AUTOINCREMENT, all primary keys (like document_id, patient_id, session_id, output_id) should be TEXT and generated within your Python code using str(uuid.uuid4()).
+
+* **`__init__(self, db_path: str)`:**
+    * The constructor should take the path to the SQLite database file as an argument.
+    * It should establish a connection to the database.
+    * It must call a method (e.g., `_initialize_db()`) to create all necessary tables if they don't already exist.
+
+* **`_initialize_db(self)` (Private Method):**
+    * This method will contain the `CREATE TABLE IF NOT EXISTS` statements for all tables defined below.
+    * Include basic indexes for foreign keys and commonly queried fields.
+
+* **Schema Definition (to be implemented in `_initialize_db()`):**
+
+    * **`patients` table:**
+        * `patient_id` (TEXT PRIMARY KEY)
+        * `patient_name` (TEXT, nullable)
+        * `creation_timestamp` (DATETIME DEFAULT CURRENT_TIMESTAMP)
+        * `last_modified_timestamp` (DATETIME DEFAULT CURRENT_TIMESTAMP)
+        * *Indexes:* `patient_name`
+
+    * **`sessions` table:**
+        * `session_id` (TEXT PRIMARY KEY)
+        * `user_id` (TEXT, nullable)
+        * `creation_timestamp` (DATETIME DEFAULT CURRENT_TIMESTAMP)
+        * `status` (TEXT) (e.g., "active", "completed", "archived")
+        * `session_metadata` (TEXT, nullable) (Store as a JSON string for arbitrary key-value pairs)
+        * *Indexes:* `user_id`, `status`
+
+    * **`documents` table:**
+        * `document_id` (TEXT PRIMARY KEY)
+        * `patient_id` (TEXT, nullable, FOREIGN KEY (`patient_id`) REFERENCES `patients`(`patient_id`))
+        * `session_id` (TEXT, nullable, FOREIGN KEY (`session_id`) REFERENCES `sessions`(`session_id`))
+        * `file_name` (TEXT) (Original filename)
+        * `original_file_type` (TEXT) (e.g., "pdf", "docx", "txt")
+        * `upload_timestamp` (DATETIME DEFAULT CURRENT_TIMESTAMP)
+        * `ingestion_status` (TEXT) (e.g., "pending_ingestion", "ingestion_successful", "ingestion_failed")
+        * `extracted_text` (TEXT, nullable)
+        * `document_type` (TEXT, nullable) (From classifier, e.g., "Invoice")
+        * `classification_confidence` (TEXT, nullable) (e.g., "Low", "Medium", "High")
+        * `processing_status` (TEXT, nullable) (e.g., "new", "classified", "summarized", "tagged", "filed")
+        * `document_dates` (TEXT, nullable) (Store as a JSON string, e.g., `{"invoice_date": "YYYY-MM-DD", "due_date": "YYYY-MM-DD"}`)
+        * `issuer_source` (TEXT, nullable)
+        * `recipient` (TEXT, nullable)
+        * `tags_extracted` (TEXT, nullable) (Store as a JSON string, e.g., `["urgent", "review_needed"]`)
+        * `filed_path` (TEXT, nullable) (Path after filing)
+        * `last_modified_timestamp` (DATETIME DEFAULT CURRENT_TIMESTAMP) (Implement logic to update this on modifications)
+        * *Indexes:* `patient_id`, `session_id`, `document_type`, `upload_timestamp`, `processing_status`.
+
+    * **`agent_outputs` table:**
+        * `output_id` (TEXT PRIMARY KEY)
+        * `document_id` (TEXT, FOREIGN KEY (`document_id`) REFERENCES `documents`(`document_id`))
+        * `agent_id` (TEXT) (e.g., "summarizer_agent_v1.0")
+        * `output_type` (TEXT) (e.g., "per_document_summary", "extracted_entities_json")
+        * `output_data` (TEXT) (Can be direct text or a JSON string)
+        * `confidence` (REAL, nullable) (Agent-specific confidence for this output)
+        * `creation_timestamp` (DATETIME DEFAULT CURRENT_TIMESTAMP)
+        * *Indexes:* `document_id`, `agent_id`, `output_type`.
+
+    * **`audit_trail` table:**
+        * `log_id` (INTEGER PRIMARY KEY AUTOINCREMENT)
+        * `timestamp` (DATETIME DEFAULT CURRENT_TIMESTAMP)
+        * `user_id` (TEXT)
+        * `event_type` (TEXT) (e.g., "DATA_ACCESS", "DATA_MODIFICATION", "AGENT_ACTIVITY")
+        * `event_name` (TEXT) (e.g., "VIEW_DOCUMENT_TEXT", "UPDATE_DOCUMENT_STATUS")
+        * `resource_type` (TEXT, nullable) (e.g., "document", "patient")
+        * `resource_id` (TEXT, nullable) (The ID of the resource)
+        * `status` (TEXT) (e.g., "SUCCESS", "FAILURE", "INFO")
+        * `details` (TEXT, nullable) (Human-readable description)
+        * `source_ip_address` (TEXT, nullable, default to "localhost" for MVP)
+        * *Indexes:* `timestamp`, `user_id`, `event_type`, `resource_id`.
+
+* **CRUD Methods & Others (Public Methods):**
+    * Implement methods with clear parameters (using type hints) and return values.
+    * Use parameterized queries (`?`) to prevent SQL injection.
+    * Handle JSON fields by using `json.dumps()` before saving and `json.loads()` after retrieving.
+    * Ensure `last_modified_timestamp` in `documents` and `patients` tables is updated appropriately on writes.
+
+    * **Patients:**
+        * `add_patient(self, patient_data: dict) -> str`: Returns `patient_id`.
+        * `get_patient(self, patient_id: str) -> dict | None`: Returns patient data as a dict or None.
+        * `update_patient(self, patient_id: str, update_data: dict) -> bool`: Returns True on success.
+
+    * **Sessions:**
+        * `create_session(self, user_id: str, session_metadata: dict = None) -> str`: Returns `session_id`.
+        * `get_session(self, session_id: str) -> dict | None`.
+        * `update_session_status(self, session_id: str, status: str) -> bool`.
+
+    * **Documents:**
+        * `add_document(self, document_data: dict) -> str`: Returns `document_id`. `document_data` dict includes fields like `patient_id`, `session_id`, `file_name`, `original_file_type`, `ingestion_status`, `extracted_text`, etc.
+        * `get_document(self, document_id: str) -> dict | None`.
+        * `update_document_fields(self, document_id: str, fields_to_update: dict) -> bool`: Generic method to update one or more fields of a document.
+        * `link_document_to_session(self, document_id: str, session_id: str) -> bool`.
+        * `get_documents_for_session(self, session_id: str) -> list[dict]`.
+
+    * **Agent Outputs:**
+        * `save_agent_output(self, document_id: str, agent_id: str, output_type: str, output_data: str, confidence: float = None) -> str`: Returns `output_id`. `output_data` can be a JSON string.
+        * `get_agent_outputs_for_document(self, document_id: str, agent_id: str = None, output_type: str = None) -> list[dict]`.
+
+    * **Audit Log:**
+        * `add_audit_log_entry(self, user_id: str, event_type: str, event_name: str, status: str, resource_type: str = None, resource_id: str = None, details: str = None, source_ip: str = "localhost") -> int`: Returns `log_id`.
+
+    * **Query Methods:**
+        * `query_patient_history(self, patient_id: str) -> list[dict]`: For MVP, this should return a list of dictionaries, where each dictionary represents a document associated with the `patient_id` and includes its `document_id`, `file_name`, `document_type`, `processing_status`, and `upload_timestamp`.
+
+* **Error Handling:** Methods should generally raise standard Python exceptions (e.g., `sqlite3.Error` or custom exceptions if you prefer, though standard is fine for MVP) if database operations fail.
+3. Unit Tests (tests/test_context_store.py):
+* Use Python's unittest module (or pytest if the agent prefers and it's available in Replit).
+* Ensure tests use an in-memory SQLite database (:memory:) or a temporary database file that is cleaned up after tests.
+* Write comprehensive tests for each public method in ContextStore:
+* Test successful creation, retrieval, updating, and deletion (where applicable) of records in each table.
+* Test that relationships (like a document linked to a patient/session) are correctly established/queried.
+* Test edge cases: attempting to retrieve non-existent records, invalid inputs (if basic validation is done within methods).
+* Test the query_patient_history method for correct output structure and content based on sample data.
+* Test that JSON fields are correctly serialized and deserialized.
+* Test that timestamps are being set/updated correctly.
+
+4. Documentation:
+* The ContextStore class and all its public methods must have clear, concise docstrings explaining their purpose, arguments, and return values.
+* Include inline comments for any complex logic or important assumptions.
+* (Agent Bonus): If possible, provide a brief Markdown summary of the database schema (tables and key fields).
+
+General Guidelines for the Agent:
+
+Write clean, readable, and maintainable Python code.
+Follow PEP 8 Python style guide.
+Ensure all database interactions are handled safely (e.g., using context managers for connections/cursors where appropriate, parameterized queries).
