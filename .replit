@@ -2,6 +2,7 @@ modules = ["python-3.11"]
 
 [nix]
 channel = "stable-24_05"
+packages = ["freetype", "gumbo", "harfbuzz", "jbig2dec", "libjpeg_turbo", "mupdf", "openjpeg", "swig", "tesseract", "xcbuild"]
 
 [workflows]
 runButton = "Project"
@@ -22,6 +23,10 @@ args = "test_context_store"
 [[workflows.workflow.tasks]]
 task = "workflow.run"
 args = "Run Demo Script"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "test_ingestion_agent"
 
 [[workflows.workflow]]
 name = "Run Context Store Tests"
@@ -46,6 +51,14 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python demo_context_store.py"
+
+[[workflows.workflow]]
+name = "test_ingestion_agent"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd tests && python -m unittest test_ingestion_agent.py"
 
 [deployment]
 run = ["sh", "-c", "python -m unittest discover tests"]

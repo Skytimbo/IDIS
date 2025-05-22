@@ -1,0 +1,127 @@
+Okay, with the Context Store successfully implemented and checkpointed on GitHub, we're ready to build the first agent that will populate it: the **`ingestion_agent.py`**.
+
+This agent is crucial as it's the entry point for all documents into the IDIS system. It needs to handle various file types, extract text, and communicate reliably with the `ContextStore`.
+
+Here is the detailed "Instruction Set" for **Task 1.3: Build Ingestion Agent**. Please provide this to your Replit Agent.
+
+---
+
+## Replit Agent Instruction Set: `ingestion_agent.py` (IDIS Phase 1 MVP)
+
+**Objective:**
+Create the `ingestion_agent.py` module. This agent will monitor a specified "watchfolder" for new documents, process various file types (PDF, DOCX, TXT, images) to extract their text content, and then store this extracted text along with relevant metadata into the `ContextStore`. It must also handle problematic files gracefully.
+
+**Files to Create:**
+1.  `ingestion_agent.py`: Contains the `IngestionAgent` class and its logic.
+2.  `tests/test_ingestion_agent.py`: Contains unit tests for the `IngestionAgent`.
+
+**Key Dependencies for `ingestion_agent.py`:**
+* The `ContextStore` class from `context_store.py` (it will need an instance).
+* `PyMuPDF` (also known as `fitz`): For PDF processing (text and image extraction).
+* `python-docx`: For extracting text from DOCX files.
+* `pytesseract`: For OCR capabilities (requires Tesseract OCR engine to be installed in the environment).
+* Standard Python libraries: `os`, `logging`, `datetime`, `json`, `uuid`.
+
+**1. `IngestionAgent` Class (`ingestion_agent.py`):**
+
+* **`__init__(self, context_store: ContextStore, watch_folder: str, holding_folder: str)`:**
+    * `context_store`: An initialized instance of the `ContextStore`.
+    * `watch_folder`: The path to the directory this agent will monitor for new files.
+    * `holding_folder`: The path to a directory where unprocessable/problematic files will be moved.
+    * Initialize a logger instance for logging agent activities.
+    * Define the `agent_id` for this agent (e.g., `"ingestion_agent_v1.0"`).
+
+* **Schema Update for `ContextStore` (Informational for Agent - this should already be in `context_store.py`'s schema but good to be aware of):**
+    * Ensure the `documents` table in `context_store.py` can store an `ocr_confidence_percent` (REAL, nullable). The extracted text should go into `documents.extracted_text`.
+        * *Self-correction from prior instruction: The `ContextStore` instruction set already included fields in `documents` for `extracted_text`, `ingestion_status`, etc. The main new consideration if not already there is a dedicated numeric OCR confidence field.*
+        *(Agent: Please ensure your interaction with `ContextStore` aligns with its defined methods for updating document fields. If `ocr_confidence_percent` isn't a direct field in `documents` table from the `ContextStore` implementation, save it via `save_agent_output` or we can refine this. For now, assume you will update `extracted_text` and a hypothetical `ocr_confidence_percent` field in the `documents` table directly via `update_document_fields`.)*
+
+* **`process_pending_documents(self, session_id: Optional[str] = None, patient_id: Optional[str] = None, user_id: str = "ingestion_agent_mvp_user")`:**
+    * This will be the main method to scan the `watch_folder` and process files.
+    * For MVP, this method can perform a single scan of the `watch_folder`. (A continuous watch loop is a future enhancement).
+    * For each file found in `watch_folder`:
+        1.  **Check if Already Processed:** Query `ContextStore` (e.g., `get_document_by_original_path(original_path)`) to see if a document with this exact original path from the watchfolder and a status of "ingestion\_successful" or "ingestion\_failed" already exists. If so, log and skip to avoid reprocessing. (This requires adding `original_watchfolder_path` to the `documents` table schema in `ContextStore` and a method to query by it, or using `file_name` and `upload_timestamp` as a heuristic if paths can change).
+            * **Alternative for MVP (Simpler):** To avoid reprocessing, after an attempt (success or fail), append the filename to a simple temporary list or set for the current run of `process_pending_documents`. This is less robust than DB checking but simpler for MVP's single scan. Let's proceed with this simpler approach for now: process each file found on a given scan. If `run_mvp.py` calls this multiple times, it might re-process. The `tagger_agent` will eventually move the file.
+        2.  **Initial Record:** Get `file_path = os.path.join(self.watch_folder, filename)`. Create an initial document record in `ContextStore` using `context_store.add_document()` with:
+            * `file_name`: `filename`
+            * `original_file_type`: Determined from file extension (e.g., 'pdf', 'docx', 'txt', 'png', 'jpg', 'tiff').
+            * `ingestion_status`: `"pending_ingestion"`
+            * `processing_status`: `"new"`
+            * `patient_id` (if provided to method)
+            * `session_id` (if provided to method)
+            * Include `original_watchfolder_path`: `file_path` (This is important. Agent, please ensure `context_store.py`'s `documents` table can store this, and `add_document` can accept it).
+            * Store the returned `document_id`.
+        3.  **Audit Log:** Call `context_store.add_audit_log_entry()` indicating processing has started for this file/`document_id`.
+        4.  **Text Extraction (Call a private helper method `_extract_text_from_file(self, file_path: str, file_type: str) -> Tuple[Optional[str], Optional[float]]`):**
+            * This helper method will contain the logic to call the appropriate library based on `file_type`.
+            * It should return `(extracted_text_string, confidence_float_0_to_100)`.
+        5.  **Handle Extraction Result:**
+            * **If text extraction is successful (text is not None):**
+                * Data to update: `extracted_text`, `ocr_confidence_percent` (if applicable, else 100.0 for direct), `ingestion_status="ingestion_successful"`.
+                * Call `context_store.update_document_fields(document_id, update_data)`.
+                * Log successful ingestion to audit log.
+                * *(MVP Simplification: File is NOT moved by this agent. It remains in watchfolder. The `tagger_agent` will handle final move based on its `original_watchfolder_path`)*.
+            * **If text extraction fails (text is None or an exception occurs):**
+                * Log the error clearly (including filename and exception if any).
+                * Call `context_store.update_document_fields(document_id, {"ingestion_status": "ingestion_failed"})`.
+                * Move the problematic file from `file_path` to `os.path.join(self.holding_folder, filename)`. Ensure the holding folder exists.
+                * Log failed ingestion to audit log.
+
+* **`_extract_text_from_file(self, file_path: str, file_type: str) -> Tuple[Optional[str], Optional[float]]` (Private Helper Method):**
+    * This method implements the core extraction logic:
+        * **If `file_type` is 'pdf':**
+            1.  Try `PyMuPDF` (Fitz) to extract text directly. If successful and text is substantial, return `(text, 100.0)`.
+            2.  If PyMuPDF yields little/no text, use `pytesseract` for OCR. This might involve converting PDF pages to images first (PyMuPDF can also do this: `page.get_pixmap()`). Aggregate text from all pages. `pytesseract.image_to_data` can provide confidence scores per word/line/block; calculate an average confidence for the document (0-100). Return `(ocr_text, average_ocr_confidence)`.
+            3.  Handle potential exceptions during PDF processing.
+        * **If `file_type` is 'docx':**
+            1.  Use `python-docx` to extract all text. Return `(text, 100.0)`.
+            2.  Handle potential exceptions.
+        * **If `file_type` is 'txt':**
+            1.  Read text using standard Python file I/O. Return `(text, 100.0)`.
+            2.  Handle potential exceptions (e.g., encoding issues if not UTF-8, try common encodings).
+        * **If `file_type` is an image type (e.g., 'png', 'jpg', 'jpeg', 'tiff', 'bmp'):**
+            1.  Use `pytesseract.image_to_string()` or `image_to_data` to get text and confidence. Calculate average confidence (0-100). Return `(ocr_text, average_ocr_confidence)`.
+            2.  Handle potential exceptions.
+        * **If `file_type` is unsupported:** Log a warning, return `(None, None)`.
+        * If any step fails irrecoverably, return `(None, None)`.
+
+**2. Unit Tests (`tests/test_ingestion_agent.py`):**
+    * Use Python's `unittest` module (or `pytest`).
+    * **Mocking:**
+        * Mock the `ContextStore` object to verify interactions (e.g., check that `add_document`, `update_document_fields`, `add_audit_log_entry` are called with expected arguments). Use `unittest.mock.MagicMock`.
+        * Mock external libraries (`pytesseract`, `fitz` (PyMuPDF), `docx`) to simulate their behavior (e.g., return predefined text, raise exceptions) without actually performing OCR or file parsing. This makes tests fast and reliable.
+    * **Test File Setup:**
+        * In your test setup (e.g., `setUp` method or fixtures), create temporary mock document files with simple, predictable content for each supported type:
+            * A simple text-based PDF.
+            * A mock image-based PDF (can be a simple image file renamed to .pdf for the purpose of routing to OCR, or mock the Fitz part to return no text).
+            * A simple DOCX file.
+            * A simple TXT file.
+            * A simple image file (e.g., PNG).
+        * Ensure these files are created in a temporary `test_watch_folder` and cleaned up afterwards. Also create temporary `test_holding_folder`.
+    * **Test Scenarios:**
+        1.  Test successful processing for each file type:
+            * Verify correct text is "extracted" (based on mock library outputs).
+            * Verify correct confidence is determined.
+            * Verify `ContextStore.add_document` and `ContextStore.update_document_fields` are called with correct data (especially `extracted_text`, `ocr_confidence_percent`, `ingestion_status="ingestion_successful"`).
+            * Verify `ContextStore.add_audit_log_entry` is called appropriately.
+            * Verify the file is *not* moved from the watchfolder by this agent.
+        2.  Test handling of an unprocessable/corrupted file (e.g., mock an extraction library to raise an exception):
+            * Verify `ContextStore.update_document_fields` is called with `ingestion_status="ingestion_failed"`.
+            * Verify the problematic file is moved to the `test_holding_folder`.
+            * Verify appropriate audit log entries.
+        3.  Test handling of an unsupported file type.
+            * Verify it's logged, status is set to "ingestion_failed", and file moved to holding folder.
+
+**3. Documentation:**
+    * The `IngestionAgent` class and all its public methods (especially `process_pending_documents`) must have clear, concise docstrings explaining their purpose, arguments, and any side effects (like interacting with `ContextStore` or moving files).
+    * Include inline comments for complex logic, especially within `_extract_text_from_file`.
+
+**General Guidelines for the Agent:**
+* Ensure installation of `PyMuPDF`, `python-docx`, `pytesseract` if not already handled.
+* Structure the code cleanly.
+* Handle file paths robustly using `os.path`.
+* Implement basic logging for the agent's activities and errors.
+
+---
+
+This instruction set is detailed to guide the Replit Agent in building the `ingestion_agent.py`. Please provide this to the agent. After it generates the code, we will follow our review, test, and checkpoint process.

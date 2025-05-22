@@ -90,9 +90,11 @@ class ContextStore:
                 session_id TEXT,
                 file_name TEXT,
                 original_file_type TEXT,
+                original_watchfolder_path TEXT,
                 upload_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                 ingestion_status TEXT,
                 extracted_text TEXT,
+                ocr_confidence_percent REAL,
                 document_type TEXT,
                 classification_confidence TEXT,
                 processing_status TEXT,
@@ -699,7 +701,7 @@ class ContextStore:
         resource_id: Optional[str] = None,
         details: Optional[str] = None,
         source_ip: str = "localhost"
-    ) -> int:
+    ) -> Optional[int]:
         """
         Add an entry to the audit log.
         
@@ -732,7 +734,9 @@ class ContextStore:
                 resource_id, details, source_ip)
             )
             self.conn.commit()
-            return cursor.lastrowid
+            if cursor.lastrowid:
+                return cursor.lastrowid
+            return None
         except sqlite3.Error as e:
             self.conn.rollback()
             raise e
