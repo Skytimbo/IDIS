@@ -7,6 +7,9 @@ demo_idis.db
 # Output Files / Generated Documents
 *.pdf
 
+# Python Virtual Environment
+venv/
+
 # Python bytecode
 __pycache__/
 *.pyc
