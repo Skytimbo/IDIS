@@ -161,7 +161,7 @@ class TestEndToEndPipeline(unittest.TestCase):
             self.assertIn(doc_id, summary_doc_ids, f"No summary found for document {doc_id}")
         
         # Verify audit log entries
-        cursor.execute("SELECT * FROM audit_log")
+        cursor.execute("SELECT * FROM audit_trail")
         audit_entries = cursor.fetchall()
         self.assertGreaterEqual(len(audit_entries), 5, "Too few audit log entries")
         
