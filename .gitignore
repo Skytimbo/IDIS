@@ -13,6 +13,9 @@ __pycache__/
 *.pyo
 *.pyd
 
+# Replit specific or temporary asset folders
+attached_assets/
+
 # OS-specific files
 .DS_Store
 Thumbs.db

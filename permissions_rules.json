@@ -1,0 +1,44 @@
+{
+  "roles": {
+    "admin": {
+      "description": "Full access to all system functions and data.",
+      "permissions": [
+        {"action": "read", "resource_privacy": ["Highly Confidential", "Confidential", "General"]},
+        {"action": "write", "resource_privacy": ["Highly Confidential", "Confidential", "General"]},
+        {"action": "delete", "resource_privacy": ["Highly Confidential", "Confidential", "General"]},
+        {"action": "classify", "resource_privacy": ["Highly Confidential", "Confidential", "General"]},
+        {"action": "summarize", "resource_privacy": ["Highly Confidential", "Confidential", "General"]},
+        {"action": "tag_file", "resource_privacy": ["Highly Confidential", "Confidential", "General"]}
+      ]
+    },
+    "editor": {
+      "description": "Can read and write general and confidential data, but not highly confidential. Cannot delete.",
+      "permissions": [
+        {"action": "read", "resource_privacy": ["Confidential", "General"]},
+        {"action": "write", "resource_privacy": ["Confidential", "General"]},
+        {"action": "classify", "resource_privacy": ["Confidential", "General"]},
+        {"action": "summarize", "resource_privacy": ["Confidential", "General"]},
+        {"action": "tag_file", "resource_privacy": ["Confidential", "General"]}
+      ]
+    },
+    "viewer": {
+      "description": "Can only read data with general privacy level.",
+      "permissions": [
+        {"action": "read", "resource_privacy": ["General"]}
+      ]
+    }
+  },
+  "privacy_levels": [
+    "Highly Confidential",
+    "Confidential",
+    "General"
+  ],
+  "actions": [
+    "read",
+    "write",
+    "delete",
+    "classify",
+    "summarize",
+    "tag_file"
+  ]
+}
