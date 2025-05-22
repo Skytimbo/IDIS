@@ -1,0 +1,121 @@
+That's great to hear your excitement! The `tagger_agent.py` is indeed a very interesting module as it starts to bring more structured metadata out of the raw text and also handles the physical organization of the documents.
+
+Based on Task 1.6 and all our discussions, let's get the detailed "Instruction Set" ready for the Replit Agent.
+
+---
+
+## Replit Agent Instruction Set: `tagger_agent.py` (IDIS Phase 1 MVP)
+
+**Objective:**
+Create the `tagger_agent.py` module. This agent will:
+1.  Fetch documents that have been summarized from the `ContextStore`.
+2.  Extract key entities from their `extracted_text`:
+    * Various relevant dates and their context (e.g., "invoice_date", "due_date", "letter_date").
+    * Issuer/Source of the document.
+    * Recipient of the document.
+    * Predefined status-like tags (e.g., "urgent", "confidential").
+3.  Update the document's record in the `ContextStore` with this new metadata.
+4.  Physically move the original document file from its location in the watchfolder (as recorded in `original_watchfolder_path`) to a structured archive directory.
+5.  Update the document's `processing_status` to "filed".
+
+**Files to Create:**
+1.  `tagger_agent.py`: Contains the `TaggerAgent` class and its logic.
+2.  `tests/test_tagger_agent.py`: Contains unit tests for the `TaggerAgent`.
+
+**Key Dependencies for `tagger_agent.py`:**
+* The `ContextStore` class from `context_store.py`.
+* Standard Python libraries: `os`, `shutil` (for file moving), `re` (for regular expressions), `logging`, `json`, `datetime`.
+
+**1. `TaggerAgent` Class (`tagger_agent.py`):**
+
+* Import necessary libraries and `ContextStore`.
+* Initialize logging.
+
+* **`__init__(self, context_store: ContextStore, base_filed_folder: str, tag_definitions: Optional[Dict[str, List[str]]] = None)`:**
+    * `context_store`: An initialized instance of the `ContextStore`.
+    * `base_filed_folder`: The root directory where processed files will be archived (e.g., "idis\_archived\_documents").
+    * `tag_definitions`: A dictionary for predefined status-like tags.
+        * Keys are the tag names (e.g., "urgent").
+        * Values are lists of case-insensitive keywords/phrases that trigger the tag.
+        * Example: `{"urgent": ["urgent", "immediate action"], "confidential": ["confidential", "private only"]}`. If `None`, no predefined tag extraction will occur.
+    * Initialize `self.logger` and `self.agent_id = "tagger_agent_v1.0"`.
+    * Store `base_filed_folder`.
+    * Pre-compile regex patterns from `tag_definitions` for efficient, case-insensitive matching if `tag_definitions` are provided.
+
+* **`process_documents_for_tagging_and_filing(self, user_id: str = "tagger_agent_mvp_user", status_to_process: str = "summarized", new_status_after_filing: str = "filed") -> Tuple[int, int]`:**
+    * Returns `(successfully_processed_count, failed_count)`.
+    * Log the start of the batch run.
+    * Fetch documents from `ContextStore` using `context_store.get_documents_by_processing_status(processing_status=status_to_process)`.
+    * Loop through each document:
+        1.  Get `document_id`, `extracted_text`, `original_watchfolder_path`, `patient_id` (if any), `file_name`.
+        2.  If `extracted_text` is empty/None, log a warning, potentially update status to "tagging_skipped\_no\_text", increment `failed_count`, add audit log, and continue.
+        3.  **Extract Entities (call helper methods):**
+            * `extracted_dates_dict = self._extract_dates(extracted_text)` (should return a dict like `{"invoice_date": "YYYY-MM-DD", "letter_date": "YYYY-MM-DD"}`).
+            * `issuer = self._extract_issuer(extracted_text)` (returns str or None).
+            * `recipient = self._extract_recipient(extracted_text)` (returns str or None).
+            * `active_tags = self._extract_predefined_tags(extracted_text)` (returns list of strings).
+        4.  **Determine Final `filed_path`:**
+            * Use `self.base_filed_folder`, `patient_id` (use "unassigned\_patient" or "general\_documents" if `patient_id` is None), a primary date (e.g., the earliest relevant date from `extracted_dates_dict`, or current year/month if no date found), `document_id`, and `file_name` to construct the path. Example: `/<base_filed_folder>/patients/<patient_id>/<year>/<month>/<document_id>_<file_name>` or `/<base_filed_folder>/general_documents/<year>/<month>/<document_id>_<file_name>`. Ensure target directory structure is created (`os.makedirs(..., exist_ok=True)`).
+        5.  **Move File:**
+            * `try...except` block for file operation.
+            * If `original_watchfolder_path` exists and is a file: `shutil.move(original_watchfolder_path, new_filed_path)`.
+            * If move fails: Log critical error, set `filing_successful = False`. For MVP, we might still update metadata but leave status as is or set an error status. Let's aim to update metadata but set `processing_status` to "filing\_error".
+            * If move succeeds: `filing_successful = True`.
+        6.  **Update Context Store:**
+            * Prepare `update_data` dictionary:
+                * `document_dates = json.dumps(extracted_dates_dict)` (if dates found)
+                * `issuer_source = issuer` (if found)
+                * `recipient = recipient` (if found)
+                * `tags_extracted = json.dumps(active_tags)` (if tags found)
+                * If `filing_successful`:
+                    * `filed_path = new_filed_path`
+                    * `processing_status = new_status_after_filing`
+                * Else (filing failed):
+                    * `processing_status = "filing_error"` (and `filed_path` is not updated or set to None).
+            * Call `context_store.update_document_fields(document_id, update_data)`.
+        7.  **Audit Log:** Add entry for tagging and filing attempt (success/failure).
+        8.  Increment `successfully_processed_count` or `failed_count`.
+    * Log completion of the batch run.
+    * Return counts.
+
+* **Helper Methods for Extraction (Private):**
+    * **`_extract_dates(self, text: str) -> Dict[str, str]`:**
+        * Use `re` to find dates (e.g., YYYY-MM-DD, MM/DD/YYYY, Month D, YYYY).
+        * Try to identify context (e.g., "Invoice Date:", "Date:", "Due:"). For MVP, even just finding any date is a start. Normalize to "YYYY-MM-DD".
+        * Return a dictionary (e.g., `{"doc_date_1": "2023-01-15", "due_date": "2023-02-01"}`).
+    * **`_extract_issuer(self, text: str) -> Optional[str]`:**
+        * For MVP, use simple regex/keyword patterns (e.g., "From:", "Issued by:", or look for common company name suffixes near top of document if possible, but keep simple).
+    * **`_extract_recipient(self, text: str) -> Optional[str]`:**
+        * For MVP, use simple regex/keyword patterns (e.g., "To:", "Bill To:", "Dear [Name]").
+    * **`_extract_predefined_tags(self, text: str) -> List[str]`:**
+        * Iterate through `self.compiled_rules` (from `tag_definitions`). If a keyword matches, add the tag name to a list. Return unique tags found.
+
+**2. Unit Tests (`tests/test_tagger_agent.py`):**
+
+* Use `unittest` and `unittest.mock.MagicMock / patch`.
+* **Mocking:** Mock `ContextStore`. Mock `os`, `shutil` (especially `shutil.move`, `os.path.exists`, `os.makedirs`).
+* **Test Setup:**
+    * Provide sample `tag_definitions`.
+    * Sample `extracted_text` strings with known entities (dates, potential issuers/recipients, predefined tag keywords).
+    * Mock return values for `context_store.get_documents_by_processing_status()`.
+* **Test Scenarios:**
+    1.  Test successful extraction of different date formats and contexts.
+    2.  Test successful (simple) extraction of issuer/source.
+    3.  Test successful (simple) extraction of recipient.
+    4.  Test identification of predefined tags (e.g., "urgent").
+    5.  Test correct construction of `filed_path` (with and without `patient_id`).
+    6.  Verify `shutil.move` is called with correct source/destination paths, and `os.makedirs` is called.
+    7.  Verify `ContextStore.update_document_fields` is called with all extracted metadata (JSON for dates/tags) and correct `filed_path` and `processing_status="filed"`.
+    8.  Test error handling if `original_watchfolder_path` doesn't exist or `shutil.move` fails (check for "filing\_error" status).
+    9.  Verify audit log calls.
+
+**3. Documentation:**
+* `TaggerAgent` class and public methods require clear docstrings. Inline comments for complex logic.
+
+**General Guidelines:**
+* Keep MVP extraction logic for issuer/recipient simple (keyword/regex based). Advanced NER (like spaCy) is a future enhancement.
+* Ensure robust error handling for file operations.
+* Make file path construction safe using `os.path.join`.
+
+---
+This instruction set for the `tagger_agent.py` is quite detailed due to its dual responsibilities of entity extraction and file system operations. After the agent generates the code, we'll proceed with our usual review, test, and checkpoint process.
