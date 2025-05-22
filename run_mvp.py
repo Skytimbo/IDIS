@@ -335,7 +335,7 @@ def run_pipeline(config: Dict[str, Any], keep_temp_files: bool = False) -> Dict[
     logger.info("Starting document classification...")
     classification_results = classifier_agent.process_documents_for_classification(
         user_id=default_user,
-        status_to_classify="ingestion_successful",
+        status_to_classify="ingested",
         new_status_after_classification="classified"
     )
     logger.info(f"Classification complete: {classification_results[0]} succeeded, {classification_results[1]} failed")

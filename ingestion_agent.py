@@ -150,7 +150,8 @@ class IngestionAgent:
                     update_data = {
                         'extracted_text': extracted_text,
                         'ocr_confidence_percent': confidence,
-                        'ingestion_status': 'ingestion_successful'
+                        'ingestion_status': 'ingestion_successful',
+                        'processing_status': 'ingested'
                     }
                     
                     self.context_store.update_document_fields(document_id, update_data)

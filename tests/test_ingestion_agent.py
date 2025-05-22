@@ -99,7 +99,8 @@ class TestIngestionAgent(unittest.TestCase):
             {
                 'extracted_text': "Extracted text content",
                 'ocr_confidence_percent': 100.0,
-                'ingestion_status': 'ingestion_successful'
+                'ingestion_status': 'ingestion_successful',
+                'processing_status': 'ingested'
             }
         )
         self.mock_context_store.add_audit_log_entry.assert_called()
