@@ -1,0 +1,173 @@
+Okay, let's forge ahead with the **`summarizer_agent.py`**!
+
+This agent will bring in the power of Large Language Models (LLMs) to create concise summaries for the documents processed by our IDIS system. For the Phase 1 MVP demo, it will use the OpenAI GPT-4o API.
+
+Here is the detailed "Instruction Set" for **Task 1.5: Create Summarizer Agent**. Please provide this to your Replit Agent.
+
+---
+
+## Replit Agent Instruction Set: `summarizer_agent.py` (IDIS Phase 1 MVP)
+
+**Objective:**
+Create the `summarizer_agent.py` module. This agent will:
+1.  Fetch documents that have been classified from the `ContextStore`.
+2.  For each document, call the OpenAI GPT-4o API to generate a brief, neutral, fact-based per-document summary.
+3.  Generate a batch-level summary for the set of documents processed in a run if a `session_id` is provided.
+4.  Save these summaries and a confidence metric (reflecting API call success) back to the `ContextStore`.
+5.  Update document processing status.
+
+**Files to Create/Modify:**
+
+1.  **`summarizer_agent.py` (New):** Contains the `SummarizerAgent` class and its logic.
+2.  **`tests/test_summarizer_agent.py` (New):** Contains unit tests for the `SummarizerAgent`.
+3.  **`context_store.py` (Modify):** Add a new method to update session metadata (for batch summaries).
+4.  **`tests/test_context_store.py` (Modify):** Add tests for the new method in `ContextStore`.
+
+**Key Dependencies for `summarizer_agent.py`:**
+* The `ContextStore` class from `context_store.py`.
+* The `openai` Python library (for interacting with the OpenAI API).
+* Standard Python libraries: `os` (for API key), `logging`, `json`.
+
+**Part 1: Update `ContextStore` (`context_store.py` and `tests/test_context_store.py`)**
+
+The `SummarizerAgent` will need to store batch-level summaries, ideally associated with a session.
+
+1.  **Modify `context_store.py`:**
+    * Add a new public method to the `ContextStore` class:
+      ```python
+      # ... inside ContextStore class ...
+
+      def update_session_metadata(self, session_id: str, metadata_update: Dict[str, Any]) -> bool:
+          """
+          Updates the JSON metadata for a given session.
+          Fetches existing metadata, updates it with new key-value pairs, and saves it back.
+
+          Args:
+              session_id: The ID of the session to update.
+              metadata_update: A dictionary containing the key-value pairs to add or update.
+
+          Returns:
+              bool: True if successful, False otherwise.
+          """
+          try:
+              session_data = self.get_session(session_id) # Existing method
+              if not session_data:
+                  return False # Session not found
+
+              current_metadata = session_data.get('session_metadata')
+              if current_metadata is None: # It might be None if not parsed by get_session, or if initially null
+                  current_metadata = {}
+              elif isinstance(current_metadata, str): # If get_session returned raw JSON string
+                  current_metadata = json.loads(current_metadata)
+              
+              current_metadata.update(metadata_update)
+              
+              cursor = self.conn.cursor()
+              cursor.execute(
+                  "UPDATE sessions SET session_metadata = ? WHERE session_id = ?",
+                  (json.dumps(current_metadata), session_id)
+              )
+              self.conn.commit()
+              return cursor.rowcount > 0
+          except (sqlite3.Error, json.JSONDecodeError) as e:
+              # self.logger.error(f"Error updating session metadata for {session_id}: {e}") # if logger is available
+              self.conn.rollback()
+              raise e # Or handle more gracefully
+      ```
+2.  **Modify `tests/test_context_store.py`:**
+    * Add new unit tests for the `update_session_metadata` method.
+    * Test scenarios:
+        * Adding new metadata to a session that has no prior metadata.
+        * Updating existing keys in a session's metadata.
+        * Adding new keys to existing session metadata.
+        * Handling a non-existent `session_id`.
+
+**Part 2: Implement `SummarizerAgent` Class (`summarizer_agent.py`)**
+
+* Import necessary libraries (`logging`, `os`, `openai`, `ContextStore`, etc.).
+* Initialize logging.
+
+* **`__init__(self, context_store: ContextStore, openai_api_key: Optional[str] = None)`:**
+    * `context_store`: An initialized instance of the `ContextStore`.
+    * `openai_api_key`: The OpenAI API key. If not provided, it should attempt to read from an environment variable `OPENAI_API_KEY` (e.g., `os.environ.get("OPENAI_API_KEY")`). If still not found, log an error and raise an exception or set a flag indicating it cannot operate.
+    * Initialize `self.logger` and `self.agent_id = "summarizer_agent_v1.0"`.
+    * Initialize the OpenAI client: `self.openai_client = openai.OpenAI(api_key=self.api_key)`.
+
+* **`summarize_classified_documents(self, session_id: Optional[str] = None, user_id: str = "summarizer_agent_mvp_user", status_to_summarize: str = "classified", new_status_after_summarization: str = "summarized") -> Tuple[int, int]`:**
+    * Returns a tuple: `(successfully_summarized_doc_count, batch_summary_generated_bool_as_int)`.
+    * Log the start of the summarization batch run.
+    * Fetch documents needing summarization from `ContextStore` using `context_store.get_documents_by_processing_status(processing_status=status_to_summarize)`.
+    * Initialize `successfully_summarized_doc_count = 0`.
+    * `per_doc_summaries_for_batch = []` (to collect for batch summary).
+    * Loop through each document:
+        1.  Get `document_id`, `extracted_text`, `file_name`.
+        2.  If `extracted_text` is empty/None:
+            * Log this.
+            * Call `context_store.update_document_fields(document_id, {"processing_status": "summarization_skipped_no_text"})`.
+            * Add audit log.
+            * Continue to next document.
+        3.  **Per-Document Summary:**
+            * **Prompt:** Create a prompt. For MVP: `f"Summarize the following document text in 2-3 neutral, fact-based sentences:\n\n---\n{extracted_text[:4000]}\n---"` (Truncate `extracted_text` if very long to manage token limits).
+            * **API Call:**
+                * `try...except` block for the API call.
+                * Call `self.openai_client.chat.completions.create(model="gpt-4o", messages=[{"role": "user", "content": prompt_text}], temperature=0.3, max_tokens=150)`.
+                * Extract summary text (e.g., `response.choices[0].message.content.strip()`).
+                * `api_call_confidence = 1.0` (for success) or `0.0` (for failure).
+            * **Save Output:** Call `context_store.save_agent_output()` with `document_id`, `self.agent_id`, `output_type="per_document_summary"`, `output_data=summary_text`, `confidence=api_call_confidence`.
+            * `per_doc_summaries_for_batch.append(summary_text)` if successful.
+            * Update `processing_status` in `ContextStore` to `new_status_after_summarization` if API call was successful.
+            * Add audit log entry for per-document summarization success/failure.
+            * If successful, increment `successfully_summarized_doc_count`.
+    * **Batch-Level Summary (if `session_id` and `per_doc_summaries_for_batch` are present):**
+        1.  Collect context for batch: list of doc types in batch, date range, patient ID(s) if available (can be fetched from `ContextStore` for the processed documents).
+        2.  **Prompt:** Create a prompt. MVP: `f"Provide a brief (1-2 sentence) neutral, fact-based overview of a batch of documents. The batch includes: {len(per_doc_summaries_for_batch)} documents, with types like [list dominant types]. The content is generally about: {'; '.join(per_doc_summaries_for_batch)[:1000]}"`.
+        3.  **API Call:** Similar `try...except` as per-document summary.
+        4.  If successful:
+            * `batch_summary_text = response.choices[0].message.content.strip()`.
+            * Call `context_store.update_session_metadata(session_id, {"batch_summary": batch_summary_text, "batch_summary_agent_id": self.agent_id})`.
+            * `batch_summary_generated_bool_as_int = 1`.
+            * Add audit log entry for batch summary generation.
+        5.  If fails, `batch_summary_generated_bool_as_int = 0`.
+    * Log completion of the batch run.
+    * Return `(successfully_summarized_doc_count, batch_summary_generated_bool_as_int)`.
+
+**Part 3: Unit Tests (`tests/test_summarizer_agent.py`)**
+
+* Use `unittest` and `unittest.mock.MagicMock / patch`.
+* **Mocking:**
+    * Mock `ContextStore` completely.
+    * **Mock the `openai.OpenAI` client and its `chat.completions.create` method.** This is critical. The mock should allow simulating successful responses (returning a mock Choice and Message object with a `content` attribute) and API errors (raising exceptions).
+* **Test Setup:**
+    * Provide a dummy API key (it won't be used if OpenAI client is mocked).
+    * Prepare mock document data to be returned by `mock_context_store.get_documents_by_processing_status()`.
+* **Test Scenarios:**
+    1.  Test successful per-document summary:
+        * Verify correct prompt construction.
+        * Verify `openai_client.chat.completions.create` is called with correct model and messages.
+        * Verify `context_store.save_agent_output` is called with correct summary text and confidence 1.0.
+        * Verify `context_store.update_document_fields` updates `processing_status`.
+        * Verify audit log entry.
+    2.  Test successful batch summary generation (if `session_id` is provided):
+        * Verify prompt construction.
+        * Verify API call.
+        * Verify `context_store.update_session_metadata` is called with the batch summary.
+    3.  Test handling of OpenAI API error during per-document summary:
+        * Mock API call to raise an exception.
+        * Verify error is logged.
+        * Verify `save_agent_output` is called with confidence 0.0 (or not called, and status not updated to "summarized").
+        * Verify agent continues to process other documents if applicable.
+    4.  Test handling of document with no `extracted_text`:
+        * Verify it's skipped, status updated to "summarization_skipped\_no\_text", and audit log entry made.
+    5.  Test API key handling (e.g., if API key is missing, `__init__` should raise an error or log appropriately).
+
+**Part 4: Documentation**
+* `SummarizerAgent` class and public methods need clear docstrings (purpose, args, returns).
+* Inline comments for key logic, especially around prompt construction and API interaction.
+
+**General Guidelines:**
+* Ensure robust error handling around API calls.
+* Manage API key securely (read from environment/Replit Secret).
+* Be mindful of API call costs/rate limits in design (though for MVP, direct calls are fine).
+
+---
+This instruction set should guide the Replit Agent for the `summarizer_agent.py`. After it generates the code, we will proceed with our review, test, and checkpoint process.

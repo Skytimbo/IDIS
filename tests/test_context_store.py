@@ -169,6 +169,45 @@ class TestContextStore(unittest.TestCase):
         # Retrieve the session to verify the update
         session = self.context_store.get_session(session_id)
         self.assertEqual(session["status"], "completed")
+        
+    def test_update_session_metadata(self):
+        """Test updating a session's metadata."""
+        # Create a session
+        session_id = self.create_test_session()
+        
+        # Test adding new metadata to a session with existing metadata
+        metadata_update = {'batch_summary': 'This is a test batch summary'}
+        result = self.context_store.update_session_metadata(session_id, metadata_update)
+        self.assertTrue(result)
+        
+        # Verify the update
+        session = self.context_store.get_session(session_id)
+        self.assertIn('batch_summary', session['session_metadata'])
+        self.assertEqual(session['session_metadata']['batch_summary'], 'This is a test batch summary')
+        
+        # Test updating existing keys in session metadata
+        metadata_update = {'batch_summary': 'Updated batch summary'}
+        result = self.context_store.update_session_metadata(session_id, metadata_update)
+        self.assertTrue(result)
+        
+        # Verify the update
+        session = self.context_store.get_session(session_id)
+        self.assertEqual(session['session_metadata']['batch_summary'], 'Updated batch summary')
+        
+        # Test adding new keys to existing session metadata
+        metadata_update = {'processed_by': 'summarizer_agent_v1.0'}
+        result = self.context_store.update_session_metadata(session_id, metadata_update)
+        self.assertTrue(result)
+        
+        # Verify the update
+        session = self.context_store.get_session(session_id)
+        self.assertIn('batch_summary', session['session_metadata'])
+        self.assertIn('processed_by', session['session_metadata'])
+        self.assertEqual(session['session_metadata']['processed_by'], 'summarizer_agent_v1.0')
+        
+        # Test handling a non-existent session_id
+        result = self.context_store.update_session_metadata('nonexistent_session', metadata_update)
+        self.assertFalse(result)
     
     # Document Tests
     

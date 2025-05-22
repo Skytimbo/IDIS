@@ -394,6 +394,50 @@ class ContextStore:
         except sqlite3.Error as e:
             self.conn.rollback()
             raise e
+            
+    def update_session_metadata(self, session_id: str, metadata_update: Dict[str, Any]) -> bool:
+        """
+        Updates the JSON metadata for a given session.
+        Fetches existing metadata, updates it with new key-value pairs, and saves it back.
+
+        Args:
+            session_id: The ID of the session to update.
+            metadata_update: A dictionary containing the key-value pairs to add or update.
+
+        Returns:
+            bool: True if successful, False otherwise.
+            
+        Raises:
+            sqlite3.Error: If there's a database error
+            json.JSONDecodeError: If there's an error parsing JSON
+        """
+        try:
+            session_data = self.get_session(session_id)
+            if not session_data:
+                return False  # Session not found
+
+            current_metadata = session_data.get('session_metadata')
+            if current_metadata is None:  # It might be None if not parsed by get_session, or if initially null
+                current_metadata = {}
+            elif isinstance(current_metadata, str):  # If get_session returned raw JSON string
+                current_metadata = json.loads(current_metadata)
+            
+            current_metadata.update(metadata_update)
+            
+            cursor = self.conn.cursor()
+            cursor.execute(
+                '''
+                UPDATE sessions
+                SET session_metadata = ?
+                WHERE session_id = ?
+                ''',
+                (json.dumps(current_metadata), session_id)
+            )
+            self.conn.commit()
+            return cursor.rowcount > 0
+        except (sqlite3.Error, json.JSONDecodeError) as e:
+            self.conn.rollback()
+            raise e
     
     # Document Methods
     
