@@ -167,7 +167,8 @@ class TestSmartCoverSheetRenderer(unittest.TestCase):
     @patch("cover_sheet.HTML")
     @patch("markdown2.markdown")
     @patch("os.makedirs")
-    def test_generate_cover_sheet_success(self, mock_makedirs, mock_markdown2, mock_html):
+    @patch("builtins.open", new_callable=mock_open)
+    def test_generate_cover_sheet_success(self, mock_file, mock_makedirs, mock_markdown2, mock_html):
         """
         Test successful generation of PDF cover sheet.
         """
@@ -198,21 +199,27 @@ class TestSmartCoverSheetRenderer(unittest.TestCase):
             # Verify method calls
             self.mock_context_store.get_document.assert_called_once_with("test_doc_id_1")
             self.mock_context_store.get_agent_outputs_for_document.assert_called_once()
-            # The makedirs call happens inside the patched _convert_markdown_to_pdf method
-            # so we don't verify it here
+            
+            # Verify that the Markdown file was opened for writing
+            mock_file.assert_called_with('/tmp/test_output.md', 'w')
+            
+            # Verify that write was called on the file
+            mock_file().write.assert_called()
             
             # Verify audit log entry was added
             self.mock_context_store.add_audit_log_entry.assert_called_once()
             _, kwargs = self.mock_context_store.add_audit_log_entry.call_args
             self.assertEqual(kwargs["event_name"], "COVER_SHEET_GENERATED")
             self.assertEqual(kwargs["status"], "SUCCESS")
+            self.assertTrue(json.loads(kwargs["details"])["markdown_saved"])
     
     @patch("cover_sheet.HTML")
     @patch("markdown2.markdown")
     @patch("os.makedirs")
-    def test_generate_cover_sheet_pdf_conversion_failure(self, mock_makedirs, mock_markdown2, mock_html):
+    @patch("builtins.open", new_callable=mock_open)
+    def test_generate_cover_sheet_pdf_conversion_failure(self, mock_file, mock_makedirs, mock_markdown2, mock_html):
         """
-        Test failed PDF conversion during cover sheet generation.
+        Test failed PDF conversion during cover sheet generation, but successful Markdown save.
         """
         # Set up mocks
         self.mock_context_store.get_document.return_value = self.single_document
@@ -237,11 +244,23 @@ class TestSmartCoverSheetRenderer(unittest.TestCase):
             # Verify the result
             self.assertFalse(result)
             
+            # Verify that the Markdown file was opened for writing
+            mock_file.assert_called_with('/tmp/test_output.md', 'w')
+            
+            # Verify that write was called on the file
+            mock_file().write.assert_called()
+            
             # Verify audit log entry for failure was added
             self.mock_context_store.add_audit_log_entry.assert_called_once()
             _, kwargs = self.mock_context_store.add_audit_log_entry.call_args
             self.assertEqual(kwargs["event_name"], "COVER_SHEET_GENERATED")
             self.assertEqual(kwargs["status"], "FAILURE")
+            
+            # Verify that the details include markdown_saved=True
+            details = json.loads(kwargs["details"])
+            self.assertTrue(details["markdown_saved"])
+            self.assertEqual(details["error"], "PDF generation failed")
+            self.assertEqual(details["markdown_path"], "/tmp/test_output.md")
     
     @patch("weasyprint.HTML")
     @patch("markdown2.markdown")

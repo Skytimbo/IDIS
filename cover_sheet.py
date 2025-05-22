@@ -60,7 +60,9 @@ class SmartCoverSheetRenderer:
             user_id: User ID for audit trail purposes
             
         Returns:
-            True if PDF generation was successful, False otherwise
+            True if PDF generation was successful, False otherwise.
+            Note: Even if PDF generation fails, the Markdown content will be saved
+            to a .md file with the same base name as the requested PDF.
         """
         self.logger.info(f"Starting cover sheet generation for {len(document_ids)} documents")
         
@@ -129,11 +131,32 @@ class SmartCoverSheetRenderer:
         # Generate markdown content
         markdown_content = self._build_markdown_content(documents_data, batch_summary_text)
         
-        # Convert markdown to PDF
-        success = self._convert_markdown_to_pdf(markdown_content, output_pdf_filename)
+        # Save the markdown content to a file
+        markdown_filename = output_pdf_filename.replace('.pdf', '.md')
+        markdown_saved = False
+        
+        try:
+            # Create output directory if it doesn't exist
+            output_dir = os.path.dirname(markdown_filename)
+            if output_dir:
+                os.makedirs(output_dir, exist_ok=True)
+                
+            # Write markdown content to file
+            with open(markdown_filename, 'w') as md_file:
+                md_file.write(markdown_content)
+            markdown_saved = True
+            self.logger.info(f"Successfully saved Markdown content to: {markdown_filename}")
+        except Exception as e:
+            self.logger.error(f"Failed to save Markdown content to {markdown_filename}: {e}")
+            # If Markdown saving fails, we should log but continue to attempt PDF generation
+        
+        # Attempt PDF conversion only if Markdown was successfully saved
+        pdf_success = False
+        if markdown_saved:
+            pdf_success = self._convert_markdown_to_pdf(markdown_content, output_pdf_filename)
         
         # Log result and create audit entry
-        if success:
+        if pdf_success:
             self.logger.info(f"Successfully generated cover sheet PDF: {output_pdf_filename}")
             self.context_store.add_audit_log_entry(
                 user_id=user_id,
@@ -144,25 +167,50 @@ class SmartCoverSheetRenderer:
                 resource_id=output_pdf_filename,
                 details=json.dumps({
                     "document_count": len(documents_data),
-                    "session_id": session_id
+                    "session_id": session_id,
+                    "markdown_saved": True
                 })
             )
             return True
         else:
-            self.logger.error(f"Failed to convert markdown to PDF: {output_pdf_filename}")
-            self.context_store.add_audit_log_entry(
-                user_id=user_id,
-                event_type="DOCUMENT_PROCESSING",
-                event_name="COVER_SHEET_GENERATED",
-                status="FAILURE",
-                resource_type="cover_sheet",
-                resource_id=output_pdf_filename,
-                details=json.dumps({
-                    "document_count": len(documents_data),
-                    "session_id": session_id,
-                    "error": "PDF generation failed"
-                })
-            )
+            # Different logging based on whether Markdown was saved
+            if markdown_saved:
+                self.logger.warning(
+                    f"Failed to convert to PDF: {output_pdf_filename}, but Markdown was saved to: {markdown_filename}"
+                )
+                # Audit trail with note about Markdown being saved
+                self.context_store.add_audit_log_entry(
+                    user_id=user_id,
+                    event_type="DOCUMENT_PROCESSING",
+                    event_name="COVER_SHEET_GENERATED",
+                    status="FAILURE",
+                    resource_type="cover_sheet",
+                    resource_id=output_pdf_filename,
+                    details=json.dumps({
+                        "document_count": len(documents_data),
+                        "session_id": session_id,
+                        "error": "PDF generation failed",
+                        "markdown_saved": True,
+                        "markdown_path": markdown_filename
+                    })
+                )
+            else:
+                # Both Markdown and PDF failed
+                self.logger.error(f"Failed to generate cover sheet: both Markdown and PDF generation failed")
+                self.context_store.add_audit_log_entry(
+                    user_id=user_id,
+                    event_type="DOCUMENT_PROCESSING",
+                    event_name="COVER_SHEET_GENERATED",
+                    status="FAILURE",
+                    resource_type="cover_sheet",
+                    resource_id=output_pdf_filename,
+                    details=json.dumps({
+                        "document_count": len(documents_data),
+                        "session_id": session_id,
+                        "error": "Both Markdown and PDF generation failed",
+                        "markdown_saved": False
+                    })
+                )
             return False
     
     def _build_markdown_content(
