@@ -743,6 +743,46 @@ class ContextStore:
     
     # Query Methods
     
+    def get_documents_by_processing_status(self, processing_status: str, limit: int = 100) -> List[Dict[str, Any]]:
+        """
+        Retrieve documents that match a specific processing_status.
+
+        Args:
+            processing_status: The processing status to filter by (e.g., "new", "ingested", "classified").
+            limit: Maximum number of documents to return.
+
+        Returns:
+            List[Dict[str, Any]]: A list of document dictionaries.
+                                 Each dictionary should contain at least 'document_id' and 'extracted_text'.
+                                 Include other relevant fields like 'file_name' for context if easy.
+        """
+        try:
+            cursor = self.conn.cursor()
+            # Select essential fields needed by agents for processing
+            cursor.execute(
+                """
+                SELECT document_id, extracted_text, file_name, patient_id, session_id,
+                       original_file_type, document_type, classification_confidence
+                FROM documents
+                WHERE processing_status = ?
+                ORDER BY upload_timestamp ASC
+                LIMIT ?
+                """,
+                (processing_status, limit)
+            )
+            rows = cursor.fetchall()
+            
+            # Convert rows to dictionaries and handle JSON fields
+            results = []
+            for row in rows:
+                result = dict(row)
+                results.append(result)
+                
+            return results
+        except sqlite3.Error as e:
+            # Log the error here
+            raise e
+    
     def query_patient_history(self, patient_id: str) -> List[Dict[str, Any]]:
         """
         Retrieve document history for a patient.

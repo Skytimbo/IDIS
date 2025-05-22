@@ -1,0 +1,159 @@
+Okay, let's rock and roll with the **`classifier_agent.py`**!
+
+This agent will take the text extracted by the `ingestion_agent.py` and try to determine what type of document it is using a keyword-based approach for our Phase 1 MVP.
+
+Here is the detailed "Instruction Set" for **Task 1.4: Develop Classifier Agent**. Please provide this to your Replit Agent.
+
+---
+
+## Replit Agent Instruction Set: `classifier_agent.py` (IDIS Phase 1 MVP)
+
+**Objective:**
+Create the `classifier_agent.py` module. This agent will retrieve documents pending classification from the `ContextStore`, apply a set of configurable keyword-based rules to their extracted text to determine a `document_type` and a `classification_confidence`, and then update the document's record in the `ContextStore`.
+
+**Files to Create/Modify:**
+
+1.  **`classifier_agent.py` (New):** Contains the `ClassifierAgent` class and its logic.
+2.  **`tests/test_classifier_agent.py` (New):** Contains unit tests for the `ClassifierAgent`.
+3.  **`context_store.py` (Modify):** Add a new method to fetch documents by processing status.
+4.  **`tests/test_context_store.py` (Modify):** Add tests for the new method in `ContextStore`.
+
+**Key Dependencies for `classifier_agent.py`:**
+* The `ContextStore` class from `context_store.py` (it will need an instance).
+* Standard Python libraries: `re` (for regular expressions, recommended for flexible keyword matching), `logging`, `json` (if rules were external, but for MVP rules are Python dict), `collections.defaultdict` (optional, for rule processing).
+
+**Part 1: Update `ContextStore` (`context_store.py` and `tests/test_context_store.py`)**
+
+The `ClassifierAgent` (and subsequent agents) will need a way to fetch documents based on their current processing status.
+
+1.  **Modify `context_store.py`:**
+    * Add a new public method to the `ContextStore` class:
+      ```python
+      from typing import List, Dict, Any # Ensure this is imported
+
+      # ... inside ContextStore class ...
+
+      def get_documents_by_processing_status(self, processing_status: str, limit: int = 100) -> List[Dict[str, Any]]:
+          """
+          Retrieve documents that match a specific processing_status.
+
+          Args:
+              processing_status: The processing status to filter by (e.g., "new", "ingested", "classified").
+              limit: Maximum number of documents to return.
+
+          Returns:
+              List[Dict[str, Any]]: A list of document dictionaries.
+                                     Each dictionary should contain at least 'document_id' and 'extracted_text'.
+                                     Include other relevant fields like 'file_name' for context if easy.
+          """
+          try:
+              cursor = self.conn.cursor()
+              # Select essential fields needed by agents for processing
+              cursor.execute(
+                  """
+                  SELECT document_id, extracted_text, file_name, patient_id, session_id
+                  FROM documents
+                  WHERE processing_status = ?
+                  ORDER BY upload_timestamp ASC
+                  LIMIT ?
+                  """,
+                  (processing_status, limit)
+              )
+              rows = cursor.fetchall()
+              return [dict(row) for row in rows]
+          except sqlite3.Error as e:
+              # Consider logging the error here as well
+              raise e
+      ```
+2.  **Modify `tests/test_context_store.py`:**
+    * Add new unit tests for the `get_documents_by_processing_status` method.
+    * Test scenarios:
+        * Retrieving documents with a specific status.
+        * What happens when no documents match the status (should return an empty list).
+        * Test the `limit` parameter.
+        * Ensure the returned dictionaries contain the expected keys (`document_id`, `extracted_text`, `file_name`).
+
+**Part 2: Implement `ClassifierAgent` Class (`classifier_agent.py`)**
+
+* Import necessary libraries (`logging`, `re`, `collections`, etc.) and `ContextStore` from `context_store.py`.
+* Initialize logging.
+
+* **`__init__(self, context_store: ContextStore, classification_rules: Dict[str, List[str]])`:**
+    * `context_store`: An initialized instance of the `ContextStore`.
+    * `classification_rules`: A dictionary defining the classification logic.
+        * Keys are the `document_type` strings (e.g., "Invoice", "Medical Record").
+        * Values are lists of keywords or regex patterns (as strings). For MVP, simple keywords are fine. Matching should be **case-insensitive**.
+        * Example `classification_rules` (this would be provided by the calling script, e.g., `run_mvp.py`):
+            ```python
+            rules = {
+                "Invoice": ["invoice #", "bill to:", "total due"],
+                "Medical Record": ["patient name:", "diagnosis:", "treatment plan"],
+                "Letter": ["dear sir", "dear madam", "sincerely,"],
+                "Receipt": ["receipt #", "payment method", "amount paid"],
+                # Add rules for "Insurance Document", "Legal Document", "Report"
+            }
+            ```
+    * Initialize `self.logger` and `self.agent_id = "classifier_agent_v1.0"`.
+    * Store `classification_rules`, perhaps pre-compiling regex patterns if using regex, for efficiency.
+
+* **`process_documents_for_classification(self, user_id: str = "classifier_agent_mvp_user", status_to_classify: str = "ingested", new_status_after_classification: str = "classified") -> Tuple[int, int]`:**
+    * This will be the main method. It should return a tuple: `(successfully_classified_count, failed_to_classify_count)`.
+    * Log the start of the classification batch run.
+    * Fetch documents needing classification from `ContextStore` using `context_store.get_documents_by_processing_status(processing_status=status_to_classify)`. (The `ingestion_agent` sets status to "ingestion_successful" and `processing_status` to "new". The classifier might look for "new" or "ingested". Let's assume `ingestion_agent` sets `processing_status` to `"ingested"` upon successful text extraction, and this agent looks for that status).
+    * Initialize `successfully_classified_count = 0`, `failed_to_classify_count = 0`.
+    * Loop through each document retrieved:
+        1.  Get `document_id` and `extracted_text`. If `extracted_text` is empty or None, log a warning, assign `document_type = "Unclassified"`, `classification_confidence = None`, increment `failed_to_classify_count`, update the document in ContextStore (with these values and new processing status), log to audit trail, and continue to the next document.
+        2.  **Apply Classification Rules:**
+            * Iterate through `self.classification_rules`. For each `doc_type` and its list of `keywords/patterns`:
+                * Check if any keyword/pattern is present in the `extracted_text` (case-insensitively). Use `re.search(pattern, extracted_text, re.IGNORECASE)`.
+                * If a match is found for any keyword in a category:
+                    * Assign `classified_type = doc_type`.
+                    * Assign `assigned_confidence = "Medium"` (for MVP, any rule match gets "Medium").
+                    * Break from the rule iteration (first match wins for simplicity in MVP).
+            * If no rules matched after checking all categories:
+                * Assign `classified_type = "Unclassified"`.
+                * Assign `assigned_confidence = None` (will be NULL in DB).
+        3.  **Update Context Store:**
+            * Call `context_store.update_document_fields(document_id, {"document_type": classified_type, "classification_confidence": assigned_confidence, "processing_status": new_status_after_classification})`.
+            * If update is successful, increment `successfully_classified_count`.
+        4.  **Audit Log:**
+            * Call `context_store.add_audit_log_entry()` with details about the classification (e.g., `event_name="DOCUMENT_CLASSIFIED"`, `resource_id=document_id`, `status="SUCCESS"`, `details=f"Classified as {classified_type} with confidence {assigned_confidence}"`).
+    * Log the end of the classification batch run with counts.
+    * Return `(successfully_classified_count, failed_to_classify_count)`.
+
+**Part 3: Unit Tests (`tests/test_classifier_agent.py`)**
+
+* Use Python's `unittest` module (or `pytest`).
+* **Mocking:**
+    * Mock the `ContextStore` object completely (`unittest.mock.MagicMock`). You will verify that its methods (`get_documents_by_processing_status`, `update_document_fields`, `add_audit_log_entry`) are called with the expected arguments.
+* **Test Setup:**
+    * Define a sample `classification_rules` dictionary within your test class.
+    * Prepare sample `extracted_text` strings:
+        * One that clearly matches rules for "Invoice".
+        * One that clearly matches rules for "Medical Record".
+        * One that matches no defined rules.
+        * One with empty or None text.
+* **Test Scenarios:**
+    1.  Test with text matching "Invoice" rules:
+        * Verify `update_document_fields` is called with `document_type="Invoice"` and `classification_confidence="Medium"`.
+        * Verify `processing_status` is updated to "classified".
+        * Verify correct audit log entry.
+    2.  Test with text matching "Medical Record" rules (similar checks).
+    3.  Test with text matching no rules:
+        * Verify `update_document_fields` is called with `document_type="Unclassified"` and `classification_confidence=None`.
+    4.  Test with empty/None `extracted_text`:
+        * Verify `document_type="Unclassified"` and `classification_confidence=None`.
+    5.  Test that `get_documents_by_processing_status` is called correctly to fetch documents.
+    6.  Test that the loop processes multiple mock documents returned by the mocked `get_documents_by_processing_status`.
+
+**Part 4: Documentation**
+* The `ClassifierAgent` class and its public methods must have clear docstrings (purpose, args, returns).
+* Include inline comments for key logic.
+
+**General Guidelines for the Agent:**
+* Ensure case-insensitive keyword matching.
+* Structure code cleanly.
+* Implement basic logging for the agent's activities.
+
+---
+This instruction set should guide the Replit Agent in building the `classifier_agent.py` and making the necessary additions to `context_store.py`. After the agent generates the code, we'll follow our review, test, and checkpoint process.

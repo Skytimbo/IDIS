@@ -360,6 +360,53 @@ class TestContextStore(unittest.TestCase):
     
     # Query Methods Tests
     
+    def test_get_documents_by_processing_status(self):
+        """Test retrieving documents by processing status."""
+        # Create documents with different processing statuses
+        patient_id = self.create_test_patient()
+        session_id = self.create_test_session()
+        
+        # Create documents with "new" status
+        doc1 = self.create_test_document(patient_id, session_id)
+        self.context_store.update_document_fields(doc1, {"processing_status": "new"})
+        
+        doc2 = self.create_test_document(patient_id, session_id)
+        self.context_store.update_document_fields(doc2, {"processing_status": "new"})
+        
+        # Create a document with "classified" status
+        doc3 = self.create_test_document(patient_id, session_id)
+        self.context_store.update_document_fields(doc3, {"processing_status": "classified"})
+        
+        # Get documents with "new" status
+        new_docs = self.context_store.get_documents_by_processing_status("new")
+        
+        # Check that we got the right documents
+        self.assertEqual(len(new_docs), 2)
+        doc_ids = [doc["document_id"] for doc in new_docs]
+        self.assertIn(doc1, doc_ids)
+        self.assertIn(doc2, doc_ids)
+        
+        # Check that the documents have the required fields
+        for doc in new_docs:
+            self.assertIn("document_id", doc)
+            self.assertIn("extracted_text", doc)
+            self.assertIn("file_name", doc)
+            self.assertIn("patient_id", doc)
+            self.assertIn("session_id", doc)
+        
+        # Get documents with "classified" status
+        classified_docs = self.context_store.get_documents_by_processing_status("classified")
+        self.assertEqual(len(classified_docs), 1)
+        self.assertEqual(classified_docs[0]["document_id"], doc3)
+        
+        # Test the limit parameter
+        limited_docs = self.context_store.get_documents_by_processing_status("new", limit=1)
+        self.assertEqual(len(limited_docs), 1)
+        
+        # Test status with no documents
+        no_docs = self.context_store.get_documents_by_processing_status("nonexistent_status")
+        self.assertEqual(len(no_docs), 0)
+    
     def test_query_patient_history(self):
         """Test querying patient history."""
         # Create a patient

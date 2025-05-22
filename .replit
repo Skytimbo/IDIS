@@ -28,6 +28,10 @@ args = "Run Demo Script"
 task = "workflow.run"
 args = "test_ingestion_agent"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "test_classifier_agent"
+
 [[workflows.workflow]]
 name = "Run Context Store Tests"
 author = "agent"
@@ -59,6 +63,14 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd tests && python -m unittest test_ingestion_agent.py"
+
+[[workflows.workflow]]
+name = "test_classifier_agent"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd tests && python -m unittest test_classifier_agent.py"
 
 [deployment]
 run = ["sh", "-c", "python -m unittest discover tests"]
