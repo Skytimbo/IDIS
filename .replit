@@ -2,7 +2,7 @@ modules = ["python-3.11"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["freetype", "gumbo", "harfbuzz", "jbig2dec", "libjpeg_turbo", "mupdf", "openjpeg", "swig", "tesseract", "xcbuild"]
+packages = ["fontconfig", "freetype", "ghostscript", "glib", "gumbo", "harfbuzz", "jbig2dec", "libjpeg_turbo", "mupdf", "openjpeg", "pango", "swig", "tesseract", "xcbuild"]
 
 [workflows]
 runButton = "Project"
@@ -43,6 +43,18 @@ args = "test_tagger_agent"
 [[workflows.workflow.tasks]]
 task = "workflow.run"
 args = "Run IDIS Demo"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Test Cover Sheet"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Run Cover Sheet Demo"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Run IDIS Pipeline Demo"
 
 [[workflows.workflow]]
 name = "Run Context Store Tests"
@@ -106,7 +118,31 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python run_idis_pipeline.py --create-docs --clean"
+args = "python run_idis_pipeline.py --create-docs --clean --openai"
+
+[[workflows.workflow]]
+name = "Test Cover Sheet"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd tests && python -m unittest test_cover_sheet.py"
+
+[[workflows.workflow]]
+name = "Run Cover Sheet Demo"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python demo_cover_sheet.py --db-path ./idis_demo.db --output-pdf ./idis_cover_sheet.pdf --create-demo"
+
+[[workflows.workflow]]
+name = "Run IDIS Pipeline Demo"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python demo_idis_pipeline.py --clean --openai"
 
 [deployment]
 run = ["sh", "-c", "python -m unittest discover tests"]

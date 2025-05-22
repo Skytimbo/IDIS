@@ -4,8 +4,10 @@ version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.11"
 dependencies = [
+    "markdown2>=2.5.3",
     "openai>=1.81.0",
     "pymupdf>=1.25.5",
     "pytesseract>=0.3.13",
     "python-docx>=1.1.2",
+    "weasyprint>=65.1",
 ]

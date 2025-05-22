@@ -1,0 +1,152 @@
+Okay, let's get this `Smart Cover Sheet Renderer` built! This module will be responsible for creating a professional-looking summary document for batches of processed files, making the insights from IDIS easily digestible.
+
+Here is the detailed "Instruction Set" for **Task 1.7: Smart Cover Sheet Renderer**. Please provide this to your Replit Agent.
+
+---
+
+## Replit Agent Instruction Set: `cover_sheet.py` (IDIS Phase 1 MVP)
+
+**Objective:**
+Create the `cover_sheet.py` module. This module will define a `SmartCoverSheetRenderer` class capable of:
+1.  Aggregating summaries and key metadata for a given set of documents (or a session) from the `ContextStore`.
+2.  Generating a well-organized cover sheet in Markdown format.
+3.  Converting the generated Markdown into a PDF document.
+
+**Files to Create:**
+1.  `cover_sheet.py`: Contains the `SmartCoverSheetRenderer` class and its logic.
+2.  `tests/test_cover_sheet.py`: Contains unit tests for the `SmartCoverSheetRenderer`.
+
+**Key Dependencies for `cover_sheet.py`:**
+* The `ContextStore` class from `context_store.py`.
+* A Markdown to HTML conversion library (e.g., `markdown2`).
+* An HTML to PDF conversion library (e.g., `WeasyPrint` or `xhtml2pdf`). The agent should choose one that is suitable for Replit and can handle basic CSS for styling. Ensure this chosen library is installed.
+* Standard Python libraries: `logging`, `datetime`, `json`.
+
+**1. `SmartCoverSheetRenderer` Class (`cover_sheet.py`):**
+
+* Import necessary libraries and `ContextStore`.
+* Initialize logging.
+
+* **`__init__(self, context_store: ContextStore)`:**
+    * `context_store`: An initialized instance of the `ContextStore`.
+    * Initialize `self.logger` and `self.agent_id = "cover_sheet_renderer_v1.0"`.
+
+* **`generate_cover_sheet(self, document_ids: List[str], output_pdf_filename: str, session_id: Optional[str] = None, user_id: str = "cover_sheet_agent_mvp_user") -> bool`:**
+    * `document_ids`: A list of `document_id` strings for which to generate the cover sheet.
+    * `output_pdf_filename`: The full path and name for the output PDF file (e.g., `/path/to/output/batch_XYZ_coversheet.pdf`).
+    * `session_id`: Optional. If provided, can be used to fetch a batch-level summary from session metadata.
+    * `user_id`: For audit logging.
+    * **Returns:** `True` if PDF generation is successful, `False` otherwise.
+    * **Logic:**
+        1.  Log the start of cover sheet generation.
+        2.  Fetch details for each `document_id` from `ContextStore`:
+            * Use `context_store.get_document(doc_id)` to get `file_name`, `document_type`, `classification_confidence`, `document_dates` (JSON), `issuer_source`, `recipient`, `tags_extracted` (JSON), `patient_id`.
+            * Use `context_store.get_agent_outputs_for_document(doc_id, agent_id="summarizer_agent_v1.0", output_type="per_document_summary")` to get the per-document summary. Take the most recent one if multiple exist.
+        3.  If `session_id` is provided, try to fetch a batch-level summary from `context_store.get_session(session_id)` (looking in `session_metadata.get("batch_summary")`).
+        4.  **Generate Markdown Content (call a private helper method `_build_markdown_content(self, documents_data: List[Dict], batch_summary_text: Optional[str]) -> str`):**
+            * This helper will construct the full Markdown string.
+        5.  **Convert Markdown to PDF (call a private helper method `_convert_markdown_to_pdf(self, markdown_content: str, output_pdf_filename: str) -> bool`):**
+            * This helper handles Markdown -> HTML -> PDF conversion.
+        6.  If PDF generation is successful:
+            * Add an audit log entry via `context_store.add_audit_log_entry()` indicating successful cover sheet generation (event name "COVER_SHEET_GENERATED", status "SUCCESS", resource type "cover_sheet", resource ID could be `output_pdf_filename` or `session_id`).
+            * Log success.
+            * Return `True`.
+        7.  If PDF generation fails:
+            * Add an audit log entry for failure.
+            * Log error.
+            * Return `False`.
+
+* **`_build_markdown_content(self, documents_data: List[Dict[str, Any]], batch_summary_text: Optional[str]) -> str` (Private Helper Method):**
+    * `documents_data`: A list of dictionaries, where each dictionary contains all fetched details for a single document (including its per-document summary).
+    * `batch_summary_text`: The overall batch summary, if available.
+    * **Logic to construct Markdown string:**
+        1.  **Header Section:**
+            * Title: `## IDIS Smart Cover Sheet` (or similar prominent text for "IDIS - Intelligent Document Insight System").
+            * Generation Date: `**Generated on:** {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}`.
+            * Document Count: `**Documents in Batch:** {len(documents_data)}`.
+        2.  **Overall Batch Summary (if `batch_summary_text` is provided and `len(documents_data) > 1`):**
+            * `### Batch Overview`
+            * `{batch_summary_text}`
+        3.  **Document Details Section:**
+            * If `len(documents_data) == 1` (Single Document):
+                * `### Document Details: {documents_data[0]['file_name']}`
+                * Per-document summary: `**Summary:** {documents_data[0]['per_doc_summary']}` (Handle if summary is missing).
+                * Key Metadata (use Markdown list or bolded key-value pairs):
+                    * `**File Name:** {file_name}`
+                    * `**Document Type:** {document_type} (Confidence: {classification_confidence})`
+                    * `**Patient ID:** {patient_id}` (if available)
+                    * `**Key Dates:**` (Iterate through `document_dates` dict: `  - {date_label}: {date_value}`)
+                    * `**Issuer/Source:** {issuer_source}`
+                    * `**Recipient:** {recipient}`
+                    * `**Tags:** {', '.join(tags_extracted)}`
+            * If `len(documents_data) > 1` (Batch of Documents):
+                * `### Document Index`
+                * Create a Markdown table with columns: `No.`, `File Name`, `Type`, `Patient ID`, `Key Date`, `Summary Snippet`, `Tags`.
+                * Populate the table by iterating through `documents_data`. For "Key Date," pick the most relevant one from `document_dates` or the earliest. For "Summary Snippet," use the first ~50-100 characters of the per-document summary.
+    * Return the complete Markdown string.
+
+* **`_convert_markdown_to_pdf(self, markdown_content: str, output_pdf_filename: str) -> bool` (Private Helper Method):**
+    * **Step 1: Markdown to HTML:**
+        * Use a library like `markdown2` to convert `markdown_content` to an HTML string.
+        * `html_content = markdown2.markdown(markdown_content, extras=["tables", "fenced-code-blocks"])`
+    * **Step 2: HTML to PDF:**
+        * Use the chosen library (e.g., `WeasyPrint` or `xhtml2pdf`).
+        * Example with `WeasyPrint`:
+            ```python
+            # from weasyprint import HTML, CSS # (Import at top of file)
+            # try:
+            #     html = HTML(string=html_content)
+            #     # Optional: Add basic CSS for better professional look
+            #     css = CSS(string='''
+            #         body { font-family: sans-serif; line-height: 1.4; }
+            #         h1, h2, h3 { color: #333; }
+            #         table { border-collapse: collapse; width: 100%; margin-bottom: 1em; }
+            #         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            #         th { background-color: #f2f2f2; }
+            #     ''')
+            #     html.write_pdf(output_pdf_filename, stylesheets=[css])
+            #     return True
+            # except Exception as e:
+            #     self.logger.error(f"Error converting HTML to PDF: {e}")
+            #     return False
+            ```
+        * Agent should implement this using its chosen library, ensuring it can handle the generated HTML (including tables).
+    * Return `True` on success, `False` on failure.
+
+**2. Unit Tests (`tests/test_cover_sheet.py`):**
+
+* Use `unittest` and `unittest.mock.MagicMock / patch`.
+* **Mocking:**
+    * Mock `ContextStore` to provide sample document data, summaries, and session metadata.
+    * Mock the chosen Markdown-to-HTML library (e.g., `markdown2.markdown`).
+    * Mock the chosen HTML-to-PDF library (e.g., `weasyprint.HTML().write_pdf` or `xhtml2pdf.pisa.CreatePDF`). The goal is to verify it's *called* with the correct HTML content and output path, not to actually generate a PDF file during most tests.
+    * Mock `os.makedirs` if the PDF output path might involve creating directories.
+* **Test Setup:**
+    * Prepare mock return values for `context_store.get_document()`, `context_store.get_agent_outputs_for_document()`, and `context_store.get_session()`.
+* **Test Scenarios:**
+    1.  Test `_build_markdown_content` for a single document:
+        * Verify the generated Markdown string contains the correct header, summary, and all key metadata fields.
+    2.  Test `_build_markdown_content` for a batch of multiple documents:
+        * Verify the header, batch overview (if provided), and the Markdown table structure and content for the document index.
+    3.  Test `generate_cover_sheet` successful path:
+        * Verify `_build_markdown_content` is called.
+        * Verify the Markdown-to-HTML conversion is called.
+        * Verify the HTML-to-PDF conversion method is called with the generated HTML and correct output filename.
+        * Verify `context_store.add_audit_log_entry` is called for success.
+        * Assert it returns `True`.
+    4.  Test `generate_cover_sheet` when PDF conversion fails (mock PDF library to raise an exception):
+        * Verify error is logged.
+        * Verify audit log entry for failure.
+        * Assert it returns `False`.
+    5.  Test handling of missing data (e.g., no per-document summary, no batch summary, document not found in ContextStore – though `generate_cover_sheet` expects valid `document_ids`).
+
+**3. Documentation:**
+* `SmartCoverSheetRenderer` class and public methods need clear docstrings.
+* Inline comments for key logic, especially in Markdown generation and PDF conversion steps.
+
+**General Guidelines:**
+* Ensure the chosen PDF library is added as a dependency.
+* The generated Markdown should be well-structured for a professional PDF output. Basic CSS in the PDF conversion step is encouraged for better readability.
+
+---
+This instruction set for the `cover_sheet.py` module should guide the Replit Agent. After it generates the code, we'll follow our review, test, and checkpoint process.
