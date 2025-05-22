@@ -1,0 +1,30 @@
+
+    ACME CORPORATION
+    123 Business Rd, Commerce City, CA 90001
+    
+    INVOICE #12345
+    
+    Date: May 15, 2023
+    Due Date: June 15, 2023
+    
+    Bill To:
+    John Smith
+    XYZ Company
+    456 Customer Lane
+    Buyerville, CA 90002
+    
+    Item         Description                 Quantity    Price       Total
+    -------------------------------------------------------------------------
+    SVC-001      Consulting Services         40 hrs      $150.00     $6,000.00
+    HW-002       Server Hardware             2           $1,200.00   $2,400.00
+    SW-003       Software License            5           $300.00     $1,500.00
+    
+    Subtotal:                                                       $9,900.00
+    Tax (8%):                                                         $792.00
+    Total Due:                                                     $10,692.00
+    
+    Payment Terms: Net 30
+    Please make checks payable to ACME Corporation
+    
+    URGENT: Please process this invoice as soon as possible.
+    

@@ -18,6 +18,7 @@ import time
 import shutil
 import argparse
 import logging
+import json
 from typing import Dict, List
 
 from context_store import ContextStore
@@ -122,8 +123,8 @@ def run_pipeline(folders: Dict[str, str], db_path: str, use_openai: bool = False
     # Step 2: Initialize the Ingestion Agent
     ingestion_agent = IngestionAgent(
         context_store=context_store,
-        watchfolder_path=folders["watch_folder"],
-        problem_files_path=folders["problem_files"]
+        watch_folder=folders["watch_folder"],
+        holding_folder=folders["problem_files"]
     )
     logger.info("Initialized Ingestion Agent")
     
@@ -151,7 +152,8 @@ def run_pipeline(folders: Dict[str, str], db_path: str, use_openai: bool = False
     
     # Step 6: Run the Ingestion Agent to process documents
     logger.info("Starting document ingestion...")
-    ingested_count = ingestion_agent.process_documents_in_watchfolder(session_id=session_id)
+    ingested_document_ids = ingestion_agent.process_pending_documents(session_id=session_id)
+    ingested_count = len(ingested_document_ids)
     logger.info(f"Ingested {ingested_count} documents")
     
     if ingested_count == 0:
@@ -160,6 +162,16 @@ def run_pipeline(folders: Dict[str, str], db_path: str, use_openai: bool = False
     
     # Step 7: Run the Classifier Agent to categorize documents
     logger.info("Starting document classification...")
+    
+    # First, make sure we set the processing_status to "ingested" for all documents
+    docs = context_store.get_documents_for_session(session_id)
+    for doc in docs:
+        if doc['processing_status'] == 'new':
+            context_store.update_document_fields(
+                doc['document_id'],
+                {"processing_status": "ingested"}
+            )
+    
     classified_success, classified_failed = classifier_agent.process_documents_for_classification(
         user_id="pipeline_demo_user"
     )
@@ -222,8 +234,18 @@ def display_pipeline_results(context_store: ContextStore, session_id: str) -> No
     # Get session information
     session = context_store.get_session(session_id)
     print(f"\nSession ID: {session_id}")
-    if 'batch_summary' in session.get('session_metadata', {}):
-        print(f"\nBatch Summary: {session['session_metadata']['batch_summary']}")
+    
+    if session and 'session_metadata' in session:
+        session_metadata = session['session_metadata']
+        if isinstance(session_metadata, str):
+            import json
+            try:
+                session_metadata = json.loads(session_metadata)
+            except:
+                session_metadata = {}
+                
+        if 'batch_summary' in session_metadata:
+            print(f"\nBatch Summary: {session_metadata['batch_summary']}")
     
     # Get all documents processed in this session
     documents = context_store.get_documents_for_session(session_id)
@@ -244,8 +266,12 @@ def display_pipeline_results(context_store: ContextStore, session_id: str) -> No
         
         # Display metadata if available
         if doc.get('document_dates'):
-            dates = json.loads(doc['document_dates']) if isinstance(doc['document_dates'], str) else doc['document_dates']
-            print(f"   - Dates: {', '.join([f'{k}: {v}' for k, v in dates.items()])}")
+            try:
+                dates = json.loads(doc['document_dates']) if isinstance(doc['document_dates'], str) else doc['document_dates']
+                if dates:
+                    print(f"   - Dates: {', '.join([f'{k}: {v}' for k, v in dates.items()])}")
+            except:
+                pass
         
         if doc.get('issuer_source'):
             print(f"   - Issuer: {doc['issuer_source']}")
@@ -254,9 +280,12 @@ def display_pipeline_results(context_store: ContextStore, session_id: str) -> No
             print(f"   - Recipient: {doc['recipient']}")
             
         if doc.get('tags_extracted'):
-            tags = json.loads(doc['tags_extracted']) if isinstance(doc['tags_extracted'], str) else doc['tags_extracted']
-            if tags:
-                print(f"   - Tags: {', '.join(tags)}")
+            try:
+                tags = json.loads(doc['tags_extracted']) if isinstance(doc['tags_extracted'], str) else doc['tags_extracted']
+                if tags:
+                    print(f"   - Tags: {', '.join(tags)}")
+            except:
+                pass
         
         if doc.get('filed_path'):
             print(f"   - Filed at: {doc['filed_path']}")

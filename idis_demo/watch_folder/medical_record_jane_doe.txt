@@ -1,0 +1,37 @@
+
+    CONFIDENTIAL MEDICAL RECORD
+    
+    Sunshine Medical Center
+    789 Health Avenue
+    Wellness City, CA 90003
+    
+    Patient Name: Jane Doe
+    Date of Birth: 04/12/1985
+    Patient ID: SMC-12345
+    
+    Date of Visit: May 10, 2023
+    
+    Chief Complaint:
+    Patient presents with recurring headaches and mild dizziness for the past 2 weeks.
+    
+    Medical History:
+    - Hypertension (diagnosed 2018)
+    - Seasonal allergies
+    
+    Vital Signs:
+    - BP: 138/85
+    - Pulse: 76
+    - Temp: 98.6°F
+    
+    Assessment:
+    Patient likely experiencing tension headaches possibly exacerbated by seasonal allergies.
+    No indication of more serious conditions at this time.
+    
+    Treatment Plan:
+    1. Prescribed Amitriptyline 10mg daily for headache prevention
+    2. Recommended OTC Zyrtec for allergies
+    3. Stress reduction techniques discussed
+    4. Follow up in 3 weeks if symptoms persist
+    
+    Dr. Robert Johnson, MD
+    
