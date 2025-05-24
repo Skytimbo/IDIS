@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  idis:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./watch_folder:/app/watch_folder
+      - ./archive:/app/archive_folder
+      - ./database:/app/db
+      - /dev/bus/usb:/dev/bus/usb
+    restart: unless-stopped
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    privileged: true  # Needed for full USB device access
+    command: ["--db-path", "/app/db/idis.db", "--watch-folder", "/app/watch_folder", "--archive-folder", "/app/archive"]
