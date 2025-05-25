@@ -485,6 +485,30 @@ if __name__ == "__main__":
                         help='Keep temporary files after completion')
     parser.add_argument('--base-dir', type=str, 
                         help='Base directory for temporary files (defaults to a new temp directory)')
+    parser.add_argument('--create-docs', action='store_true',
+                        help='Create demo documents for the pipeline run')
+    parser.add_argument('--openai', action='store_true',
+                        help='Enable OpenAI for summarization')
+    
+    # Set defaults after base_dir is determined
+    args_temp = parser.parse_known_args()[0]
+    if args_temp.base_dir:
+        base_dir = args_temp.base_dir
+    else:
+        base_dir = tempfile.mkdtemp(prefix="idis_mvp_run_")
+    
+    # Add remaining arguments with proper defaults
+    parser.add_argument('--db-path', type=str, default=os.path.join(base_dir, 'idis_mvp.db'),
+                        help='Path to the SQLite database file')
+    parser.add_argument('--watch-folder', type=str, default=os.path.join(base_dir, 'watch_folder'),
+                        help='Path to the folder to watch for documents')
+    parser.add_argument('--holding-folder', type=str, default=os.path.join(base_dir, 'holding_folder'),
+                        help='Path to the folder for problematic documents')
+    parser.add_argument('--archive-folder', type=str, default=os.path.join(base_dir, 'archive_folder'),
+                        help='Path to the folder for archived documents')
+    parser.add_argument('--cover-sheets-folder', type=str, default=os.path.join(base_dir, 'cover_sheets'),
+                        help='Path to the folder for generated cover sheets')
+    
     args = parser.parse_args()
     
     # Create base directory if not provided
@@ -492,15 +516,41 @@ if __name__ == "__main__":
         base_dir = args.base_dir
         os.makedirs(base_dir, exist_ok=True)
     else:
-        base_dir = tempfile.mkdtemp(prefix="idis_mvp_run_")
+        # base_dir already set above for defaults
+        pass
     
-    # Default to None in case setup fails
-    config_paths = None
+    # Build config dictionary from arguments
+    config_paths = {
+        'base_dir': base_dir,
+        'db_path': args.db_path,
+        'watch_folder': args.watch_folder,
+        'holding_folder': args.holding_folder,
+        'archive_folder': args.archive_folder,
+        'pdf_output_dir': args.cover_sheets_folder
+    }
+    
+    # Ensure all directories exist
+    for folder_path in [config_paths['watch_folder'], config_paths['holding_folder'], 
+                        config_paths['archive_folder'], config_paths['pdf_output_dir']]:
+        os.makedirs(folder_path, exist_ok=True)
+    
+    # Ensure database directory exists
+    db_dir = os.path.dirname(config_paths['db_path'])
+    if db_dir:
+        os.makedirs(db_dir, exist_ok=True)
     
     try:
-        # Setup environment and run pipeline
-        config_paths = setup_environment(base_dir)
-        run_pipeline(config_paths, args.keep_temp_files)
+        # Create demo documents if requested
+        if args.create_docs:
+            create_mock_documents(config_paths['watch_folder'])
+            print(f"Demo documents created in {config_paths['watch_folder']}")
+        
+        # Update OPENAI_API_KEY if --openai flag is used
+        if args.openai and not OPENAI_API_KEY:
+            print("Warning: --openai flag used but no OPENAI_API_KEY environment variable found")
+        
+        # Run pipeline
+        results = run_pipeline(config_paths, args.keep_temp_files)
         print(f"Pipeline completed successfully. Results stored in {base_dir}")
         if args.keep_temp_files:
             print(f"Temporary files preserved in {base_dir}")
@@ -509,5 +559,5 @@ if __name__ == "__main__":
         raise
     finally:
         # Clean up if not keeping temp files
-        if not args.keep_temp_files and not args.base_dir and config_paths is not None:
+        if not args.keep_temp_files and not args.base_dir:
             cleanup_environment(config_paths, base_dir)
