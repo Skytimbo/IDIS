@@ -511,7 +511,7 @@ if __name__ == "__main__":
     
     # Set defaults for paths that weren't provided
     if not args.db_path:
-        args.db_path = os.path.join(base_dir, 'idis_mvp.db')
+        args.db_path = os.path.join(base_dir, DB_NAME)
     if not args.watch_folder:
         args.watch_folder = os.path.join(base_dir, 'watch_folder')
     if not args.holding_folder:
