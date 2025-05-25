@@ -489,24 +489,15 @@ if __name__ == "__main__":
                         help='Create demo documents for the pipeline run')
     parser.add_argument('--openai', action='store_true',
                         help='Enable OpenAI for summarization')
-    
-    # Set defaults after base_dir is determined
-    args_temp = parser.parse_known_args()[0]
-    if args_temp.base_dir:
-        base_dir = args_temp.base_dir
-    else:
-        base_dir = tempfile.mkdtemp(prefix="idis_mvp_run_")
-    
-    # Add remaining arguments with proper defaults
-    parser.add_argument('--db-path', type=str, default=os.path.join(base_dir, 'idis_mvp.db'),
+    parser.add_argument('--db-path', type=str,
                         help='Path to the SQLite database file')
-    parser.add_argument('--watch-folder', type=str, default=os.path.join(base_dir, 'watch_folder'),
+    parser.add_argument('--watch-folder', type=str,
                         help='Path to the folder to watch for documents')
-    parser.add_argument('--holding-folder', type=str, default=os.path.join(base_dir, 'holding_folder'),
+    parser.add_argument('--holding-folder', type=str,
                         help='Path to the folder for problematic documents')
-    parser.add_argument('--archive-folder', type=str, default=os.path.join(base_dir, 'archive_folder'),
+    parser.add_argument('--archive-folder', type=str,
                         help='Path to the folder for archived documents')
-    parser.add_argument('--cover-sheets-folder', type=str, default=os.path.join(base_dir, 'cover_sheets'),
+    parser.add_argument('--cover-sheets-folder', type=str,
                         help='Path to the folder for generated cover sheets')
     
     args = parser.parse_args()
@@ -516,8 +507,19 @@ if __name__ == "__main__":
         base_dir = args.base_dir
         os.makedirs(base_dir, exist_ok=True)
     else:
-        # base_dir already set above for defaults
-        pass
+        base_dir = tempfile.mkdtemp(prefix="idis_mvp_run_")
+    
+    # Set defaults for paths that weren't provided
+    if not args.db_path:
+        args.db_path = os.path.join(base_dir, 'idis_mvp.db')
+    if not args.watch_folder:
+        args.watch_folder = os.path.join(base_dir, 'watch_folder')
+    if not args.holding_folder:
+        args.holding_folder = os.path.join(base_dir, 'holding_folder')
+    if not args.archive_folder:
+        args.archive_folder = os.path.join(base_dir, 'archive_folder')
+    if not args.cover_sheets_folder:
+        args.cover_sheets_folder = os.path.join(base_dir, 'cover_sheets')
     
     # Build config dictionary from arguments
     config_paths = {
