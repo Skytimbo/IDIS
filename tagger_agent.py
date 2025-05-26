@@ -176,6 +176,14 @@ class TaggerAgent:
                 filed_filename = f"{document_id}_{file_name}"
                 new_filed_path = os.path.join(filing_dir, filed_filename)
                 
+                # Add detailed logging for debugging file path issues
+                self.logger.info(f"TAGGER: Attempting to process document_id: {document_id}")
+                self.logger.info(f"TAGGER: Original watchfolder path from DB: '{original_watchfolder_path}'")
+                if original_watchfolder_path:  # Add a check to ensure path is not None
+                    self.logger.info(f"TAGGER: Does original file exist at that path? {os.path.exists(original_watchfolder_path)}")
+                else:
+                    self.logger.warning("TAGGER: original_watchfolder_path is None or empty.")
+                
                 # Move file if original path exists
                 if original_watchfolder_path and os.path.isfile(original_watchfolder_path):
                     shutil.move(original_watchfolder_path, new_filed_path)
