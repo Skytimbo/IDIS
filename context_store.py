@@ -806,7 +806,7 @@ class ContextStore:
             cursor.execute(
                 """
                 SELECT document_id, extracted_text, file_name, patient_id, session_id,
-                       original_file_type, document_type, classification_confidence
+                       original_file_type, document_type, classification_confidence, original_watchfolder_path
                 FROM documents
                 WHERE processing_status = ?
                 ORDER BY upload_timestamp ASC
