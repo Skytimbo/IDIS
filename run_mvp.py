@@ -132,6 +132,9 @@ def create_mock_documents(watch_folder: str) -> List[Dict[str, Any]]:
     with open(invoice_path, 'w') as f:
         f.write(invoice_content)
     
+    logger = logging.getLogger("create_mock_documents")
+    logger.info(f"Mock document CREATED: {invoice_path}")
+    
     mock_docs.append({
         'filename': 'invoice_001.txt',
         'expected_type': 'Invoice',
@@ -173,6 +176,8 @@ def create_mock_documents(watch_folder: str) -> List[Dict[str, Any]]:
     
     with open(medical_path, 'w') as f:
         f.write(medical_content)
+    
+    logger.info(f"Mock document CREATED: {medical_path}")
     
     mock_docs.append({
         'filename': 'medical_002.txt',
@@ -217,6 +222,8 @@ def create_mock_documents(watch_folder: str) -> List[Dict[str, Any]]:
     
     with open(letter_path, 'w') as f:
         f.write(letter_content)
+    
+    logger.info(f"Mock document CREATED: {letter_path}")
     
     mock_docs.append({
         'filename': 'letter_003.txt',
@@ -418,6 +425,9 @@ def run_pipeline(config: Dict[str, Any], keep_temp_files: bool = False) -> Dict[
     # Create mock documents
     mock_doc_details = create_mock_documents(config['watch_folder'])
     logger.info(f"Created {len(mock_doc_details)} mock documents in {config['watch_folder']}")
+    
+    # Log watch folder contents before ingestion
+    logger.info(f"Contents of watch folder '{config['watch_folder']}' before ingestion: {os.listdir(config['watch_folder'])}")
     
     # Get list of files in watch folder
     files_to_process = []

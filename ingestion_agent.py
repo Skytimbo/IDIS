@@ -73,7 +73,7 @@ class IngestionAgent:
         Returns:
             List of document IDs that were successfully processed
         """
-        self.logger.info(f"Starting document processing scan of {self.watch_folder}")
+        self.logger.info(f"Starting document processing scan of watch folder: {self.watch_folder}")
         
         # Track processed files to avoid duplication within this run
         processed_files: Set[str] = set()
@@ -87,7 +87,8 @@ class IngestionAgent:
             self.logger.error(f"Error accessing watchfolder {self.watch_folder}: {str(e)}")
             return []
         
-        self.logger.info(f"Found {len(files)} files in watchfolder")
+        self.logger.info(f"Found files in watch folder: {files}")
+        self.logger.info(f"Total file count: {len(files)}")
         
         for filename in files:
             if filename in processed_files:
@@ -126,10 +127,13 @@ class IngestionAgent:
                 'session_id': session_id
             }
             
+            self.logger.info(f"About to add document to context store: {document_data}")
+            
             document_id = None
             
             try:
                 document_id = self.context_store.add_document(document_data)
+                self.logger.info(f"Successfully added document to context store - ID: {document_id}, filename: {filename}")
                 
                 # Add audit log entry for processing start
                 self.context_store.add_audit_log_entry(
