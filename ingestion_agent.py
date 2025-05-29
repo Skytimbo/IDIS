@@ -327,17 +327,7 @@ class IngestionAgent:
                     self.logger.info(f"Successfully ingested document: {filename} (ID: {document_id})")
                     successful_document_ids.append(document_id)
                     
-                    # Move file to holding folder to avoid reprocessing
-                    holding_path = os.path.join(self.holding_folder, filename)
-                    # Handle duplicate filenames by adding timestamp
-                    if os.path.exists(holding_path):
-                        import time
-                        timestamp = int(time.time())
-                        name, ext = os.path.splitext(filename)
-                        holding_path = os.path.join(self.holding_folder, f"{name}_{timestamp}{ext}")
-                    
-                    shutil.move(file_path, holding_path)
-                    self.logger.info(f"Moved processed file to holding folder: {holding_path}")
+                    # Leave successfully processed file at original location for TaggerAgent to find and archive properly
                     
                 else:
                     # Move file to holding folder and update status to failed
