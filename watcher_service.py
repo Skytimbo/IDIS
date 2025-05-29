@@ -124,8 +124,11 @@ class NewFileHandler(FileSystemEventHandler):
             if stable_count >= 2:
                 self.logger.info(f"File {file_path} confirmed stable. Triggering pipeline.")
                 
-                # Create a new session for this file
-                session_id = self.context_store_instance.create_session(
+                # Create a local ContextStore instance for this thread to avoid SQLite threading issues
+                local_context_store = ContextStore(db_path=self.config_paths['db_path'])
+                
+                # Create a new session for this file using the thread-local context store
+                session_id = local_context_store.create_session(
                     user_id=self.user_id_for_new_docs,
                     session_metadata={
                         "source_file": os.path.basename(file_path),
@@ -136,9 +139,9 @@ class NewFileHandler(FileSystemEventHandler):
                 
                 # Process the single file using specific file processing
                 try:
-                    # Initialize ingestion agent for this file
+                    # Initialize ingestion agent for this file with thread-local context store
                     ingestion_agent = IngestionAgent(
-                        context_store=self.context_store_instance,
+                        context_store=local_context_store,
                         watch_folder=self.config_paths['watch_folder'],
                         holding_folder=self.config_paths['holding_folder']
                     )
@@ -152,24 +155,24 @@ class NewFileHandler(FileSystemEventHandler):
                     )
                     
                     if ingestion_results > 0:
-                        # Continue with the rest of the pipeline
+                        # Continue with the rest of the pipeline using thread-local context store
                         classifier_agent = ClassifierAgent(
-                            context_store=self.context_store_instance,
+                            context_store=local_context_store,
                             classification_rules=self.classification_rules
                         )
                         
                         summarizer_agent = SummarizerAgent(
-                            context_store=self.context_store_instance,
+                            context_store=local_context_store,
                             openai_api_key=self.openai_api_key
                         )
                         
                         tagger_agent = TaggerAgent(
-                            context_store=self.context_store_instance,
+                            context_store=local_context_store,
                             base_filed_folder=self.config_paths['archive_folder'],
                             tag_definitions=self.tag_definitions
                         )
                         
-                        cover_sheet_renderer = SmartCoverSheetRenderer(context_store=self.context_store_instance)
+                        cover_sheet_renderer = SmartCoverSheetRenderer(context_store=local_context_store)
                         
                         # Run the pipeline steps
                         classification_results = classifier_agent.process_documents_for_classification(
@@ -190,7 +193,7 @@ class NewFileHandler(FileSystemEventHandler):
                         )
                         
                         # Generate cover sheet
-                        documents = self.context_store_instance.get_documents_for_session(session_id)
+                        documents = local_context_store.get_documents_for_session(session_id)
                         document_ids = [doc["document_id"] for doc in documents]
                         
                         cover_sheet_pdf_path = None
@@ -233,9 +236,9 @@ class NewFileHandler(FileSystemEventHandler):
                 except Exception as pipeline_error:
                     self.logger.error(f"Pipeline processing failed for {file_path}: {pipeline_error}")
                     
-                    # Update session with error status
+                    # Update session with error status using thread-local context store
                     try:
-                        self.context_store_instance.update_session_metadata(
+                        local_context_store.update_session_metadata(
                             session_id, 
                             {"processing_error": str(pipeline_error)}
                         )
