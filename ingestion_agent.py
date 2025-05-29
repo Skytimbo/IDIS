@@ -404,6 +404,31 @@ class IngestionAgent:
         self.logger.info(f"Specific file processing complete. Successfully processed: {len(successful_document_ids)}")
         return len(successful_document_ids)
     
+    def _determine_file_type(self, filename: str) -> str:
+        """
+        Determine the file type category based on the filename extension.
+        
+        Args:
+            filename: The name of the file
+            
+        Returns:
+            String representing the file type category ('pdf', 'docx', 'txt', 'image', 'unsupported')
+        """
+        file_extension = os.path.splitext(filename)[1].lower()
+        file_type_category = file_extension[1:] if file_extension.startswith('.') else file_extension
+
+        if file_type_category in ['jpeg', 'jpg', 'png', 'bmp', 'tiff', 'tif']:
+            return 'image'
+        elif file_type_category == 'pdf':
+            return 'pdf'
+        elif file_type_category == 'docx':
+            return 'docx'
+        elif file_type_category == 'txt':
+            return 'txt'
+        else:
+            self.logger.warning(f"Determined unsupported file type category: {file_type_category} for {filename}")
+            return 'unsupported'
+    
     def _extract_text_from_file(self, file_path: str, file_type: str) -> Tuple[Optional[str], Optional[float]]:
         """
         Extract text from a file based on its type.
