@@ -134,19 +134,92 @@ class NewFileHandler(FileSystemEventHandler):
                     }
                 )
                 
-                # Call the pipeline executor for this single file
+                # Process the single file using specific file processing
                 try:
-                    results = execute_pipeline_for_files(
+                    # Initialize ingestion agent for this file
+                    ingestion_agent = IngestionAgent(
                         context_store=self.context_store_instance,
-                        config_paths=self.config_paths,
-                        classification_rules=self.classification_rules,
-                        tag_definitions=self.tag_definitions,
-                        openai_api_key=self.openai_api_key,
-                        files_to_process_paths=[file_path],
+                        watch_folder=self.config_paths['watch_folder'],
+                        holding_folder=self.config_paths['holding_folder']
+                    )
+                    
+                    # Use the new process_specific_files method for single file processing
+                    ingestion_results = ingestion_agent.process_specific_files(
+                        file_paths=[file_path],
                         session_id=session_id,
                         patient_id=self.patient_id_for_new_docs,
                         user_id=self.user_id_for_new_docs
                     )
+                    
+                    if ingestion_results > 0:
+                        # Continue with the rest of the pipeline
+                        classifier_agent = ClassifierAgent(
+                            context_store=self.context_store_instance,
+                            classification_rules=self.classification_rules
+                        )
+                        
+                        summarizer_agent = SummarizerAgent(
+                            context_store=self.context_store_instance,
+                            openai_api_key=self.openai_api_key
+                        )
+                        
+                        tagger_agent = TaggerAgent(
+                            context_store=self.context_store_instance,
+                            base_filed_folder=self.config_paths['archive_folder'],
+                            tag_definitions=self.tag_definitions
+                        )
+                        
+                        cover_sheet_renderer = SmartCoverSheetRenderer(context_store=self.context_store_instance)
+                        
+                        # Run the pipeline steps
+                        classification_results = classifier_agent.process_documents_for_classification(
+                            user_id=self.user_id_for_new_docs,
+                            status_to_classify="ingested",
+                            new_status_after_classification="classified"
+                        )
+                        
+                        summarization_results = summarizer_agent.summarize_classified_documents(
+                            session_id=session_id,
+                            user_id=self.user_id_for_new_docs,
+                            status_to_summarize="classified"
+                        )
+                        
+                        tagging_results = tagger_agent.process_documents_for_tagging_and_filing(
+                            user_id=self.user_id_for_new_docs,
+                            status_to_process="summarized"
+                        )
+                        
+                        # Generate cover sheet
+                        documents = self.context_store_instance.get_documents_for_session(session_id)
+                        document_ids = [doc["document_id"] for doc in documents]
+                        
+                        cover_sheet_pdf_path = None
+                        if document_ids:
+                            cover_sheet_pdf_path = os.path.join(
+                                self.config_paths['pdf_output_dir'],
+                                f"Watcher_Cover_Sheet_{session_id}.pdf"
+                            )
+                            
+                            success = cover_sheet_renderer.generate_cover_sheet(
+                                document_ids=document_ids,
+                                output_pdf_filename=cover_sheet_pdf_path,
+                                session_id=session_id,
+                                user_id=self.user_id_for_new_docs
+                            )
+                        
+                        results = {
+                            'session_id': session_id,
+                            'documents': documents,
+                            'cover_sheet_path': cover_sheet_pdf_path if document_ids else None,
+                            'stats': {
+                                'ingested': ingestion_results,
+                                'classified': classification_results,
+                                'summarized': summarization_results,
+                                'tagged': tagging_results
+                            }
+                        }
+                    else:
+                        results = {'session_id': session_id, 'stats': {'ingested': 0}}
                     
                     self.logger.info(
                         f"Pipeline processing completed for {file_path} under session {session_id}. "

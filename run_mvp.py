@@ -312,15 +312,14 @@ def execute_pipeline_for_files(
     
     cover_sheet_renderer = SmartCoverSheetRenderer(context_store=context_store)
     
-    # Step 1: Ingest specific files
+    # Step 1: Process documents through ingestion
     logger.info("Starting document ingestion...")
-    ingestion_results = ingestion_agent.process_specific_files(
-        file_paths=files_to_process_paths,
+    ingestion_results = ingestion_agent.process_pending_documents(
         session_id=session_id,
         patient_id=patient_id,
         user_id=user_id
     )
-    logger.info(f"Ingested {ingestion_results} documents")
+    logger.info(f"Ingested {len(ingestion_results)} documents")
     
     # Step 2: Classification
     logger.info("Starting document classification...")
