@@ -2,7 +2,7 @@ modules = ["python-3.11"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["fontconfig", "freetype", "ghostscript", "glib", "gumbo", "harfbuzz", "jbig2dec", "libjpeg_turbo", "mupdf", "openjpeg", "pango", "swig", "tesseract", "xcbuild"]
+packages = ["cacert", "cargo", "fontconfig", "freetype", "ghostscript", "glib", "glibcLocales", "gumbo", "harfbuzz", "jbig2dec", "lcms2", "libffi", "libiconv", "libimagequant", "libjpeg", "libjpeg_turbo", "libtiff", "libwebp", "libxcrypt", "mupdf", "openjpeg", "pango", "pkg-config", "rustc", "swig", "tcl", "tesseract", "tk", "xcbuild", "xcodebuild", "zlib"]
 
 [workflows]
 runButton = "Project"
@@ -67,6 +67,10 @@ args = "test_permissions"
 [[workflows.workflow.tasks]]
 task = "workflow.run"
 args = "test_end_to_end"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Run Watcher Service Demo"
 
 [[workflows.workflow]]
 name = "Run Context Store Tests"
@@ -179,6 +183,14 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd tests && python -m unittest test_end_to_end.py"
+
+[[workflows.workflow]]
+name = "Run Watcher Service Demo"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python watcher_service.py --watch-folder ./demo_watch --holding-folder ./demo_holding --archive-folder ./demo_archive --cover-sheets-folder ./demo_coversheets --db-path ./watcher_demo.db --openai"
 
 [deployment]
 run = ["sh", "-c", "python -m unittest discover tests"]

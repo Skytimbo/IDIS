@@ -231,6 +231,185 @@ class IngestionAgent:
         self.logger.info(f"Document processing scan complete. Successfully processed: {len(successful_document_ids)}")
         return successful_document_ids
     
+    def process_specific_files(
+        self, 
+        file_paths: List[str], 
+        session_id: str, 
+        patient_id: Optional[str] = None, 
+        user_id: str = "system_watcher"
+    ) -> int:
+        """
+        Process a specific list of file paths through the ingestion pipeline.
+        
+        Args:
+            file_paths: List of absolute paths to files to process
+            session_id: Session ID to associate documents with
+            patient_id: Optional patient ID to associate documents with
+            user_id: User ID for audit trail purposes
+            
+        Returns:
+            Number of successfully processed documents
+        """
+        self.logger.info(f"Starting processing of {len(file_paths)} specific files")
+        
+        successful_document_ids = []
+        
+        for file_path in file_paths:
+            if not os.path.exists(file_path):
+                self.logger.warning(f"File does not exist: {file_path}")
+                continue
+                
+            if not os.path.isfile(file_path):
+                self.logger.warning(f"Path is not a file: {file_path}")
+                continue
+            
+            filename = os.path.basename(file_path)
+            document_id = None
+            
+            try:
+                # Determine file type
+                file_type = self._determine_file_type(filename)
+                
+                # Add document to context store first
+                document_data = {
+                    'file_name': filename,
+                    'original_file_type': file_type,
+                    'ingestion_status': 'ingestion_pending',
+                    'processing_status': 'new',
+                    'patient_id': patient_id,
+                    'session_id': session_id,
+                    'original_watchfolder_path': file_path  # Store original path for reference
+                }
+                
+                document_id = self.context_store.add_document(document_data)
+                self.logger.info(f"Created document record with ID: {document_id} for file: {filename}")
+                
+                # Add audit log entry for document creation
+                self.context_store.add_audit_log_entry(
+                    user_id=user_id,
+                    event_type="AGENT_ACTIVITY",
+                    event_name="START_DOCUMENT_INGESTION",
+                    status="SUCCESS",
+                    resource_type="document",
+                    resource_id=document_id,
+                    details=f"Starting ingestion of {filename}"
+                )
+                
+                # Extract text from the file
+                extracted_text, confidence = self._extract_text_from_file(file_path, file_type)
+                
+                if extracted_text:
+                    # Update document with extracted text and success status
+                    update_data = {
+                        'extracted_text': extracted_text,
+                        'ocr_confidence_percent': confidence,
+                        'ingestion_status': 'ingestion_successful',
+                        'processing_status': 'ingested'
+                    }
+                    
+                    self.context_store.update_document_fields(document_id, update_data)
+                    
+                    # Add audit log entry for successful processing
+                    self.context_store.add_audit_log_entry(
+                        user_id=user_id,
+                        event_type="AGENT_ACTIVITY",
+                        event_name="COMPLETE_DOCUMENT_INGESTION",
+                        status="SUCCESS",
+                        resource_type="document",
+                        resource_id=document_id,
+                        details=f"Successfully ingested {filename} with confidence {confidence}%"
+                    )
+                    
+                    self.logger.info(f"Successfully ingested document: {filename} (ID: {document_id})")
+                    successful_document_ids.append(document_id)
+                    
+                    # Move file to holding folder to avoid reprocessing
+                    holding_path = os.path.join(self.holding_folder, filename)
+                    # Handle duplicate filenames by adding timestamp
+                    if os.path.exists(holding_path):
+                        import time
+                        timestamp = int(time.time())
+                        name, ext = os.path.splitext(filename)
+                        holding_path = os.path.join(self.holding_folder, f"{name}_{timestamp}{ext}")
+                    
+                    shutil.move(file_path, holding_path)
+                    self.logger.info(f"Moved processed file to holding folder: {holding_path}")
+                    
+                else:
+                    # Move file to holding folder and update status to failed
+                    holding_path = os.path.join(self.holding_folder, filename)
+                    # Handle duplicate filenames
+                    if os.path.exists(holding_path):
+                        import time
+                        timestamp = int(time.time())
+                        name, ext = os.path.splitext(filename)
+                        holding_path = os.path.join(self.holding_folder, f"{name}_{timestamp}{ext}")
+                    
+                    shutil.move(file_path, holding_path)
+                    
+                    self.context_store.update_document_fields(
+                        document_id, 
+                        {'ingestion_status': 'ingestion_failed'}
+                    )
+                    
+                    # Add audit log entry for failed processing
+                    self.context_store.add_audit_log_entry(
+                        user_id=user_id,
+                        event_type="AGENT_ACTIVITY",
+                        event_name="COMPLETE_DOCUMENT_INGESTION",
+                        status="FAILURE",
+                        resource_type="document",
+                        resource_id=document_id,
+                        details=f"Failed to extract text from {filename}"
+                    )
+                    
+                    self.logger.warning(
+                        f"Failed to extract text from document: {filename} (ID: {document_id}). "
+                        f"Moved to holding folder: {holding_path}"
+                    )
+            
+            except Exception as e:
+                self.logger.error(f"Error processing file {filename}: {str(e)}")
+                
+                # If we already created a document record, update it to failed
+                if document_id:
+                    try:
+                        self.context_store.update_document_fields(
+                            document_id, 
+                            {'ingestion_status': 'ingestion_failed'}
+                        )
+                        
+                        self.context_store.add_audit_log_entry(
+                            user_id=user_id,
+                            event_type="AGENT_ACTIVITY",
+                            event_name="COMPLETE_DOCUMENT_INGESTION",
+                            status="ERROR",
+                            resource_type="document",
+                            resource_id=document_id,
+                            details=f"Error processing {filename}: {str(e)}"
+                        )
+                    except Exception as inner_e:
+                        self.logger.error(f"Error updating document status: {str(inner_e)}")
+                
+                # Try to move the file to holding folder if it exists
+                try:
+                    if os.path.exists(file_path):
+                        holding_path = os.path.join(self.holding_folder, filename)
+                        # Handle duplicate filenames
+                        if os.path.exists(holding_path):
+                            import time
+                            timestamp = int(time.time())
+                            name, ext = os.path.splitext(filename)
+                            holding_path = os.path.join(self.holding_folder, f"{name}_{timestamp}{ext}")
+                        
+                        shutil.move(file_path, holding_path)
+                        self.logger.info(f"Moved problematic file to holding folder: {holding_path}")
+                except Exception as move_e:
+                    self.logger.error(f"Error moving file to holding folder: {str(move_e)}")
+        
+        self.logger.info(f"Specific file processing complete. Successfully processed: {len(successful_document_ids)}")
+        return len(successful_document_ids)
+    
     def _extract_text_from_file(self, file_path: str, file_type: str) -> Tuple[Optional[str], Optional[float]]:
         """
         Extract text from a file based on its type.

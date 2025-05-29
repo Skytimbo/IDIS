@@ -249,6 +249,135 @@ def cleanup_environment(paths: Dict[str, str], base_dir: Optional[str] = None):
             os.remove(paths['db_path'])
 
 
+def execute_pipeline_for_files(
+    context_store: ContextStore,
+    config_paths: Dict[str, str],
+    classification_rules: Dict[str, List[str]],
+    tag_definitions: Dict[str, List[str]],
+    openai_api_key: Optional[str],
+    files_to_process_paths: List[str],
+    session_id: str,
+    patient_id: Optional[str] = None,
+    user_id: str = "system_watcher"
+) -> Dict[str, Any]:
+    """
+    Execute the IDIS pipeline for specific files.
+    
+    Args:
+        context_store: An initialized instance of the ContextStore
+        config_paths: Dictionary containing configuration paths
+        classification_rules: Dictionary defining the classification logic
+        tag_definitions: Dictionary defining tag extraction rules
+        openai_api_key: Optional OpenAI API key for summarization
+        files_to_process_paths: List of absolute paths to files to process
+        session_id: Session ID for this processing run
+        patient_id: Optional patient ID to associate documents with
+        user_id: User ID for audit trail purposes
+        
+    Returns:
+        Dictionary with processing results and statistics
+    """
+    logger = logging.getLogger("Pipeline_Executor")
+    logger.info(f"Starting pipeline execution for {len(files_to_process_paths)} files")
+    
+    # Initialize agents
+    ingestion_agent = IngestionAgent(
+        context_store=context_store,
+        watch_folder=config_paths['watch_folder'],
+        holding_folder=config_paths['holding_folder']
+    )
+    
+    classifier_agent = ClassifierAgent(
+        context_store=context_store,
+        classification_rules=classification_rules
+    )
+    
+    summarizer_agent = SummarizerAgent(
+        context_store=context_store,
+        openai_api_key=openai_api_key
+    )
+    
+    tagger_agent = TaggerAgent(
+        context_store=context_store,
+        base_filed_folder=config_paths['archive_folder'],
+        tag_definitions=tag_definitions
+    )
+    
+    cover_sheet_renderer = SmartCoverSheetRenderer(context_store=context_store)
+    
+    # Step 1: Ingest specific files
+    logger.info("Starting document ingestion...")
+    ingestion_results = ingestion_agent.process_specific_files(
+        file_paths=files_to_process_paths,
+        session_id=session_id,
+        patient_id=patient_id,
+        user_id=user_id
+    )
+    logger.info(f"Ingested {ingestion_results} documents")
+    
+    # Step 2: Classification
+    logger.info("Starting document classification...")
+    classification_results = classifier_agent.process_documents_for_classification(
+        user_id=user_id,
+        status_to_classify="ingested",
+        new_status_after_classification="classified"
+    )
+    logger.info(f"Classification complete: {classification_results[0]} succeeded, {classification_results[1]} failed")
+    
+    # Step 3: Summarization
+    logger.info("Starting document summarization...")
+    summarization_results = summarizer_agent.summarize_classified_documents(
+        session_id=session_id,
+        user_id=user_id,
+        status_to_summarize="classified"
+    )
+    logger.info(f"Summarization complete: {summarization_results[0]} succeeded, {summarization_results[1]} failed")
+    
+    # Step 4: Tagging and Filing
+    logger.info("Starting document tagging and filing...")
+    tagging_results = tagger_agent.process_documents_for_tagging_and_filing(
+        user_id=user_id,
+        status_to_process="summarized"
+    )
+    logger.info(f"Tagging and filing complete: {tagging_results[0]} succeeded, {tagging_results[1]} failed")
+    
+    # Step 5: Generate Cover Sheet
+    logger.info("Generating cover sheet...")
+    documents = context_store.get_documents_for_session(session_id)
+    document_ids = [doc["document_id"] for doc in documents]
+    
+    cover_sheet_pdf_path = None
+    if document_ids:
+        cover_sheet_pdf_path = os.path.join(
+            config_paths['pdf_output_dir'],
+            f"Cover_Sheet_{session_id}.pdf"
+        )
+        
+        success = cover_sheet_renderer.generate_cover_sheet(
+            document_ids=document_ids,
+            output_pdf_filename=cover_sheet_pdf_path,
+            session_id=session_id,
+            user_id=user_id
+        )
+        
+        if success:
+            logger.info(f"Successfully generated cover sheet: {cover_sheet_pdf_path}")
+        else:
+            logger.error("Failed to generate cover sheet")
+    
+    return {
+        'session_id': session_id,
+        'documents': documents,
+        'cover_sheet_path': cover_sheet_pdf_path if document_ids else None,
+        'stats': {
+            'ingested': ingestion_results,
+            'classified': classification_results,
+            'summarized': summarization_results,
+            'tagged': tagging_results
+        }
+    }
+
+
 def run_pipeline(config: Dict[str, Any], keep_temp_files: bool = False) -> Dict[str, Any]:
     """
     Run the complete IDIS pipeline from ingestion to cover sheet generation.
@@ -286,111 +415,35 @@ def run_pipeline(config: Dict[str, Any], keep_temp_files: bool = False) -> Dict[
     )
     logger.info(f"Created session with ID: {mock_session_id}")
     
-    # Initialize agents
-    ingestion_agent = IngestionAgent(
-        context_store=context_store,
-        watch_folder=config['watch_folder'],
-        holding_folder=config['holding_folder']
-    )
-    logger.info("Initialized Ingestion Agent")
-    
-    classifier_agent = ClassifierAgent(
-        context_store=context_store,
-        classification_rules=CLASSIFICATION_RULES
-    )
-    logger.info("Initialized Classifier Agent")
-    
-    summarizer_agent = SummarizerAgent(
-        context_store=context_store,
-        openai_api_key=OPENAI_API_KEY
-    )
-    logger.info("Initialized Summarizer Agent")
-    
-    tagger_agent = TaggerAgent(
-        context_store=context_store,
-        base_filed_folder=config['archive_folder'],
-        tag_definitions=TAG_DEFINITIONS
-    )
-    logger.info("Initialized Tagger Agent")
-    
-    cover_sheet_renderer = SmartCoverSheetRenderer(context_store=context_store)
-    logger.info("Initialized Cover Sheet Renderer")
-    
     # Create mock documents
     mock_doc_details = create_mock_documents(config['watch_folder'])
     logger.info(f"Created {len(mock_doc_details)} mock documents in {config['watch_folder']}")
     
-    # Process documents through the pipeline
+    # Get list of files in watch folder
+    files_to_process = []
+    if os.path.exists(config['watch_folder']):
+        for filename in os.listdir(config['watch_folder']):
+            file_path = os.path.join(config['watch_folder'], filename)
+            if os.path.isfile(file_path):
+                files_to_process.append(file_path)
     
-    # Step 1: Ingestion
-    logger.info("Starting document ingestion...")
-    ingestion_results = ingestion_agent.process_pending_documents(
+    # Execute pipeline for these files
+    results = execute_pipeline_for_files(
+        context_store=context_store,
+        config_paths=config,
+        classification_rules=CLASSIFICATION_RULES,
+        tag_definitions=TAG_DEFINITIONS,
+        openai_api_key=OPENAI_API_KEY,
+        files_to_process_paths=files_to_process,
         session_id=mock_session_id,
         patient_id=mock_patient_id,
         user_id=default_user
     )
-    logger.info(f"Ingested {ingestion_results} documents")
     
-    # Step 2: Classification
-    logger.info("Starting document classification...")
-    classification_results = classifier_agent.process_documents_for_classification(
-        user_id=default_user,
-        status_to_classify="ingested",
-        new_status_after_classification="classified"
-    )
-    logger.info(f"Classification complete: {classification_results[0]} succeeded, {classification_results[1]} failed")
-    
-    # Step 3: Summarization
-    logger.info("Starting document summarization...")
-    if OPENAI_API_KEY:
-        logger.info("Using OpenAI for summarization")
-    else:
-        logger.info("No OpenAI API key provided, using mock summarization")
-    
-    summarization_results = summarizer_agent.summarize_classified_documents(
-        session_id=mock_session_id,
-        user_id=default_user,
-        status_to_summarize="classified"
-    )
-    logger.info(f"Summarization complete: {summarization_results[0]} succeeded, {summarization_results[1]} failed")
-    
-    # Step 4: Tagging and Filing
-    logger.info("Starting document tagging and filing...")
-    tagging_results = tagger_agent.process_documents_for_tagging_and_filing(
-        user_id=default_user,
-        status_to_process="summarized"
-    )
-    logger.info(f"Tagging and filing complete: {tagging_results[0]} succeeded, {tagging_results[1]} failed")
-    
-    # Step 5: Generate Cover Sheet
-    logger.info("Generating cover sheet...")
-    
-    # Get all processed documents for the session
-    documents = context_store.get_documents_for_session(mock_session_id)
-    document_ids = [doc["document_id"] for doc in documents]
-    
-    # Initialize cover sheet path
-    cover_sheet_pdf_path = None
-    
-    if document_ids:
-        cover_sheet_pdf_path = os.path.join(
-            config['pdf_output_dir'],
-            f"MVP_Cover_Sheet_{mock_session_id}.pdf"
-        )
-        
-        success = cover_sheet_renderer.generate_cover_sheet(
-            document_ids=document_ids,
-            output_pdf_filename=cover_sheet_pdf_path,
-            session_id=mock_session_id,
-            user_id=default_user
-        )
-        
-        if success:
-            logger.info(f"Successfully generated cover sheet: {cover_sheet_pdf_path}")
-        else:
-            logger.error("Failed to generate cover sheet")
-    else:
-        logger.warning("No documents found to include in cover sheet")
+    # Get documents for display
+    documents = results['documents']
+    cover_sheet_pdf_path = results['cover_sheet_path']
+    stats = results['stats']
     
     # Print document summary for verification
     logger.info("\n" + "="*80)
@@ -464,17 +517,15 @@ def run_pipeline(config: Dict[str, Any], keep_temp_files: bool = False) -> Dict[
     logger.info("="*80)
     
     # Return results for the test suite
+    # Extract document IDs for the return value
+    document_ids = [doc["document_id"] for doc in documents]
+    
     return {
         'session_id': mock_session_id,
         'patient_id': mock_patient_id,
         'documents': documents,
         'cover_sheet_path': cover_sheet_pdf_path if document_ids else None,
-        'stats': {
-            'ingested': ingestion_results,
-            'classified': classification_results,
-            'summarized': summarization_results,
-            'tagged': tagging_results
-        }
+        'stats': stats
     }
 
 

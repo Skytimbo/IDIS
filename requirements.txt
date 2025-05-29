@@ -33,3 +33,4 @@ typing-inspection==0.4.1
 weasyprint==65.1
 webencodings==0.5.1
 zopfli==0.2.3.post1
+watchdog
