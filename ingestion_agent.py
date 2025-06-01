@@ -98,21 +98,10 @@ class IngestionAgent:
             file_path = os.path.join(self.watch_folder, filename)
             processed_files.add(filename)
             
-            # Determine file type from extension
-            file_extension = os.path.splitext(filename)[1].lower()
-            file_type = file_extension[1:] if file_extension.startswith('.') else file_extension
-            
-            # Normalize some common file types
-            if file_type in ['jpeg', 'jpg', 'png', 'bmp', 'tiff', 'tif']:
-                file_type_category = 'image'
-            elif file_type == 'pdf':
-                file_type_category = 'pdf'
-            elif file_type == 'docx':
-                file_type_category = 'docx'
-            elif file_type == 'txt':
-                file_type_category = 'txt'
-            else:
-                file_type_category = 'unsupported'
+            # Determine file type from extension using shared method
+            file_type_category = self._determine_file_type(filename)
+            file_type = os.path.splitext(filename)[1].lower()
+            file_type = file_type[1:] if file_type.startswith('.') else file_type
             
             self.logger.info(f"Processing file: {filename} (Type: {file_type_category})")
             
