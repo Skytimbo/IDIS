@@ -9,11 +9,17 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     volumes:
       - ./watch_folder:/app/watch_folder
+      - ./holding_folder:/app/holding_folder
       - ./archive:/app/archive_folder
+      - ./cover_sheets:/app/cover_sheets
       - ./database:/app/db
-      - /dev/bus/usb:/dev/bus/usb
     restart: unless-stopped
-    devices:
-      - /dev/bus/usb:/dev/bus/usb
-    privileged: true  # Needed for full USB device access
-    command: ["--db-path", "/app/db/idis.db", "--watch-folder", "/app/watch_folder", "--archive-folder", "/app/archive"]
+    command: [
+      "python3", "watcher_service.py",
+      "--watch-folder", "/app/watch_folder",
+      "--holding-folder", "/app/holding_folder", 
+      "--archive-folder", "/app/archive_folder",
+      "--cover-sheets-folder", "/app/cover_sheets",
+      "--db-path", "/app/db/idis.db",
+      "--openai"
+    ]

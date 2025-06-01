@@ -8,18 +8,11 @@ ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
-    libtesseract-dev \
     libcairo2 \
     libpango-1.0-0 \
     libpangocairo-1.0-0 \
     libgdk-pixbuf2.0-0 \
     libffi-dev \
-    # Additional packages for handling USB devices and file operations
-    usbutils \
-    libusb-1.0-0 \
-    libsane \
-    libsane-common \
-    sane-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
@@ -48,5 +41,5 @@ USER scanner
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
   CMD ["python", "healthcheck.py"]
 
-# Define entrypoint
-ENTRYPOINT ["python", "run_mvp.py"]
+# Define default command
+CMD ["python3", "watcher_service.py"]
