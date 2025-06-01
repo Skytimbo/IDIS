@@ -421,10 +421,6 @@ def run_pipeline(config: Dict[str, Any], keep_temp_files: bool = False) -> Dict[
     )
     logger.info(f"Created session with ID: {mock_session_id}")
     
-    # Create mock documents
-    mock_doc_details = create_mock_documents(config['watch_folder'])
-    logger.info(f"Created {len(mock_doc_details)} mock documents in {config['watch_folder']}")
-    
     # Log watch folder contents before ingestion
     logger.info(f"Contents of watch folder '{config['watch_folder']}' before ingestion: {os.listdir(config['watch_folder'])}")
     
