@@ -10,8 +10,10 @@ import re
 import json
 import shutil
 import logging
+import hashlib
 from datetime import datetime
 from typing import Dict, List, Tuple, Any, Optional
+from dateutil import parser as date_parser
 
 from context_store import ContextStore
 
@@ -215,6 +217,103 @@ class TaggerAgent:
         new_filename = f"{date_prefix}_{sanitized_info}_{doc_abbrev}-{doc_id_prefix}{ext}"
         
         return new_filename
+    
+    def _verify_file_integrity(self, src: str, dst: str) -> bool:
+        """
+        Verify file integrity by comparing SHA256 hashes.
+        
+        Args:
+            src: Source file path
+            dst: Destination file path
+            
+        Returns:
+            True if files have matching hashes, False otherwise
+        """
+        try:
+            def get_file_hash(filepath: str) -> str:
+                hash_sha256 = hashlib.sha256()
+                with open(filepath, "rb") as f:
+                    for chunk in iter(lambda: f.read(4096), b""):
+                        hash_sha256.update(chunk)
+                return hash_sha256.hexdigest()
+            
+            return get_file_hash(src) == get_file_hash(dst)
+        except Exception as e:
+            self.logger.error(f"Failed to verify file integrity: {e}")
+            return False
+    
+    def _safe_file_move(self, src: str, dst: str) -> bool:
+        """
+        Safely move a file using copy-verify-delete mechanism.
+        
+        Args:
+            src: Source file path
+            dst: Destination file path
+            
+        Returns:
+            True if file was successfully moved, False otherwise
+        """
+        try:
+            # Pre-flight checks
+            if not os.path.exists(src):
+                self.logger.error(f"Source file does not exist: {src}")
+                return False
+            
+            if os.path.exists(dst):
+                self.logger.error(f"Destination file already exists: {dst}")
+                return False
+            
+            # Ensure destination directory exists
+            dst_dir = os.path.dirname(dst)
+            os.makedirs(dst_dir, exist_ok=True)
+            
+            # Get source file size
+            src_size = os.path.getsize(src)
+            
+            # Copy file with metadata
+            shutil.copy2(src, dst)
+            
+            # Verify copy was successful
+            if not os.path.exists(dst):
+                self.logger.error(f"Destination file was not created: {dst}")
+                return False
+            
+            # Verify file size matches
+            dst_size = os.path.getsize(dst)
+            if src_size != dst_size:
+                self.logger.error(f"File size mismatch: src={src_size}, dst={dst_size}")
+                # Clean up partial copy
+                try:
+                    os.remove(dst)
+                except:
+                    pass
+                return False
+            
+            # For larger files, verify integrity with hash comparison
+            if src_size > 1024 * 1024:  # 1MB threshold
+                if not self._verify_file_integrity(src, dst):
+                    self.logger.error(f"File integrity verification failed for {src}")
+                    # Clean up partial copy
+                    try:
+                        os.remove(dst)
+                    except:
+                        pass
+                    return False
+            
+            # All verifications passed, remove original
+            os.remove(src)
+            self.logger.info(f"Successfully moved file: {src} -> {dst}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Error during safe file move: {e}")
+            # Clean up any partial copy
+            try:
+                if os.path.exists(dst):
+                    os.remove(dst)
+            except:
+                pass
+            return False
     
     def process_documents_for_tagging_and_filing(
         self,
@@ -474,7 +573,7 @@ class TaggerAgent:
     
     def _normalize_date(self, date_str: str) -> Optional[str]:
         """
-        Normalize a date string to YYYY-MM-DD format.
+        Normalize a date string to YYYY-MM-DD format using robust dateutil parsing.
         
         Args:
             date_str: The date string to normalize
@@ -482,88 +581,88 @@ class TaggerAgent:
         Returns:
             Normalized date in YYYY-MM-DD format or None if parsing fails
         """
-        # Handle various date formats
         try:
-            # Month names and abbreviations mapping
-            month_names = {
-                'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6,
-                'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12,
-                'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'jun': 6,
-                'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12
-            }
+            # Clean the input string
+            cleaned_str = date_str.strip(',. ')
             
-            date_str_clean = date_str.lower().strip(',. ')
-            
-            # Check for "Month YYYY" format (e.g., "February 2025", "Feb 2025") FIRST
-            month_year_pattern = r'\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?,?\s+(\d{4})\b'
-            month_year_match = re.search(month_year_pattern, date_str_clean)
+            # Handle "Month YYYY" format specially (defaults to first day of month)
+            month_year_pattern = r'\b(Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+(\d{4})\b'
+            month_year_match = re.search(month_year_pattern, cleaned_str, re.IGNORECASE)
             
             if month_year_match:
-                # Extract month and year from "Month YYYY" format
-                month_text = re.sub(r'[,.]', '', month_year_match.group(1))
+                month_name = month_year_match.group(1).rstrip('.')
                 year = month_year_match.group(2)
-                
-                if month_text in month_names:
-                    month_num = month_names[month_text]
-                    # Default to first day of the month
+                # Use explicit month mapping to ensure first day of month
+                month_map = {
+                    'jan': 1, 'january': 1, 'feb': 2, 'february': 2,
+                    'mar': 3, 'march': 3, 'apr': 4, 'april': 4,
+                    'may': 5, 'jun': 6, 'june': 6, 'jul': 7, 'july': 7,
+                    'aug': 8, 'august': 8, 'sep': 9, 'september': 9,
+                    'oct': 10, 'october': 10, 'nov': 11, 'november': 11,
+                    'dec': 12, 'december': 12
+                }
+                month_num = month_map.get(month_name.lower())
+                if month_num:
                     return f"{year}-{month_num:02d}-01"
             
-            # Try parsing Month DD, YYYY format - but only if no 4-digit year immediately follows month
-            for month_text, month_num in month_names.items():
-                if month_text in date_str_clean:
-                    # Skip if this looks like "Month YYYY" format (month followed directly by 4-digit year)
-                    month_pos = date_str_clean.find(month_text)
-                    after_month = date_str_clean[month_pos + len(month_text):].strip(' ,.')
-                    if re.match(r'^\d{4}\b', after_month):
-                        continue  # This is Month YYYY format, skip
-                    
-                    # This is a textual month format with potential day
-                    # Extract day and year
-                    parts = re.split(r'[,\s]+', date_str_clean.replace(month_text, ''))
-                    parts = [p.strip() for p in parts if p.strip()]
-                    
-                    if len(parts) >= 1:  # Need at least year
-                        year = next((p for p in parts if p.isdigit() and len(p) >= 4), None)
-                        day = next((p for p in parts if p.isdigit() and 1 <= int(p) <= 31), None)
-                        
-                        if not year:  # Try two-digit year
-                            year = next((p for p in parts if p.isdigit() and len(p) == 2), None)
-                            if year:
-                                year = f"20{year}" if int(year) < 50 else f"19{year}"
-                        
-                        if year:
-                            # Use provided day or default to 1
-                            day_num = int(day) if day else 1
-                            return f"{year}-{month_num:02d}-{day_num:02d}"
+            # Use dateutil parser for comprehensive date parsing
+            parsed_date = date_parser.parse(cleaned_str, fuzzy=True)
             
-            # Try MM/DD/YYYY or MM-DD-YYYY
-            if '/' in date_str or '-' in date_str:
-                separator = '/' if '/' in date_str else '-'
-                parts = date_str.split(separator)
-                
-                if len(parts) == 3:
-                    # Determine format: MM/DD/YYYY or YYYY/MM/DD
-                    if len(parts[0]) == 4:  # YYYY-MM-DD
-                        year, month, day = parts
-                    else:  # MM-DD-YYYY (assume American format)
-                        month, day, year = parts
-                    
-                    # Fix two-digit years
-                    if len(year) == 2:
-                        year = f"20{year}" if int(year) < 50 else f"19{year}"
-                    
-                    return f"{year}-{int(month):02d}-{int(day):02d}"
+            # Validate date is reasonable (not before 1900 or more than 1 year in future)
+            current_year = datetime.now().year
+            if parsed_date.year < 1900 or parsed_date.year > current_year + 1:
+                self.logger.warning(f"Date {parsed_date.year} outside reasonable range, skipping")
+                return None
             
-            # If we couldn't parse it, return None
-            return None
+            return parsed_date.strftime("%Y-%m-%d")
             
-        except (ValueError, IndexError) as e:
+        except Exception as e:
             self.logger.debug(f"Error normalizing date '{date_str}': {str(e)}")
             return None
     
+    def _clean_issuer_name(self, raw_name: str) -> str:
+        """
+        Clean extracted issuer name by removing noise.
+        
+        Args:
+            raw_name: Raw extracted issuer name
+            
+        Returns:
+            Cleaned issuer name
+        """
+        # Remove everything after | symbol (common in headers)
+        if '|' in raw_name:
+            raw_name = raw_name.split('|')[0]
+        
+        # Remove address/phone patterns
+        cleaned = re.sub(r'\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b', '', raw_name)  # Phone numbers
+        cleaned = re.sub(r'\b\d{1,5}\s+\w+\s+(St|Street|Ave|Avenue|Rd|Road|Blvd|Boulevard)\b', '', cleaned, flags=re.IGNORECASE)  # Addresses
+        cleaned = re.sub(r'\b[A-Z]{2}\s+\d{5}(-\d{4})?\b', '', cleaned)  # ZIP codes
+        
+        return cleaned.strip()
+    
+    def _is_metadata_line(self, line: str) -> bool:
+        """
+        Check if a line contains metadata rather than issuer information.
+        
+        Args:
+            line: Line of text to check
+            
+        Returns:
+            True if line appears to be metadata
+        """
+        metadata_patterns = [
+            r'^\s*(?:to|from|date|subject|re):\s*',
+            r'^\s*(?:invoice|bill|statement|receipt)#?\s*:?\s*\d',
+            r'^\s*(?:page|p\.)\s*\d+\s*(?:of|/)\s*\d+',
+            r'^\s*\d{1,2}[/-]\d{1,2}[/-]\d{2,4}\s*$'
+        ]
+        
+        return any(re.match(pattern, line, re.IGNORECASE) for pattern in metadata_patterns)
+    
     def _extract_issuer(self, text: str) -> Optional[str]:
         """
-        Extract the issuer/source of the document.
+        Extract the issuer/source of the document using intelligent multi-pass strategy.
         
         Args:
             text: The document text to process
@@ -571,27 +670,40 @@ class TaggerAgent:
         Returns:
             Extracted issuer name or None if not found
         """
-        # Common patterns for issuers
-        issuer_patterns = [
-            r'(?:from|issued\s+by|sender):\s*([A-Z][A-Za-z0-9\s&.,]+(?:Inc\.|LLC|Ltd\.|Corp\.|Corporation|Company))',
-            r'(?:letterhead|header):\s*([A-Z][A-Za-z0-9\s&.,]+(?:Inc\.|LLC|Ltd\.|Corp\.|Corporation|Company))',
-            r'([A-Z][A-Za-z0-9\s&.,]+(?:Inc\.|LLC|Ltd\.|Corp\.|Corporation|Company|Hospital|Medical Center))[^\n.]*?presents',
-            r'^([A-Z][A-Za-z0-9\s&.,]+(?:Inc\.|LLC|Ltd\.|Corp\.|Corporation|Company|Hospital|Medical Center))[\n\r]'
-        ]
+        lines = [line.strip() for line in text.split('\n') if line.strip()]
+        if not lines:
+            return None
         
-        # Try each pattern
-        for pattern in issuer_patterns:
-            match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
-            if match:
-                issuer = match.group(1).strip()
-                if len(issuer) > 3:  # Avoid very short matches
+        # Pass 1: Search header (first ~7 lines) for high-confidence signals
+        header_lines = lines[:7]
+        
+        # Look for explicit "From:" patterns
+        for line in header_lines:
+            from_match = re.search(r'(?:from|sender|issued\s+by):\s*(.+)', line, re.IGNORECASE)
+            if from_match:
+                issuer = self._clean_issuer_name(from_match.group(1))
+                if len(issuer) > 3:
                     return issuer
         
-        # Fallback: Look at the first non-empty line (often contains letterhead info)
-        lines = [line.strip() for line in text.split('\n') if line.strip()]
-        if lines and len(lines[0]) > 3 and not lines[0].lower().startswith(('re:', 'subject:', 'to:', 'date:')):
-            return lines[0]
-            
+        # Pass 2: Look for company suffixes in header
+        company_suffixes = r'\b(Inc\.?|LLC|Ltd\.?|Corp\.?|Corporation|Company|Hospital|Clinic|Associates|Foundation|Center|Medical\s+Center|Health\s+System)\b'
+        
+        for line in header_lines:
+            if re.search(company_suffixes, line, re.IGNORECASE) and not self._is_metadata_line(line):
+                # Extract the organization name
+                # Look for text before the suffix plus the suffix
+                match = re.search(r'([A-Z][A-Za-z0-9\s&.,\'-]+' + company_suffixes + r')', line, re.IGNORECASE)
+                if match:
+                    issuer = self._clean_issuer_name(match.group(0))
+                    if len(issuer) > 3:
+                        return issuer
+        
+        # Pass 3: First line fallback (if not metadata)
+        if not self._is_metadata_line(lines[0]) and len(lines[0]) > 3:
+            # Check if it looks like an organization name
+            if any(char.isupper() for char in lines[0]) and not lines[0].isdigit():
+                return self._clean_issuer_name(lines[0])
+        
         return None
     
     def _extract_recipient(self, text: str) -> Optional[str]:
