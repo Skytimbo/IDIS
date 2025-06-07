@@ -218,6 +218,158 @@ class TaggerAgent:
         
         return new_filename
     
+    def _is_valid_entity_name(self, name: str) -> bool:
+        """
+        Check if extracted entity name is valid and not garbage data.
+        
+        Args:
+            name: The entity name to validate
+            
+        Returns:
+            True if name appears to be a valid entity name
+        """
+        if not name or len(name.strip()) < 3:
+            return False
+        
+        name = name.strip()
+        
+        # Filter out common garbage patterns
+        garbage_patterns = [
+            r'^[\d\s\-_.,]+$',  # Only numbers, spaces, and punctuation
+            r'^[A-Z]{1,2}\s*\d+$',  # State codes with numbers (e.g., "CA 123")
+            r'^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}$',  # Date patterns
+            r'^[A-Z]{2,3}\s*\d{5,}$',  # ZIP codes or similar
+            r'^(page|p\.)\s*\d+',  # Page numbers
+            r'^(invoice|bill|receipt|statement)#?\s*\d+',  # Document numbers
+            r'^(fax|phone|tel|email)[:.]',  # Contact info labels
+        ]
+        
+        for pattern in garbage_patterns:
+            if re.match(pattern, name, re.IGNORECASE):
+                return False
+        
+        # Must contain at least one letter
+        if not re.search(r'[a-zA-Z]', name):
+            return False
+        
+        # Reject if too many consecutive special characters
+        if re.search(r'[^\w\s]{3,}', name):
+            return False
+        
+        return True
+    
+    def _validate_extracted_data(self, extracted_dates: Dict[str, str], 
+                                 issuer: Optional[str], recipient: Optional[str], 
+                                 tags: List[str]) -> Dict[str, Any]:
+        """
+        Validate and clean extracted metadata using quality checks.
+        
+        Args:
+            extracted_dates: Dictionary of extracted dates
+            issuer: Extracted issuer name
+            recipient: Extracted recipient name  
+            tags: List of extracted tags
+            
+        Returns:
+            Dictionary of validated metadata
+        """
+        validated_data = {}
+        
+        # Validate dates - remove invalid ones
+        validated_dates = {}
+        for context, date_str in extracted_dates.items():
+            if date_str and re.match(r'^\d{4}-\d{2}-\d{2}$', date_str):
+                try:
+                    # Parse to verify it's a valid date
+                    date_parser.parse(date_str)
+                    validated_dates[context] = date_str
+                except:
+                    self.logger.warning(f"Invalid date format ignored: {date_str}")
+        
+        validated_data['dates'] = validated_dates
+        
+        # Validate issuer
+        if issuer and self._is_valid_entity_name(issuer):
+            validated_data['issuer'] = issuer.strip()
+        else:
+            validated_data['issuer'] = None
+            if issuer:
+                self.logger.debug(f"Invalid issuer name filtered out: {issuer}")
+        
+        # Validate recipient  
+        if recipient and self._is_valid_entity_name(recipient):
+            validated_data['recipient'] = recipient.strip()
+        else:
+            validated_data['recipient'] = None
+            if recipient:
+                self.logger.debug(f"Invalid recipient name filtered out: {recipient}")
+        
+        # Validate tags - ensure they're non-empty strings
+        validated_tags = [tag.strip() for tag in tags if tag and tag.strip()]
+        validated_data['tags'] = validated_tags
+        
+        return validated_data
+    
+    def _extract_semantic_tags(self, text: str, document_type: str) -> List[str]:
+        """
+        Extract context-aware semantic tags based on document type and content.
+        
+        Args:
+            text: The document text to process
+            document_type: The classified document type
+            
+        Returns:
+            List of semantic tags
+        """
+        semantic_tags = []
+        text_lower = text.lower()
+        
+        # Document type specific tagging
+        if document_type == "Medical Record":
+            medical_patterns = {
+                'lab_results': [r'\b(lab\s+results?|laboratory|blood\s+work|test\s+results?)\b'],
+                'prescription': [r'\b(prescription|medication|rx|drug|dosage)\b'],
+                'diagnosis': [r'\b(diagnosis|diagnosed|condition|disorder|disease)\b'],
+                'treatment': [r'\b(treatment|therapy|procedure|surgery|operation)\b'],
+                'followup': [r'\b(follow\s*up|next\s+visit|appointment|schedule)\b']
+            }
+            
+            for tag, patterns in medical_patterns.items():
+                if any(re.search(pattern, text_lower) for pattern in patterns):
+                    semantic_tags.append(tag)
+        
+        elif document_type == "Invoice":
+            invoice_patterns = {
+                'overdue': [r'\b(overdue|past\s+due|late|delinquent)\b'],
+                'payment_due': [r'\b(payment\s+due|due\s+date|remit|pay\s+by)\b'],
+                'services': [r'\b(services?|consulting|professional)\b'],
+                'products': [r'\b(products?|goods|items|materials)\b'],
+                'discount': [r'\b(discount|rebate|credit|reduction)\b']
+            }
+            
+            for tag, patterns in invoice_patterns.items():
+                if any(re.search(pattern, text_lower) for pattern in patterns):
+                    semantic_tags.append(tag)
+        
+        elif document_type == "Legal Document":
+            legal_patterns = {
+                'contract': [r'\b(contract|agreement|terms|conditions)\b'],
+                'notice': [r'\b(notice|notification|serve|legal\s+notice)\b'],
+                'court': [r'\b(court|judge|hearing|trial|lawsuit)\b'],
+                'settlement': [r'\b(settlement|resolve|mediation|arbitration)\b']
+            }
+            
+            for tag, patterns in legal_patterns.items():
+                if any(re.search(pattern, text_lower) for pattern in patterns):
+                    semantic_tags.append(tag)
+        
+        # Extract predefined tags as well
+        predefined_tags = self._extract_predefined_tags(text)
+        semantic_tags.extend(predefined_tags)
+        
+        # Remove duplicates while preserving order
+        return list(dict.fromkeys(semantic_tags))
+    
     def _verify_file_integrity(self, src: str, dst: str) -> bool:
         """
         Verify file integrity by comparing SHA256 hashes.

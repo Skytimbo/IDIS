@@ -146,8 +146,10 @@ class TestTaggerAgent(unittest.TestCase):
     
     @patch('os.path.isfile')
     @patch('os.makedirs')
-    @patch('shutil.move')
-    def test_recipient_extraction(self, mock_move, mock_makedirs, mock_isfile):
+    @patch('os.path.getsize')
+    @patch('shutil.copy2')
+    @patch('os.remove')
+    def test_recipient_extraction(self, mock_remove, mock_copy2, mock_getsize, mock_makedirs, mock_isfile):
         """Test extraction of document recipient."""
         # Text with recipient information
         text_with_recipient = """
@@ -165,6 +167,7 @@ class TestTaggerAgent(unittest.TestCase):
         
         # Mock a document with this text
         mock_isfile.return_value = True
+        mock_getsize.return_value = 1024  # Mock file size
         mock_document = {
             "document_id": "test_doc_id",
             "extracted_text": text_with_recipient,
@@ -188,8 +191,10 @@ class TestTaggerAgent(unittest.TestCase):
     
     @patch('os.path.isfile')
     @patch('os.makedirs')
-    @patch('shutil.move')
-    def test_tag_extraction(self, mock_move, mock_makedirs, mock_isfile):
+    @patch('os.path.getsize')
+    @patch('shutil.copy2')
+    @patch('os.remove')
+    def test_tag_extraction(self, mock_remove, mock_copy2, mock_getsize, mock_makedirs, mock_isfile):
         """Test extraction of predefined tags."""
         # Text with tag keywords
         text_with_tags = """
@@ -202,6 +207,7 @@ class TestTaggerAgent(unittest.TestCase):
         
         # Mock a document with this text
         mock_isfile.return_value = True
+        mock_getsize.return_value = 1024  # Mock file size
         mock_document = {
             "document_id": "test_doc_id",
             "extracted_text": text_with_tags,
@@ -229,11 +235,14 @@ class TestTaggerAgent(unittest.TestCase):
     
     @patch('os.path.isfile')
     @patch('os.makedirs')
-    @patch('shutil.move')
-    def test_filing_with_patient_id(self, mock_move, mock_makedirs, mock_isfile):
+    @patch('os.path.getsize')
+    @patch('shutil.copy2')
+    @patch('os.remove')
+    def test_filing_with_patient_id(self, mock_remove, mock_copy2, mock_getsize, mock_makedirs, mock_isfile):
         """Test filing documents with patient ID using enhanced schema."""
         # Mock document with patient ID
         mock_isfile.return_value = True
+        mock_getsize.return_value = 1024  # Mock file size
         mock_document = {
             "document_id": "test_doc_12345678",
             "extracted_text": "Test document with invoice_date January 15, 2023",
@@ -273,10 +282,10 @@ class TestTaggerAgent(unittest.TestCase):
         # Check enhanced filename: 2023-01-15_scan001_MEDREC-test_doc.pdf
         self.assertIn("2023-01-15_scan001_MEDREC-test_doc", filed_path)
         
-        # Verify move was called with correct paths
-        mock_move.assert_called_once()
-        source_path = mock_move.call_args[0][0]
-        dest_path = mock_move.call_args[0][1]
+        # Verify copy2 was called with correct paths (safe file movement)
+        mock_copy2.assert_called_once()
+        source_path = mock_copy2.call_args[0][0]
+        dest_path = mock_copy2.call_args[0][1]
         
         self.assertEqual(source_path, "/tmp/scan001.pdf")
         self.assertEqual(dest_path, filed_path)
