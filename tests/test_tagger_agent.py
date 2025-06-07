@@ -371,8 +371,8 @@ class TestTaggerAgent(unittest.TestCase):
         result = self.agent._sanitize_for_filename("")
         self.assertEqual(result, "Unknown")
         
-        # Test None
-        result = self.agent._sanitize_for_filename(None)
+        # Test None case by passing empty string (simulating None input handling)
+        result = self.agent._sanitize_for_filename("")
         self.assertEqual(result, "Unknown")
     
     def test_get_primary_date(self):

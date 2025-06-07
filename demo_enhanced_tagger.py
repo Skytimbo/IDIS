@@ -137,7 +137,7 @@ def main():
         add_demo_patients(context_store)
         
         # Create demo session
-        session_id = context_store.add_session(
+        session_id = context_store.create_session(
             user_id="demo_user",
             metadata={"demo_type": "enhanced_filing"}
         )
