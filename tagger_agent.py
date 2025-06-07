@@ -60,9 +60,161 @@ class TaggerAgent:
         # Create the base filing directory if it doesn't exist
         os.makedirs(self.base_filed_folder, exist_ok=True)
         
+        # Document type abbreviations for filename generation
+        self.doc_type_abbreviations = {
+            "Invoice": "INV",
+            "Medical Record": "MEDREC", 
+            "Letter": "LTR",
+            "Report": "RPT",
+            "Insurance Document": "INS",
+            "Legal Document": "LEGAL",
+            "Receipt": "RCPT",
+            "Unclassified": "UNC"
+        }
+        
         self.logger.info(f"TaggerAgent initialized with base filing directory: {base_filed_folder}")
         if tag_definitions:
             self.logger.info(f"Configured with {len(tag_definitions)} tag definitions")
+    
+    def _sanitize_for_filename(self, text: str) -> str:
+        """
+        Sanitize text to make it safe for file and folder names.
+        
+        Args:
+            text: The text to sanitize
+            
+        Returns:
+            Sanitized text safe for filesystem use
+        """
+        if not text:
+            return "Unknown"
+        
+        # Replace spaces with underscores
+        sanitized = text.replace(" ", "_")
+        
+        # Remove or replace special characters, keep only alphanumeric, underscore, and hyphen
+        sanitized = re.sub(r'[^a-zA-Z0-9_\-]', '', sanitized)
+        
+        # Limit length to avoid filesystem issues
+        sanitized = sanitized[:50]
+        
+        # Ensure it's not empty after sanitization
+        return sanitized if sanitized else "Unknown"
+    
+    def _get_primary_date(self, document_dates: Dict[str, Any], upload_timestamp: str) -> datetime:
+        """
+        Determine the primary date for filing from document dates with priority order.
+        
+        Args:
+            document_dates: Dictionary of extracted dates from document
+            upload_timestamp: Document upload timestamp as fallback
+            
+        Returns:
+            Primary date to use for filing
+        """
+        # Priority order for date keys
+        priority_keys = ["invoice_date", "letter_date", "visit_date", "report_date"]
+        
+        # Try priority keys first
+        for key in priority_keys:
+            if key in document_dates:
+                try:
+                    date_str = document_dates[key]
+                    if isinstance(date_str, str) and len(date_str) >= 10:
+                        return datetime.strptime(date_str[:10], '%Y-%m-%d')
+                except (ValueError, TypeError):
+                    continue
+        
+        # Find earliest valid date from any key
+        valid_dates = []
+        for date_value in document_dates.values():
+            if isinstance(date_value, str) and len(date_value) >= 10:
+                try:
+                    valid_dates.append(datetime.strptime(date_value[:10], '%Y-%m-%d'))
+                except (ValueError, TypeError):
+                    continue
+        
+        if valid_dates:
+            return min(valid_dates)
+        
+        # Fallback to upload timestamp
+        try:
+            if upload_timestamp:
+                return datetime.fromisoformat(upload_timestamp.replace('Z', '+00:00'))
+        except (ValueError, TypeError):
+            pass
+        
+        # Final fallback to current time
+        return datetime.now()
+    
+    def _get_patient_folder_name(self, patient_id: str) -> str:
+        """
+        Get sanitized patient folder name with patient name and ID prefix.
+        
+        Args:
+            patient_id: The patient ID to look up
+            
+        Returns:
+            Sanitized folder name in format: PatientName_first6chars or patient_id if name not found
+        """
+        try:
+            patient_data = self.context_store.get_patient(patient_id)
+            if patient_data and patient_data.get('patient_name'):
+                sanitized_name = self._sanitize_for_filename(patient_data['patient_name'])
+                id_prefix = patient_id[:6] if len(patient_id) >= 6 else patient_id
+                return f"{sanitized_name}_{id_prefix}"
+        except Exception as e:
+            self.logger.warning(f"Could not fetch patient name for {patient_id}: {e}")
+        
+        # Fallback to full patient_id
+        return self._sanitize_for_filename(patient_id)
+    
+    def _generate_new_filename(self, document_id: str, file_name: str, document_type: str, 
+                               primary_date: datetime, patient_id: Optional[str], 
+                               issuer_source: Optional[str]) -> str:
+        """
+        Generate new descriptive filename using the enhanced naming convention.
+        
+        Args:
+            document_id: The document UUID
+            file_name: Original filename
+            document_type: The classified document type
+            primary_date: The primary date for the document
+            patient_id: Patient ID if associated with a patient
+            issuer_source: The document issuer/source
+            
+        Returns:
+            New filename in format: YYYY-MM-DD_[SanitizedInfo]_[DocTypeAbbrev]-[doc_id_first_8].[ext]
+        """
+        # Get date prefix
+        date_prefix = primary_date.strftime('%Y-%m-%d')
+        
+        # Get document type abbreviation
+        doc_abbrev = self.doc_type_abbreviations.get(document_type, "UNC")
+        
+        # Get document ID prefix (first 8 characters)
+        doc_id_prefix = document_id[:8] if len(document_id) >= 8 else document_id
+        
+        # Get original file extension
+        _, ext = os.path.splitext(file_name)
+        ext = ext if ext else '.txt'
+        
+        # Determine sanitized info part
+        if patient_id:
+            # For patient documents, use sanitized original filename
+            base_name = os.path.splitext(file_name)[0]
+            sanitized_info = self._sanitize_for_filename(base_name)
+        else:
+            # For general documents, use sanitized issuer or fallback
+            if issuer_source:
+                sanitized_info = self._sanitize_for_filename(issuer_source)
+            else:
+                sanitized_info = "UnknownSource"
+        
+        # Construct the new filename
+        new_filename = f"{date_prefix}_{sanitized_info}_{doc_abbrev}-{doc_id_prefix}{ext}"
+        
+        return new_filename
     
     def process_documents_for_tagging_and_filing(
         self,
@@ -135,45 +287,36 @@ class TaggerAgent:
             recipient = self._extract_recipient(extracted_text)
             active_tags = self._extract_predefined_tags(extracted_text)
             
-            # Determine the filed path for document
+            # Determine the filed path for document using enhanced schema
             filing_successful = False
             new_filed_path = None
             
             try:
-                # Select primary date for filing structure (earliest date or current date)
-                primary_date = None
-                if extracted_dates_dict:
-                    dates = []
-                    for date_str in extracted_dates_dict.values():
-                        try:
-                            dates.append(datetime.strptime(date_str, "%Y-%m-%d"))
-                        except ValueError:
-                            pass
-                    
-                    if dates:
-                        primary_date = min(dates)
+                # Get primary date using enhanced logic
+                upload_timestamp = document.get("upload_timestamp", "")
+                primary_date = self._get_primary_date(extracted_dates_dict, upload_timestamp)
                 
-                if not primary_date:
-                    primary_date = datetime.now()
-                
-                # Construct filing path
+                # Construct filing path based on enhanced schema
                 year_month_folder = os.path.join(
                     str(primary_date.year),
                     f"{primary_date.month:02d}"
                 )
                 
-                # Create patient-specific or general folder
+                # Create patient-specific or general folder using new schema
                 if patient_id:
-                    relative_folder = os.path.join("patients", patient_id, year_month_folder)
+                    patient_folder_name = self._get_patient_folder_name(patient_id)
+                    relative_folder = os.path.join("patients", patient_folder_name, year_month_folder)
                 else:
-                    relative_folder = os.path.join("general_documents", document_type, year_month_folder)
+                    relative_folder = os.path.join("general_archive", year_month_folder)
                 
                 # Create full path
                 filing_dir = os.path.join(self.base_filed_folder, relative_folder)
                 os.makedirs(filing_dir, exist_ok=True)
                 
-                # Add document ID prefix to filename to ensure uniqueness
-                filed_filename = f"{document_id}_{file_name}"
+                # Generate new descriptive filename using enhanced naming convention
+                filed_filename = self._generate_new_filename(
+                    document_id, file_name, document_type, primary_date, patient_id, issuer
+                )
                 new_filed_path = os.path.join(filing_dir, filed_filename)
                 
                 # Add detailed logging for debugging file path issues

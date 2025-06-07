@@ -228,17 +228,25 @@ class TestTaggerAgent(unittest.TestCase):
     @patch('os.makedirs')
     @patch('shutil.move')
     def test_filing_with_patient_id(self, mock_move, mock_makedirs, mock_isfile):
-        """Test filing documents with patient ID."""
+        """Test filing documents with patient ID using enhanced schema."""
         # Mock document with patient ID
         mock_isfile.return_value = True
         mock_document = {
-            "document_id": "test_doc_id",
-            "extracted_text": "Test document with date January 15, 2023",
-            "file_name": "test_document.pdf",
-            "original_watchfolder_path": "/tmp/test_document.pdf",
-            "patient_id": "patient_123"
+            "document_id": "test_doc_12345678",
+            "extracted_text": "Test document with invoice_date January 15, 2023",
+            "file_name": "scan001.pdf",
+            "original_watchfolder_path": "/tmp/scan001.pdf",
+            "patient_id": "patient_123456",
+            "document_type": "Medical Record",
+            "upload_timestamp": "2023-01-15T10:30:00Z"
         }
         self.mock_context_store.get_documents_by_processing_status.return_value = [mock_document]
+        
+        # Mock patient lookup to return patient name
+        self.mock_context_store.get_patient.return_value = {
+            "patient_id": "patient_123456",
+            "patient_name": "John Doe"
+        }
         
         # Run tagging and filing
         result = self.agent.process_documents_for_tagging_and_filing()
@@ -246,22 +254,28 @@ class TestTaggerAgent(unittest.TestCase):
         # Check results
         self.assertEqual(result[0], 1)  # One document successfully processed
         
-        # Verify filing path was constructed correctly
+        # Verify filing path was constructed correctly with enhanced schema
         update_calls = self.mock_context_store.update_document_fields.call_args_list
         update_data = update_calls[0][0][1]
         
         self.assertIn("filed_path", update_data)
         filed_path = update_data["filed_path"]
         
-        # Check that patient ID is in the path
-        self.assertIn("patient_123", filed_path)
+        # Check enhanced filing structure: /patients/John_Doe_patien/2023/01/
+        self.assertIn("patients", filed_path)
+        self.assertIn("John_Doe_patien", filed_path)  # Sanitized name + first 6 chars of ID
+        self.assertIn("2023", filed_path)
+        self.assertIn("01", filed_path)
+        
+        # Check enhanced filename: 2023-01-15_scan001_MEDREC-test_doc.pdf
+        self.assertIn("2023-01-15_scan001_MEDREC-test_doc", filed_path)
         
         # Verify move was called with correct paths
         mock_move.assert_called_once()
         source_path = mock_move.call_args[0][0]
         dest_path = mock_move.call_args[0][1]
         
-        self.assertEqual(source_path, "/tmp/test_document.pdf")
+        self.assertEqual(source_path, "/tmp/scan001.pdf")
         self.assertEqual(dest_path, filed_path)
         
         # Verify makedirs was called to create directory structure
@@ -271,15 +285,16 @@ class TestTaggerAgent(unittest.TestCase):
     @patch('os.makedirs')
     @patch('shutil.move')
     def test_filing_without_patient_id(self, mock_move, mock_makedirs, mock_isfile):
-        """Test filing documents without patient ID."""
-        # Mock document without patient ID but with document type
+        """Test filing documents without patient ID using enhanced general archive schema."""
+        # Mock document without patient ID but with document type and issuer
         mock_isfile.return_value = True
         mock_document = {
-            "document_id": "test_doc_id",
-            "extracted_text": "Test document with date January 15, 2023",
-            "file_name": "test_document.pdf",
-            "original_watchfolder_path": "/tmp/test_document.pdf",
-            "document_type": "Invoice"
+            "document_id": "test_doc_87654321",
+            "extracted_text": "Test invoice from ABC Company dated January 15, 2023",
+            "file_name": "invoice_001.pdf",
+            "original_watchfolder_path": "/tmp/invoice_001.pdf",
+            "document_type": "Invoice",
+            "upload_timestamp": "2023-01-15T14:20:00Z"
         }
         self.mock_context_store.get_documents_by_processing_status.return_value = [mock_document]
         
@@ -289,16 +304,21 @@ class TestTaggerAgent(unittest.TestCase):
         # Check results
         self.assertEqual(result[0], 1)  # One document successfully processed
         
-        # Verify filing path was constructed correctly
+        # Verify filing path was constructed correctly with enhanced schema
         update_calls = self.mock_context_store.update_document_fields.call_args_list
         update_data = update_calls[0][0][1]
         
         self.assertIn("filed_path", update_data)
         filed_path = update_data["filed_path"]
         
-        # Check that general_documents and document type are in the path
-        self.assertIn("general_documents", filed_path)
-        self.assertIn("Invoice", filed_path)
+        # Check enhanced filing structure: /general_archive/2023/01/
+        self.assertIn("general_archive", filed_path)
+        self.assertIn("2023", filed_path)
+        self.assertIn("01", filed_path)
+        
+        # Check enhanced filename includes document type abbreviation and issuer
+        self.assertIn("2023-01-15", filed_path)
+        self.assertIn("INV-test_doc", filed_path)  # INV abbreviation for Invoice
         
         # Verify move was called with correct paths
         mock_move.assert_called_once()
@@ -336,6 +356,88 @@ class TestTaggerAgent(unittest.TestCase):
         
         # Verify move was not called
         mock_move.assert_not_called()
+    
+    def test_sanitize_for_filename(self):
+        """Test filename sanitization helper method."""
+        # Test normal text
+        result = self.agent._sanitize_for_filename("John Doe")
+        self.assertEqual(result, "John_Doe")
+        
+        # Test text with special characters
+        result = self.agent._sanitize_for_filename("Patient@#123!")
+        self.assertEqual(result, "Patient123")
+        
+        # Test empty string
+        result = self.agent._sanitize_for_filename("")
+        self.assertEqual(result, "Unknown")
+        
+        # Test None
+        result = self.agent._sanitize_for_filename(None)
+        self.assertEqual(result, "Unknown")
+    
+    def test_get_primary_date(self):
+        """Test primary date determination logic."""
+        # Test with priority date keys
+        document_dates = {
+            "invoice_date": "2023-01-15",
+            "visit_date": "2023-01-20"
+        }
+        result = self.agent._get_primary_date(document_dates, "2023-01-10T10:00:00Z")
+        self.assertEqual(result.strftime('%Y-%m-%d'), "2023-01-15")  # Should pick invoice_date
+        
+        # Test with earliest date when no priority keys
+        document_dates = {
+            "some_date": "2023-01-20",
+            "another_date": "2023-01-15"
+        }
+        result = self.agent._get_primary_date(document_dates, "2023-01-10T10:00:00Z")
+        self.assertEqual(result.strftime('%Y-%m-%d'), "2023-01-15")  # Should pick earliest
+        
+        # Test fallback to upload timestamp
+        result = self.agent._get_primary_date({}, "2023-01-10T10:00:00Z")
+        self.assertEqual(result.strftime('%Y-%m-%d'), "2023-01-10")
+    
+    def test_get_patient_folder_name(self):
+        """Test patient folder name generation."""
+        # Mock patient lookup to return patient name
+        self.mock_context_store.get_patient.return_value = {
+            "patient_id": "patient_123456",
+            "patient_name": "John Doe"
+        }
+        
+        result = self.agent._get_patient_folder_name("patient_123456")
+        self.assertEqual(result, "John_Doe_patien")
+        
+        # Test fallback when patient not found
+        self.mock_context_store.get_patient.return_value = None
+        result = self.agent._get_patient_folder_name("unknown_patient")
+        self.assertEqual(result, "unknown_patient")
+    
+    def test_generate_new_filename(self):
+        """Test enhanced filename generation."""
+        from datetime import datetime
+        
+        # Test patient document filename
+        primary_date = datetime(2023, 1, 15)
+        result = self.agent._generate_new_filename(
+            "test_doc_12345678", "scan001.pdf", "Medical Record", 
+            primary_date, "patient_123", None
+        )
+        self.assertEqual(result, "2023-01-15_scan001_MEDREC-test_doc.pdf")
+        
+        # Test general document filename with issuer
+        result = self.agent._generate_new_filename(
+            "test_doc_87654321", "invoice.pdf", "Invoice", 
+            primary_date, None, "ABC Company"
+        )
+        self.assertEqual(result, "2023-01-15_ABC_Company_INV-test_doc.pdf")
+        
+        # Test general document filename without issuer
+        result = self.agent._generate_new_filename(
+            "test_doc_11111111", "document.pdf", "Unclassified", 
+            primary_date, None, None
+        )
+        self.assertEqual(result, "2023-01-15_UnknownSource_UNC-test_doc.pdf")
     
     @patch('os.path.isfile')
     @patch('os.makedirs')
