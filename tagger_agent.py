@@ -409,11 +409,15 @@ class TaggerAgent:
         # Dictionary to store extracted dates with their context
         dates_dict = {}
         
-        # Common date formats
+        # Common date formats - ordered by specificity
+        # Format: Month YYYY (e.g., "February 2025", "Feb 2025", "Feb. 2025") - must come first
+        pattern1 = r'(\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?,?\s+\d{4})\b'
+        # Format: Month DD, YYYY (e.g., "January 15, 2023")
+        pattern2 = r'(\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)[,.\s]+\d{1,2}(?:[,.\s]+\d{2,4})?)'
         # Format: MM/DD/YYYY or MM-DD-YYYY
-        pattern1 = r'(\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)[,.\s]+\d{1,2}(?:[,.\s]+\d{2,4})?)'
-        pattern2 = r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})'
-        pattern3 = r'(\d{4}[/-]\d{1,2}[/-]\d{1,2})'
+        pattern3 = r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})'
+        # Format: YYYY-MM-DD
+        pattern4 = r'(\d{4}[/-]\d{1,2}[/-]\d{1,2})'
         
         # Common date labels
         date_labels = {
@@ -436,8 +440,8 @@ class TaggerAgent:
                     search_text = text[label_pos:label_pos + 100]
                     
                     # Try each date pattern
-                    for pattern in [pattern1, pattern2, pattern3]:
-                        date_match = re.search(pattern, search_text)
+                    for pattern in [pattern1, pattern2, pattern3, pattern4]:
+                        date_match = re.search(pattern, search_text, re.IGNORECASE)
                         if date_match:
                             date_str = date_match.group(1)
                             try:
@@ -451,8 +455,8 @@ class TaggerAgent:
         
         # Look for any additional dates without context
         all_dates = []
-        for pattern in [pattern1, pattern2, pattern3]:
-            all_dates.extend(re.findall(pattern, text))
+        for pattern in [pattern1, pattern2, pattern3, pattern4]:
+            all_dates.extend(re.findall(pattern, text, re.IGNORECASE))
         
         # Add dates without identified context
         date_counter = 1
@@ -480,32 +484,56 @@ class TaggerAgent:
         """
         # Handle various date formats
         try:
-            # Try parsing Month DD, YYYY
-            month_names = ['january', 'february', 'march', 'april', 'may', 'june', 
-                           'july', 'august', 'september', 'october', 'november', 'december',
-                           'jan', 'feb', 'mar', 'apr', 'may', 'jun', 
-                           'jul', 'aug', 'sep', 'oct', 'nov', 'dec']
+            # Month names and abbreviations mapping
+            month_names = {
+                'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6,
+                'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11, 'december': 12,
+                'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'jun': 6,
+                'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12
+            }
             
-            date_str = date_str.lower().strip(',. ')
-            for i, month in enumerate(month_names):
-                if month in date_str:
-                    # This is a textual month format
-                    # Extract day and year
-                    parts = re.split(r'[,\s]+', date_str.replace(month, ''))
-                    parts = [p for p in parts if p.strip()]
+            date_str_clean = date_str.lower().strip(',. ')
+            
+            # Check for "Month YYYY" format (e.g., "February 2025", "Feb 2025")
+            month_year_pattern = r'\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?,?\s+(\d{4})\b'
+            month_year_match = re.search(month_year_pattern, date_str_clean)
+            
+            if month_year_match:
+                # Extract month and year from "Month YYYY" format
+                month_text = re.sub(r'[,.]', '', month_year_match.group(1))
+                year = month_year_match.group(2)
+                
+                if month_text in month_names:
+                    month_num = month_names[month_text]
+                    # Default to first day of the month
+                    return f"{year}-{month_num:02d}-01"
+            
+            # Try parsing Month DD, YYYY format (but skip if it's already a Month YYYY format)
+            for month_text, month_num in month_names.items():
+                if month_text in date_str_clean:
+                    # Check if this is actually a "Month YYYY" format that was already handled
+                    month_year_check = re.search(rf'\b{re.escape(month_text)}\.?,?\s+\d{{4}}\b', date_str_clean)
+                    if month_year_check:
+                        continue  # Skip, already handled by Month YYYY logic above
                     
-                    if len(parts) >= 2:  # Need at least day and year
-                        day = next((p for p in parts if p.isdigit() and 1 <= int(p) <= 31), None)
+                    # This is a textual month format with potential day
+                    # Extract day and year
+                    parts = re.split(r'[,\s]+', date_str_clean.replace(month_text, ''))
+                    parts = [p.strip() for p in parts if p.strip()]
+                    
+                    if len(parts) >= 1:  # Need at least year
                         year = next((p for p in parts if p.isdigit() and len(p) >= 4), None)
+                        day = next((p for p in parts if p.isdigit() and 1 <= int(p) <= 31), None)
                         
                         if not year:  # Try two-digit year
                             year = next((p for p in parts if p.isdigit() and len(p) == 2), None)
                             if year:
                                 year = f"20{year}" if int(year) < 50 else f"19{year}"
                         
-                        if day and year:
-                            month_num = (i % 12) + 1  # Convert to 1-12
-                            return f"{year}-{month_num:02d}-{int(day):02d}"
+                        if year:
+                            # Use provided day or default to 1
+                            day_num = int(day) if day else 1
+                            return f"{year}-{month_num:02d}-{day_num:02d}"
             
             # Try MM/DD/YYYY or MM-DD-YYYY
             if '/' in date_str or '-' in date_str:

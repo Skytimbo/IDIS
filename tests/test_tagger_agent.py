@@ -439,6 +439,91 @@ class TestTaggerAgent(unittest.TestCase):
         )
         self.assertEqual(result, "2023-01-15_UnknownSource_UNC-test_doc.pdf")
     
+    def test_extract_dates_month_year_format(self):
+        """Test extraction of Month YYYY format dates."""
+        # Test various Month YYYY formats
+        test_cases = [
+            ("This letter is dated February 2025", {"doc_date_1": "2025-02-01"}),
+            ("Invoice date: Feb 2025", {"invoice_date": "2025-02-01"}),
+            ("Report from March 2024", {"doc_date_1": "2024-03-01"}),
+            ("Due date: Dec. 2023", {"due_date": "2023-12-01"}),
+            ("Service date JANUARY 2025", {"service_date": "2025-01-01"}),
+            ("Letter dated September 2024", {"letter_date": "2024-09-01"}),
+            ("Exam scheduled for Nov 2025", {"exam_date": "2025-11-01"}),
+        ]
+        
+        for text, expected_dates in test_cases:
+            with self.subTest(text=text):
+                result = self.agent._extract_dates(text)
+                for context, expected_date in expected_dates.items():
+                    self.assertIn(context, result, f"Context '{context}' not found in extracted dates")
+                    self.assertEqual(result[context], expected_date, 
+                                   f"Expected {expected_date}, got {result[context]} for text: {text}")
+    
+    def test_normalize_date_month_year_format(self):
+        """Test normalization of Month YYYY format dates."""
+        test_cases = [
+            ("February 2025", "2025-02-01"),
+            ("Feb 2025", "2025-02-01"),
+            ("Feb. 2025", "2025-02-01"),
+            ("FEBRUARY 2025", "2025-02-01"),
+            ("March 2024", "2024-03-01"),
+            ("Dec 2023", "2023-12-01"),
+            ("December 2023", "2023-12-01"),
+            ("Jan 2026", "2026-01-01"),
+            ("January 2026", "2026-01-01"),
+            ("Sep 2025", "2025-09-01"),
+            ("September 2025", "2025-09-01"),
+        ]
+        
+        for date_str, expected in test_cases:
+            with self.subTest(date_str=date_str):
+                result = self.agent._normalize_date(date_str)
+                self.assertEqual(result, expected, 
+                               f"Failed to normalize '{date_str}' to '{expected}', got '{result}'")
+    
+    def test_normalize_date_mixed_formats(self):
+        """Test that existing date formats still work alongside Month YYYY format."""
+        test_cases = [
+            # Existing formats should still work
+            ("January 15, 2023", "2023-01-15"),
+            ("12/25/2023", "2023-12-25"),
+            ("2024-03-10", "2024-03-10"),
+            # New Month YYYY format
+            ("April 2025", "2025-04-01"),
+            ("May 2024", "2024-05-01"),
+        ]
+        
+        for date_str, expected in test_cases:
+            with self.subTest(date_str=date_str):
+                result = self.agent._normalize_date(date_str)
+                self.assertEqual(result, expected, 
+                               f"Failed to normalize '{date_str}' to '{expected}', got '{result}'")
+    
+    def test_extract_dates_contextual_month_year(self):
+        """Test that Month YYYY dates are properly extracted with context labels."""
+        text = """
+        This invoice is dated February 2025.
+        The payment is due March 2025.
+        Service was provided in January 2025.
+        This letter was written April 2025.
+        """
+        
+        result = self.agent._extract_dates(text)
+        
+        # Should extract contextual dates
+        expected_contexts = {
+            "invoice_date": "2025-02-01",
+            "due_date": "2025-03-01", 
+            "service_date": "2025-01-01",
+            "letter_date": "2025-04-01"
+        }
+        
+        for context, expected_date in expected_contexts.items():
+            self.assertIn(context, result, f"Context '{context}' not found")
+            self.assertEqual(result[context], expected_date, 
+                           f"Expected {expected_date} for {context}, got {result[context]}")
+    
     @patch('os.path.isfile')
     @patch('os.makedirs')
     @patch('shutil.move')
