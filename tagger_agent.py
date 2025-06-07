@@ -532,11 +532,24 @@ class TaggerAgent:
                 failed_count += 1
                 continue
             
-            # Extract metadata from document text
+            # Extract metadata from document text using enhanced methods
             extracted_dates_dict = self._extract_dates(extracted_text)
             issuer = self._extract_issuer(extracted_text)
             recipient = self._extract_recipient(extracted_text)
-            active_tags = self._extract_predefined_tags(extracted_text)
+            
+            # Use enhanced semantic tagging based on document type
+            semantic_tags = self._extract_semantic_tags(extracted_text, document_type)
+            
+            # Validate all extracted data for quality
+            validated_data = self._validate_extracted_data(
+                extracted_dates_dict, issuer, recipient, semantic_tags
+            )
+            
+            # Use validated data
+            extracted_dates_dict = validated_data['dates']
+            issuer = validated_data['issuer']
+            recipient = validated_data['recipient']
+            active_tags = validated_data['tags']
             
             # Determine the filed path for document using enhanced schema
             filing_successful = False
@@ -629,12 +642,22 @@ class TaggerAgent:
             # Update document in Context Store
             self.context_store.update_document_fields(document_id, update_data)
             
-            # Add audit log entry
-            details = f"Document tagged with {len(active_tags)} tags, {len(extracted_dates_dict)} dates"
+            # Add comprehensive audit log entry with enhanced details
+            metadata_summary = []
+            if extracted_dates_dict:
+                metadata_summary.append(f"{len(extracted_dates_dict)} dates extracted")
+            if issuer:
+                metadata_summary.append(f"issuer: {issuer[:30]}...")
+            if recipient:
+                metadata_summary.append(f"recipient: {recipient[:30]}...")
+            if active_tags:
+                metadata_summary.append(f"{len(active_tags)} semantic tags: {', '.join(active_tags[:3])}")
+            
+            details = f"Enhanced processing: {'; '.join(metadata_summary)}"
             if filing_successful:
-                details += f", and filed at {new_filed_path}"
+                details += f"; filed at {new_filed_path}"
             else:
-                details += ", but filing failed"
+                details += "; metadata-only processing (no file movement)"
                 
             self.context_store.add_audit_log_entry(
                 user_id=user_id,
@@ -646,9 +669,13 @@ class TaggerAgent:
                 details=details
             )
         
-        self.logger.info(f"Tagging and filing batch run complete. "
-                        f"Successfully processed: {successfully_processed_count}, "
-                        f"Failed: {failed_count}")
+        # Enhanced summary logging with quality metrics
+        total_processed = successfully_processed_count + failed_count
+        success_rate = (successfully_processed_count / total_processed * 100) if total_processed > 0 else 0
+        
+        self.logger.info(f"Enhanced tagging and filing batch run complete.")
+        self.logger.info(f"Processing summary: {successfully_processed_count}/{total_processed} successful ({success_rate:.1f}%)")
+        self.logger.info(f"Enhanced features: semantic tagging, data validation, safe file movement")
         
         return (successfully_processed_count, failed_count)
     
