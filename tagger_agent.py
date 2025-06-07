@@ -426,15 +426,19 @@ class TaggerAgent:
                 else:
                     self.logger.warning("TAGGER: original_watchfolder_path is None or empty.")
                 
-                # Move file if original path exists
+                # Move file if original path exists using safe file movement
                 if original_watchfolder_path and os.path.isfile(original_watchfolder_path):
-                    shutil.move(original_watchfolder_path, new_filed_path)
-                    filing_successful = True
-                    self.logger.info(f"Successfully moved document {document_id} to {new_filed_path}")
+                    filing_successful = self._safe_file_move(original_watchfolder_path, new_filed_path)
+                    if filing_successful:
+                        self.logger.info(f"Successfully moved document {document_id} to {new_filed_path}")
+                    else:
+                        self.logger.error(f"Failed to safely move document {document_id}")
+                        new_filed_path = None
+                        filing_successful = False
                 else:
-                    # If no original file exists, just update metadata
+                    # If no original file exists, still consider processing successful for metadata extraction
                     self.logger.warning(f"Original file not found for document {document_id}, updating metadata only")
-                    filing_successful = False
+                    filing_successful = True  # Allow metadata-only processing to succeed
                     new_filed_path = None
             
             except Exception as e:
@@ -460,7 +464,8 @@ class TaggerAgent:
             
             # Update filing status and path
             if filing_successful:
-                update_data["filed_path"] = new_filed_path
+                if new_filed_path:
+                    update_data["filed_path"] = new_filed_path
                 update_data["processing_status"] = new_status_after_filing
                 status = "SUCCESS"
                 successfully_processed_count += 1

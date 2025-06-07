@@ -102,8 +102,10 @@ class TestTaggerAgent(unittest.TestCase):
     
     @patch('os.path.isfile')
     @patch('os.makedirs')
-    @patch('shutil.move')
-    def test_issuer_extraction(self, mock_move, mock_makedirs, mock_isfile):
+    @patch('os.path.getsize')
+    @patch('shutil.copy2')
+    @patch('os.remove')
+    def test_issuer_extraction(self, mock_remove, mock_copy2, mock_getsize, mock_makedirs, mock_isfile):
         """Test extraction of document issuer."""
         # Text with issuer information
         text_with_issuer = """
@@ -120,6 +122,7 @@ class TestTaggerAgent(unittest.TestCase):
         
         # Mock a document with this text
         mock_isfile.return_value = True
+        mock_getsize.return_value = 1024  # Mock file size
         mock_document = {
             "document_id": "test_doc_id",
             "extracted_text": text_with_issuer,
