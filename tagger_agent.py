@@ -412,8 +412,8 @@ class TaggerAgent:
         # Common date formats - ordered by specificity
         # Format: Month YYYY (e.g., "February 2025", "Feb 2025", "Feb. 2025") - must come first
         pattern1 = r'(\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?,?\s+\d{4})\b'
-        # Format: Month DD, YYYY (e.g., "January 15, 2023")
-        pattern2 = r'(\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)[,.\s]+\d{1,2}(?:[,.\s]+\d{2,4})?)'
+        # Format: Month DD, YYYY (e.g., "January 15, 2023") - requires day AND year
+        pattern2 = r'(\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)[,.\s]+\d{1,2}[,.\s]+\d{4})\b'
         # Format: MM/DD/YYYY or MM-DD-YYYY
         pattern3 = r'(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})'
         # Format: YYYY-MM-DD
@@ -421,12 +421,12 @@ class TaggerAgent:
         
         # Common date labels
         date_labels = {
-            "invoice_date": [r'invoice\s+date', r'date\s+of\s+invoice', r'dated'],
-            "due_date": [r'due\s+date', r'payment\s+due', r'due\s+by', r'pay\s+by'],
-            "service_date": [r'service\s+date', r'date\s+of\s+service'],
-            "letter_date": [r'letter\s+date', r'dated'],
-            "exam_date": [r'exam\s+date', r'examination\s+date', r'date\s+of\s+exam'],
-            "report_date": [r'report\s+date', r'reported\s+on', r'date\s+of\s+report']
+            "invoice_date": [r'invoice\s+(?:is\s+)?dated', r'date\s+of\s+invoice', r'invoice\s+date'],
+            "due_date": [r'due\s+date', r'payment\s+(?:is\s+)?due', r'due\s+by', r'pay\s+by'],
+            "service_date": [r'service\s+(?:was\s+)?provided', r'service\s+date', r'date\s+of\s+service'],
+            "letter_date": [r'letter\s+(?:was\s+)?(?:dated|written)', r'this\s+letter\s+(?:is\s+)?dated'],
+            "exam_date": [r'exam\s+(?:scheduled\s+for|date)', r'examination\s+date', r'date\s+of\s+exam'],
+            "report_date": [r'report\s+(?:from|date)', r'reported\s+on', r'date\s+of\s+report']
         }
         
         # Find dates with context
@@ -494,7 +494,7 @@ class TaggerAgent:
             
             date_str_clean = date_str.lower().strip(',. ')
             
-            # Check for "Month YYYY" format (e.g., "February 2025", "Feb 2025")
+            # Check for "Month YYYY" format (e.g., "February 2025", "Feb 2025") FIRST
             month_year_pattern = r'\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?,?\s+(\d{4})\b'
             month_year_match = re.search(month_year_pattern, date_str_clean)
             
@@ -508,13 +508,14 @@ class TaggerAgent:
                     # Default to first day of the month
                     return f"{year}-{month_num:02d}-01"
             
-            # Try parsing Month DD, YYYY format (but skip if it's already a Month YYYY format)
+            # Try parsing Month DD, YYYY format - but only if no 4-digit year immediately follows month
             for month_text, month_num in month_names.items():
                 if month_text in date_str_clean:
-                    # Check if this is actually a "Month YYYY" format that was already handled
-                    month_year_check = re.search(rf'\b{re.escape(month_text)}\.?,?\s+\d{{4}}\b', date_str_clean)
-                    if month_year_check:
-                        continue  # Skip, already handled by Month YYYY logic above
+                    # Skip if this looks like "Month YYYY" format (month followed directly by 4-digit year)
+                    month_pos = date_str_clean.find(month_text)
+                    after_month = date_str_clean[month_pos + len(month_text):].strip(' ,.')
+                    if re.match(r'^\d{4}\b', after_month):
+                        continue  # This is Month YYYY format, skip
                     
                     # This is a textual month format with potential day
                     # Extract day and year

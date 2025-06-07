@@ -443,9 +443,9 @@ class TestTaggerAgent(unittest.TestCase):
         """Test extraction of Month YYYY format dates."""
         # Test various Month YYYY formats
         test_cases = [
-            ("This letter is dated February 2025", {"doc_date_1": "2025-02-01"}),
+            ("This letter is dated February 2025", {"letter_date": "2025-02-01"}),
             ("Invoice date: Feb 2025", {"invoice_date": "2025-02-01"}),
-            ("Report from March 2024", {"doc_date_1": "2024-03-01"}),
+            ("Report from March 2024", {"report_date": "2024-03-01"}),
             ("Due date: Dec. 2023", {"due_date": "2023-12-01"}),
             ("Service date JANUARY 2025", {"service_date": "2025-01-01"}),
             ("Letter dated September 2024", {"letter_date": "2024-09-01"}),
