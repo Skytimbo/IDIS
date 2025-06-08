@@ -85,7 +85,12 @@ class TestTaggerAgent(unittest.TestCase):
         
         mock_exists.side_effect = mock_exists_side_effect
         mock_copy2.side_effect = mock_copy2_side_effect
-        mock_isfile.return_value = True
+        
+        # Mock isfile to return True for source files (watchfolder paths)
+        def mock_isfile_side_effect(path):
+            return '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc'])
+        
+        mock_isfile.side_effect = mock_isfile_side_effect
         
         # Mock a document with this text
         mock_document = {
@@ -145,13 +150,22 @@ class TestTaggerAgent(unittest.TestCase):
         Invoice Date: January 15, 2023
         """
         
-        # Configure mock to simulate safe file move behavior
+        # Configure mock to simulate safe file move behavior with state tracking
+        copied_files = set()
+        
         def mock_exists_side_effect(path):
             if '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc']):
-                return True  # Source files exist
-            return False  # Destination archive paths don't exist initially
+                return True
+            if path in copied_files:
+                return True
+            return False
+        
+        def mock_copy2_side_effect(src, dst):
+            copied_files.add(dst)
+            return None
         
         mock_exists.side_effect = mock_exists_side_effect
+        mock_copy2.side_effect = mock_copy2_side_effect
         mock_isfile.return_value = True
         mock_getsize.return_value = 1024  # Mock file size
         
@@ -199,13 +213,22 @@ class TestTaggerAgent(unittest.TestCase):
         This letter is to inform you...
         """
         
-        # Configure mock to simulate safe file move behavior
+        # Configure mock to simulate safe file move behavior with state tracking
+        copied_files = set()
+        
         def mock_exists_side_effect(path):
             if '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc']):
-                return True  # Source files exist
-            return False  # Destination archive paths don't exist initially
+                return True
+            if path in copied_files:
+                return True
+            return False
+        
+        def mock_copy2_side_effect(src, dst):
+            copied_files.add(dst)
+            return None
         
         mock_exists.side_effect = mock_exists_side_effect
+        mock_copy2.side_effect = mock_copy2_side_effect
         mock_isfile.return_value = True
         mock_getsize.return_value = 1024  # Mock file size
         
@@ -248,13 +271,22 @@ class TestTaggerAgent(unittest.TestCase):
         This document contains important information about your account.
         """
         
-        # Configure mock to simulate safe file move behavior
+        # Configure mock to simulate safe file move behavior with state tracking
+        copied_files = set()
+        
         def mock_exists_side_effect(path):
             if '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc']):
-                return True  # Source files exist
-            return False  # Destination archive paths don't exist initially
+                return True
+            if path in copied_files:
+                return True
+            return False
+        
+        def mock_copy2_side_effect(src, dst):
+            copied_files.add(dst)
+            return None
         
         mock_exists.side_effect = mock_exists_side_effect
+        mock_copy2.side_effect = mock_copy2_side_effect
         mock_isfile.return_value = True
         mock_getsize.return_value = 1024  # Mock file size
         
@@ -292,13 +324,22 @@ class TestTaggerAgent(unittest.TestCase):
     @patch('tagger_agent.os.makedirs')
     def test_filing_with_patient_id(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
         """Test filing documents with patient ID using enhanced schema."""
-        # Configure mock to simulate safe file move behavior
+        # Configure mock to simulate safe file move behavior with state tracking
+        copied_files = set()
+        
         def mock_exists_side_effect(path):
             if '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc']):
-                return True  # Source files exist
-            return False  # Destination archive paths don't exist initially
+                return True
+            if path in copied_files:
+                return True
+            return False
+        
+        def mock_copy2_side_effect(src, dst):
+            copied_files.add(dst)
+            return None
         
         mock_exists.side_effect = mock_exists_side_effect
+        mock_copy2.side_effect = mock_copy2_side_effect
         mock_isfile.return_value = True
         mock_getsize.return_value = 1024  # Mock file size
         
@@ -361,13 +402,22 @@ class TestTaggerAgent(unittest.TestCase):
     @patch('tagger_agent.os.makedirs')
     def test_filing_without_patient_id(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
         """Test filing documents without patient ID using enhanced general archive schema."""
-        # Configure mock to simulate safe file move behavior
+        # Configure mock to simulate safe file move behavior with state tracking
+        copied_files = set()
+        
         def mock_exists_side_effect(path):
             if '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc']):
-                return True  # Source files exist
-            return False  # Destination archive paths don't exist initially
+                return True
+            if path in copied_files:
+                return True
+            return False
+        
+        def mock_copy2_side_effect(src, dst):
+            copied_files.add(dst)
+            return None
         
         mock_exists.side_effect = mock_exists_side_effect
+        mock_copy2.side_effect = mock_copy2_side_effect
         mock_isfile.return_value = True
         
         # Mock document without patient ID but with document type and issuer
