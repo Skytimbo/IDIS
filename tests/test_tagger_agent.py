@@ -65,15 +65,26 @@ class TestTaggerAgent(unittest.TestCase):
         Report completed: 04-10-2023
         """
         
-        # Configure mock to simulate safe file move behavior
-        # Source file exists, destination doesn't exist initially
+        # Configure mock to simulate safe file move behavior with state tracking
+        copied_files = set()
+        
         def mock_exists_side_effect(path):
-            # Source files exist, destination files don't exist initially
+            # Source files exist
             if '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc']):
-                return True  # Source files exist
-            return False  # Destination archive paths don't exist initially
+                return True
+            # Destination files exist after copy operation
+            if path in copied_files:
+                return True
+            # All other paths (destination archive paths) don't exist initially
+            return False
+        
+        def mock_copy2_side_effect(src, dst):
+            # Simulate successful copy by adding dst to copied_files
+            copied_files.add(dst)
+            return None
         
         mock_exists.side_effect = mock_exists_side_effect
+        mock_copy2.side_effect = mock_copy2_side_effect
         mock_isfile.return_value = True
         
         # Mock a document with this text
@@ -188,9 +199,17 @@ class TestTaggerAgent(unittest.TestCase):
         This letter is to inform you...
         """
         
-        # Mock a document with this text
+        # Configure mock to simulate safe file move behavior
+        def mock_exists_side_effect(path):
+            if '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc']):
+                return True  # Source files exist
+            return False  # Destination archive paths don't exist initially
+        
+        mock_exists.side_effect = mock_exists_side_effect
         mock_isfile.return_value = True
         mock_getsize.return_value = 1024  # Mock file size
+        
+        # Mock a document with this text
         mock_document = {
             "document_id": "test_doc_id",
             "extracted_text": text_with_recipient,
@@ -215,7 +234,7 @@ class TestTaggerAgent(unittest.TestCase):
     @patch('tagger_agent.os.remove')
     @patch('tagger_agent.shutil.copy2')
     @patch('tagger_agent.os.path.getsize', return_value=1024)
-    @patch('tagger_agent.os.path.exists', return_value=True)
+    @patch('tagger_agent.os.path.exists')
     @patch('tagger_agent.os.path.isfile', return_value=True)
     @patch('tagger_agent.os.makedirs')
     def test_tag_extraction(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
@@ -229,9 +248,17 @@ class TestTaggerAgent(unittest.TestCase):
         This document contains important information about your account.
         """
         
-        # Mock a document with this text
+        # Configure mock to simulate safe file move behavior
+        def mock_exists_side_effect(path):
+            if '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc']):
+                return True  # Source files exist
+            return False  # Destination archive paths don't exist initially
+        
+        mock_exists.side_effect = mock_exists_side_effect
         mock_isfile.return_value = True
         mock_getsize.return_value = 1024  # Mock file size
+        
+        # Mock a document with this text
         mock_document = {
             "document_id": "test_doc_id",
             "extracted_text": text_with_tags,
@@ -260,14 +287,22 @@ class TestTaggerAgent(unittest.TestCase):
     @patch('tagger_agent.os.remove')
     @patch('tagger_agent.shutil.copy2')
     @patch('tagger_agent.os.path.getsize', return_value=1024)
-    @patch('tagger_agent.os.path.exists', return_value=True)
+    @patch('tagger_agent.os.path.exists')
     @patch('tagger_agent.os.path.isfile', return_value=True)
     @patch('tagger_agent.os.makedirs')
     def test_filing_with_patient_id(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
         """Test filing documents with patient ID using enhanced schema."""
-        # Mock document with patient ID
+        # Configure mock to simulate safe file move behavior
+        def mock_exists_side_effect(path):
+            if '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc']):
+                return True  # Source files exist
+            return False  # Destination archive paths don't exist initially
+        
+        mock_exists.side_effect = mock_exists_side_effect
         mock_isfile.return_value = True
         mock_getsize.return_value = 1024  # Mock file size
+        
+        # Mock document with patient ID
         mock_document = {
             "document_id": "test_doc_12345678",
             "extracted_text": "Test document with invoice_date January 15, 2023",
@@ -321,13 +356,21 @@ class TestTaggerAgent(unittest.TestCase):
     @patch('tagger_agent.os.remove')
     @patch('tagger_agent.shutil.copy2')
     @patch('tagger_agent.os.path.getsize', return_value=1024)
-    @patch('tagger_agent.os.path.exists', return_value=True)
+    @patch('tagger_agent.os.path.exists')
     @patch('tagger_agent.os.path.isfile', return_value=True)
     @patch('tagger_agent.os.makedirs')
     def test_filing_without_patient_id(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
         """Test filing documents without patient ID using enhanced general archive schema."""
-        # Mock document without patient ID but with document type and issuer
+        # Configure mock to simulate safe file move behavior
+        def mock_exists_side_effect(path):
+            if '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc']):
+                return True  # Source files exist
+            return False  # Destination archive paths don't exist initially
+        
+        mock_exists.side_effect = mock_exists_side_effect
         mock_isfile.return_value = True
+        
+        # Mock document without patient ID but with document type and issuer
         mock_document = {
             "document_id": "test_doc_87654321",
             "extracted_text": "Test invoice from ABC Company dated January 15, 2023",
