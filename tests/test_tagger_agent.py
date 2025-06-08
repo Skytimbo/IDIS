@@ -65,7 +65,7 @@ class TestTaggerAgent(unittest.TestCase):
         Report completed: 04-10-2023
         """
         
-        # Configure mock to simulate safe file move behavior with state tracking
+        # Configure comprehensive mock to simulate all file system operations
         copied_files = set()
         
         def mock_exists_side_effect(path):
@@ -75,24 +75,30 @@ class TestTaggerAgent(unittest.TestCase):
             # Destination files exist after copy operation
             if path in copied_files:
                 return True
-            # All other paths (destination archive paths) don't exist initially
             return False
         
         def mock_copy2_side_effect(src, dst):
-            # Simulate successful copy by adding dst to copied_files
+            # Simulate successful copy
             copied_files.add(dst)
-            # Also ensure mock_exists will return True for the destination after copy
             return None
+        
+        def mock_isfile_side_effect(path):
+            # Source files are files
+            if '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc']):
+                return True
+            # Destination files are files after copy
+            if path in copied_files:
+                return True
+            return False
+        
+        def mock_getsize_side_effect(path):
+            # Return consistent size for all files
+            return 1024
         
         mock_exists.side_effect = mock_exists_side_effect
         mock_copy2.side_effect = mock_copy2_side_effect
-        
-        # Mock isfile to return True for source files (watchfolder paths)
-        def mock_isfile_side_effect(path):
-            return '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc'])
-        
         mock_isfile.side_effect = mock_isfile_side_effect
-        mock_getsize.return_value = 1024  # Mock consistent file size
+        mock_getsize.side_effect = mock_getsize_side_effect
         
         # Mock a document with this text
         mock_document = {
