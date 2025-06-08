@@ -51,7 +51,7 @@ class TestTaggerAgent(unittest.TestCase):
     @patch('tagger_agent.os.remove')
     @patch('tagger_agent.shutil.copy2')
     @patch('tagger_agent.os.path.getsize', return_value=1024)
-    @patch('tagger_agent.os.path.exists', return_value=True)
+    @patch('tagger_agent.os.path.exists')
     @patch('tagger_agent.os.path.isfile', return_value=True)
     @patch('tagger_agent.os.makedirs')
     def test_date_extraction(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
@@ -65,8 +65,18 @@ class TestTaggerAgent(unittest.TestCase):
         Report completed: 04-10-2023
         """
         
-        # Mock a document with this text
+        # Configure mock to simulate safe file move behavior
+        # Source file exists, destination doesn't exist initially
+        def mock_exists_side_effect(path):
+            # Source files exist, destination files don't exist initially
+            if '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc']):
+                return True  # Source files exist
+            return False  # Destination archive paths don't exist initially
+        
+        mock_exists.side_effect = mock_exists_side_effect
         mock_isfile.return_value = True
+        
+        # Mock a document with this text
         mock_document = {
             "document_id": "test_doc_id",
             "extracted_text": text_with_dates,
@@ -106,7 +116,7 @@ class TestTaggerAgent(unittest.TestCase):
     @patch('tagger_agent.os.remove')
     @patch('tagger_agent.shutil.copy2')
     @patch('tagger_agent.os.path.getsize', return_value=1024)
-    @patch('tagger_agent.os.path.exists', return_value=True)
+    @patch('tagger_agent.os.path.exists')
     @patch('tagger_agent.os.path.isfile', return_value=True)
     @patch('tagger_agent.os.makedirs')
     def test_issuer_extraction(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
@@ -124,9 +134,17 @@ class TestTaggerAgent(unittest.TestCase):
         Invoice Date: January 15, 2023
         """
         
-        # Mock a document with this text
+        # Configure mock to simulate safe file move behavior
+        def mock_exists_side_effect(path):
+            if '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc']):
+                return True  # Source files exist
+            return False  # Destination archive paths don't exist initially
+        
+        mock_exists.side_effect = mock_exists_side_effect
         mock_isfile.return_value = True
         mock_getsize.return_value = 1024  # Mock file size
+        
+        # Mock a document with this text
         mock_document = {
             "document_id": "test_doc_id",
             "extracted_text": text_with_issuer,
@@ -151,7 +169,7 @@ class TestTaggerAgent(unittest.TestCase):
     @patch('tagger_agent.os.remove')
     @patch('tagger_agent.shutil.copy2')
     @patch('tagger_agent.os.path.getsize', return_value=1024)
-    @patch('tagger_agent.os.path.exists', return_value=True)
+    @patch('tagger_agent.os.path.exists')
     @patch('tagger_agent.os.path.isfile', return_value=True)
     @patch('tagger_agent.os.makedirs')
     def test_recipient_extraction(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
