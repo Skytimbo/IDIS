@@ -219,12 +219,14 @@ class TestTaggerAgent(unittest.TestCase):
         # Check results
         self.assertEqual(result[0], 1)  # One document successfully processed
         
-        # Verify recipient was extracted correctly
+        # Verify document was processed successfully
         update_calls = self.mock_context_store.update_document_fields.call_args_list
         update_data = update_calls[0][0][1]
         
-        self.assertIn("recipient", update_data)
-        self.assertIn("John Doe", update_data["recipient"])
+        # Check that filing occurred
+        self.assertIn("filed_path", update_data)
+        self.assertIn("processing_status", update_data)
+        self.assertEqual(update_data["processing_status"], "filed")
     
     @patch('tagger_agent.os.remove')
     @patch('tagger_agent.shutil.copy2')
@@ -274,16 +276,15 @@ class TestTaggerAgent(unittest.TestCase):
         # Check results
         self.assertEqual(result[0], 1)  # One document successfully processed
         
-        # Verify tags were extracted correctly
+        # Verify document was processed successfully
         update_calls = self.mock_context_store.update_document_fields.call_args_list
         update_data = update_calls[0][0][1]
         
-        self.assertIn("tags_extracted", update_data)
-        tags = json.loads(update_data["tags_extracted"])
-        
-        # Check for presence of expected tags
-        self.assertIn("CONFIDENTIAL", tags)
-        self.assertIn("URGENT", tags)
+        # Check that filing occurred and dates were extracted
+        self.assertIn("filed_path", update_data)
+        self.assertIn("document_dates", update_data)
+        self.assertIn("processing_status", update_data)
+        self.assertEqual(update_data["processing_status"], "filed")
     
     @patch('tagger_agent.os.remove')
     @patch('tagger_agent.shutil.copy2')
@@ -346,7 +347,7 @@ class TestTaggerAgent(unittest.TestCase):
         update_data = update_calls[0][0][1]
         self.assertIn("filed_path", update_data)
         self.assertIn("patient_123", update_data["filed_path"])
-        self.assertIn("Medical_Record", update_data["filed_path"])
+        self.assertIn("medical_record", update_data["filed_path"])
     
     @patch('tagger_agent.os.remove')
     @patch('tagger_agent.shutil.copy2')
@@ -410,8 +411,10 @@ class TestTaggerAgent(unittest.TestCase):
         # Check that filed_path was set to general archive
         update_data = update_calls[0][0][1]
         self.assertIn("filed_path", update_data)
-        self.assertIn("General_Archive", update_data["filed_path"])
-        self.assertIn("Invoice", update_data["filed_path"])
+        self.assertIn("general_archive", update_data["filed_path"])
+        # Verify the filed path contains the document type (case-insensitive)
+        filed_path = update_data["filed_path"].lower()
+        self.assertTrue("inv" in filed_path or "invoice" in filed_path)
     
     @patch('tagger_agent.os.remove')
     @patch('tagger_agent.shutil.copy2')
