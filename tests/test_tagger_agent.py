@@ -47,11 +47,19 @@ class TestTaggerAgent(unittest.TestCase):
     def test_date_extraction(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
         """Test extraction of various date formats."""
         # Configure mock_exists to handle collision detection properly
+        copied_files = set()
         def exists_side_effect(path):
             if "test_document.pdf" in path and "/tmp/" in path:
                 return True  # Source file exists
-            return False  # Destination files don't exist (avoid collisions)
+            if path in copied_files:
+                return True  # File exists after copy
+            return False  # Destination files don't exist initially
+        
+        def copy_side_effect(src, dst):
+            copied_files.add(dst)  # Track copied files
+            
         mock_exists.side_effect = exists_side_effect
+        mock_copy2.side_effect = copy_side_effect
         
         # Text with different date formats
         text_with_dates = """
@@ -108,11 +116,19 @@ class TestTaggerAgent(unittest.TestCase):
     def test_issuer_extraction(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
         """Test extraction of document issuer."""
         # Configure mock_exists for proper collision detection
+        copied_files = set()
         def exists_side_effect(path):
             if "test_document.pdf" in path and "/tmp/" in path:
                 return True  # Source file exists
-            return False  # Destination files don't exist
+            if path in copied_files:
+                return True  # File exists after copy
+            return False  # Destination files don't exist initially
+        
+        def copy_side_effect(src, dst):
+            copied_files.add(dst)  # Track copied files
+            
         mock_exists.side_effect = exists_side_effect
+        mock_copy2.side_effect = copy_side_effect
         
         # Text with issuer information
         text_with_issuer = """
@@ -159,11 +175,19 @@ class TestTaggerAgent(unittest.TestCase):
     def test_recipient_extraction(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
         """Test extraction of document recipient."""
         # Configure mock_exists for proper collision detection
+        copied_files = set()
         def exists_side_effect(path):
             if "test_document.pdf" in path and "/tmp/" in path:
                 return True  # Source file exists
-            return False  # Destination files don't exist
+            if path in copied_files:
+                return True  # File exists after copy
+            return False  # Destination files don't exist initially
+        
+        def copy_side_effect(src, dst):
+            copied_files.add(dst)  # Track copied files
+            
         mock_exists.side_effect = exists_side_effect
+        mock_copy2.side_effect = copy_side_effect
         
         # Text with recipient information
         text_with_recipient = """
@@ -211,11 +235,19 @@ class TestTaggerAgent(unittest.TestCase):
     def test_tag_extraction(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
         """Test extraction of predefined tags."""
         # Configure mock_exists for proper collision detection
+        copied_files = set()
         def exists_side_effect(path):
             if "test_document.pdf" in path and "/tmp/" in path:
                 return True  # Source file exists
-            return False  # Destination files don't exist
+            if path in copied_files:
+                return True  # File exists after copy
+            return False  # Destination files don't exist initially
+        
+        def copy_side_effect(src, dst):
+            copied_files.add(dst)  # Track copied files
+            
         mock_exists.side_effect = exists_side_effect
+        mock_copy2.side_effect = copy_side_effect
         
         # Text with tag keywords
         text_with_tags = """
@@ -262,11 +294,19 @@ class TestTaggerAgent(unittest.TestCase):
     def test_filing_with_patient_id(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
         """Test filing documents with patient ID using enhanced schema."""
         # Configure mock_exists for proper collision detection
+        copied_files = set()
         def exists_side_effect(path):
             if "medical_record.pdf" in path and "/tmp/" in path:
                 return True  # Source file exists
-            return False  # Destination files don't exist
+            if path in copied_files:
+                return True  # File exists after copy
+            return False  # Destination files don't exist initially
+        
+        def copy_side_effect(src, dst):
+            copied_files.add(dst)  # Track copied files
+            
         mock_exists.side_effect = exists_side_effect
+        mock_copy2.side_effect = copy_side_effect
         
         # Text with patient information
         text_with_patient = """
@@ -311,11 +351,26 @@ class TestTaggerAgent(unittest.TestCase):
     @patch('tagger_agent.os.remove')
     @patch('tagger_agent.shutil.copy2')
     @patch('tagger_agent.os.path.getsize', return_value=1024)
-    @patch('tagger_agent.os.path.exists', return_value=True)
+    @patch('tagger_agent.os.path.exists')
     @patch('tagger_agent.os.path.isfile', return_value=True)
     @patch('tagger_agent.os.makedirs')
     def test_filing_without_patient_id(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
         """Test filing documents without patient ID using enhanced general archive schema."""
+        # Configure mock_exists for proper collision detection
+        copied_files = set()
+        def exists_side_effect(path):
+            if "invoice_12345.pdf" in path and "/tmp/" in path:
+                return True  # Source file exists
+            if path in copied_files:
+                return True  # File exists after copy
+            return False  # Destination files don't exist initially
+        
+        def copy_side_effect(src, dst):
+            copied_files.add(dst)  # Track copied files
+            
+        mock_exists.side_effect = exists_side_effect
+        mock_copy2.side_effect = copy_side_effect
+        
         # Text without patient information
         text_without_patient = """
         Invoice #12345
