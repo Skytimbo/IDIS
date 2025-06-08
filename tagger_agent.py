@@ -607,9 +607,7 @@ class TaggerAgent:
                     new_filed_path = None
             
             except Exception as e:
-                import traceback
                 self.logger.error(f"Error filing document {document_id}: {str(e)}")
-                self.logger.error(f"Full traceback: {traceback.format_exc()}")
                 filing_successful = False
                 new_filed_path = None
             
