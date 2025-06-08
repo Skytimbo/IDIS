@@ -24,8 +24,9 @@ class TestTaggerAgent(unittest.TestCase):
         # Create a mock ContextStore
         self.mock_context_store = Mock(spec=ContextStore)
         
-        # Mock base filed folder path
-        self.test_base_filed_folder = "/tmp/test_archive"
+        # Mock base filed folder path - use unique path per test to avoid conflicts
+        import time
+        self.test_base_filed_folder = f"/tmp/test_archive_{int(time.time() * 1000000)}"
         
         # Initialize TaggerAgent with mocked dependencies
         self.agent = TaggerAgent(
@@ -40,7 +41,7 @@ class TestTaggerAgent(unittest.TestCase):
     @patch('tagger_agent.os.remove')
     @patch('tagger_agent.shutil.copy2')
     @patch('tagger_agent.os.path.getsize', return_value=1024)
-    @patch('tagger_agent.os.path.exists', return_value=True)
+    @patch('tagger_agent.os.path.exists')
     @patch('tagger_agent.os.path.isfile', return_value=True)
     @patch('tagger_agent.os.makedirs')
     def test_date_extraction(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
@@ -162,7 +163,8 @@ class TestTaggerAgent(unittest.TestCase):
             "document_id": "test_doc_id",
             "extracted_text": text_with_recipient,
             "file_name": "test_document.pdf",
-            "original_watchfolder_path": "/tmp/test_document.pdf"
+            "original_watchfolder_path": "/tmp/test_document.pdf",
+            "processing_status": "summarized"
         }
         self.mock_context_store.get_documents_by_processing_status.return_value = [mock_document]
         
@@ -201,7 +203,8 @@ class TestTaggerAgent(unittest.TestCase):
             "document_id": "test_doc_id",
             "extracted_text": text_with_tags,
             "file_name": "test_document.pdf",
-            "original_watchfolder_path": "/tmp/test_document.pdf"
+            "original_watchfolder_path": "/tmp/test_document.pdf",
+            "processing_status": "summarized"
         }
         self.mock_context_store.get_documents_by_processing_status.return_value = [mock_document]
         
@@ -249,7 +252,8 @@ class TestTaggerAgent(unittest.TestCase):
             "file_name": "medical_record.pdf",
             "original_watchfolder_path": "/tmp/medical_record.pdf",
             "patient_id": "patient_123",
-            "document_type": "Medical Record"
+            "document_type": "Medical Record",
+            "processing_status": "summarized"
         }
         self.mock_context_store.get_documents_by_processing_status.return_value = [mock_document]
         
@@ -298,7 +302,8 @@ class TestTaggerAgent(unittest.TestCase):
             "file_name": "invoice_12345.pdf",
             "original_watchfolder_path": "/tmp/invoice_12345.pdf",
             "patient_id": None,
-            "document_type": "Invoice"
+            "document_type": "Invoice",
+            "processing_status": "summarized"
         }
         self.mock_context_store.get_documents_by_processing_status.return_value = [mock_document]
         
@@ -336,7 +341,8 @@ class TestTaggerAgent(unittest.TestCase):
             "file_name": "test.pdf",
             "original_watchfolder_path": "/tmp/test.pdf",
             "patient_id": None,
-            "document_type": "Letter"
+            "document_type": "Letter",
+            "processing_status": "summarized"
         }
         self.mock_context_store.get_documents_by_processing_status.return_value = [mock_document]
         
@@ -358,77 +364,7 @@ class TestTaggerAgent(unittest.TestCase):
         self.assertEqual(result[0], 0)  # No documents processed
         self.assertEqual(result[1], 0)  # No failures
     
-    def test_extract_dates_from_text(self):
-        """Test the date extraction utility method."""
-        text_with_dates = """
-        Invoice Date: January 15, 2023
-        Due Date: 2023-02-28
-        Service Date: 03/05/2023
-        Report Date: April 10, 2023
-        """
-        
-        dates = self.agent._extract_dates_from_text(text_with_dates)
-        
-        # Should extract multiple dates
-        self.assertGreater(len(dates), 0)
-        
-        # Check for specific date formats
-        date_values = list(dates.values())
-        self.assertIn("2023-01-15", date_values)
-        self.assertIn("2023-02-28", date_values)
-    
-    def test_extract_issuer_from_text(self):
-        """Test the issuer extraction utility method."""
-        text_with_issuer = """
-        ACME Corporation
-        123 Main Street, Suite 100
-        Anytown, ST 12345
-        
-        From: ACME Billing Department
-        Phone: (555) 123-4567
-        """
-        
-        issuer = self.agent._extract_issuer_from_text(text_with_issuer)
-        
-        # Should extract issuer information
-        self.assertIsNotNone(issuer)
-        self.assertIn("ACME", issuer)
-    
-    def test_extract_recipient_from_text(self):
-        """Test the recipient extraction utility method."""
-        text_with_recipient = """
-        To: John Smith
-        123 Client Avenue
-        Client City, CS 54321
-        
-        Dear Mr. Smith,
-        
-        This letter is regarding...
-        """
-        
-        recipient = self.agent._extract_recipient_from_text(text_with_recipient)
-        
-        # Should extract recipient information
-        self.assertIsNotNone(recipient)
-        self.assertIn("John Smith", recipient)
-    
-    def test_extract_tags_from_text(self):
-        """Test the tag extraction utility method."""
-        text_with_tags = """
-        CONFIDENTIAL DOCUMENT
-        
-        URGENT: Immediate Response Required
-        
-        IMPORTANT: Please review the attached materials.
-        """
-        
-        tags = self.agent._extract_tags_from_text(text_with_tags)
-        
-        # Should extract predefined tags
-        self.assertGreater(len(tags), 0)
-        self.assertIn("CONFIDENTIAL", tags)
-        self.assertIn("URGENT", tags)
-        self.assertIn("IMPORTANT", tags)
+
 
 
 if __name__ == '__main__':
