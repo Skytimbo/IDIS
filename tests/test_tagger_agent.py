@@ -342,13 +342,16 @@ class TestTaggerAgent(unittest.TestCase):
         self.assertIn("2023-01-15", filed_path)
         self.assertIn("INV-test_doc", filed_path)  # INV abbreviation for Invoice
         
-        # Verify move was called with correct paths
-        mock_move.assert_called_once()
+        # Verify copy was called with correct paths for safe file move
+        mock_copy2.assert_called_once()
     
-    @patch('os.path.isfile')
-    @patch('os.makedirs')
-    @patch('shutil.move')
-    def test_filing_error_handling(self, mock_move, mock_makedirs, mock_isfile):
+    @patch('tagger_agent.os.remove')
+    @patch('tagger_agent.shutil.copy2')
+    @patch('tagger_agent.os.path.getsize', return_value=1024)
+    @patch('tagger_agent.os.path.exists', return_value=True)
+    @patch('tagger_agent.os.path.isfile', return_value=False)  # Simulate file not found
+    @patch('tagger_agent.os.makedirs')
+    def test_filing_error_handling(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
         """Test handling of filing errors."""
         # Set up mock to simulate file not found
         mock_isfile.return_value = False
@@ -376,8 +379,8 @@ class TestTaggerAgent(unittest.TestCase):
         self.assertIn("processing_status", update_data)
         self.assertEqual(update_data["processing_status"], "filing_error")
         
-        # Verify move was not called
-        mock_move.assert_not_called()
+        # Verify copy was not called due to file not existing
+        mock_copy2.assert_not_called()
     
     def test_sanitize_for_filename(self):
         """Test filename sanitization helper method."""
@@ -546,14 +549,17 @@ class TestTaggerAgent(unittest.TestCase):
             self.assertEqual(result[context], expected_date, 
                            f"Expected {expected_date} for {context}, got {result[context]}")
     
-    @patch('os.path.isfile')
-    @patch('os.makedirs')
-    @patch('shutil.move')
-    def test_move_error_handling(self, mock_move, mock_makedirs, mock_isfile):
+    @patch('tagger_agent.os.remove')
+    @patch('tagger_agent.shutil.copy2')
+    @patch('tagger_agent.os.path.getsize', return_value=1024)
+    @patch('tagger_agent.os.path.exists', return_value=True)
+    @patch('tagger_agent.os.path.isfile', return_value=True)
+    @patch('tagger_agent.os.makedirs')
+    def test_move_error_handling(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
         """Test handling of errors during file move operations."""
         # Set up mocks
         mock_isfile.return_value = True
-        mock_move.side_effect = Exception("File move error")
+        mock_copy2.side_effect = Exception("File copy error")
         
         # Mock document
         mock_document = {
@@ -578,10 +584,13 @@ class TestTaggerAgent(unittest.TestCase):
         self.assertIn("processing_status", update_data)
         self.assertEqual(update_data["processing_status"], "filing_error")
     
-    @patch('os.path.isfile')
-    @patch('os.makedirs')
-    @patch('shutil.move')
-    def test_empty_text_handling(self, mock_move, mock_makedirs, mock_isfile):
+    @patch('tagger_agent.os.remove')
+    @patch('tagger_agent.shutil.copy2')
+    @patch('tagger_agent.os.path.getsize', return_value=1024)
+    @patch('tagger_agent.os.path.exists', return_value=True)
+    @patch('tagger_agent.os.path.isfile', return_value=True)
+    @patch('tagger_agent.os.makedirs')
+    def test_empty_text_handling(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
         """Test handling of documents with empty or None text."""
         # Mock documents with empty and None text
         mock_documents = [
