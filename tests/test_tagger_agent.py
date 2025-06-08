@@ -48,10 +48,13 @@ class TestTaggerAgent(unittest.TestCase):
         self.mock_context_store.update_document_fields.return_value = True
         self.mock_context_store.add_audit_log_entry.return_value = 1
     
-    @patch('os.path.isfile')
-    @patch('os.makedirs')
-    @patch('shutil.move')
-    def test_date_extraction(self, mock_move, mock_makedirs, mock_isfile):
+    @patch('tagger_agent.os.remove')
+    @patch('tagger_agent.shutil.copy2')
+    @patch('tagger_agent.os.path.getsize', return_value=1024)
+    @patch('tagger_agent.os.path.exists', return_value=True)
+    @patch('tagger_agent.os.path.isfile', return_value=True)
+    @patch('tagger_agent.os.makedirs')
+    def test_date_extraction(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
         """Test extraction of various date formats."""
         # Text with different date formats
         text_with_dates = """
@@ -100,12 +103,13 @@ class TestTaggerAgent(unittest.TestCase):
         
         self.assertTrue(due_date_found, "No due date was extracted from the text")
     
-    @patch('os.path.isfile')
-    @patch('os.makedirs')
-    @patch('os.path.getsize')
-    @patch('shutil.copy2')
-    @patch('os.remove')
-    def test_issuer_extraction(self, mock_remove, mock_copy2, mock_getsize, mock_makedirs, mock_isfile):
+    @patch('tagger_agent.os.remove')
+    @patch('tagger_agent.shutil.copy2')
+    @patch('tagger_agent.os.path.getsize', return_value=1024)
+    @patch('tagger_agent.os.path.exists', return_value=True)
+    @patch('tagger_agent.os.path.isfile', return_value=True)
+    @patch('tagger_agent.os.makedirs')
+    def test_issuer_extraction(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
         """Test extraction of document issuer."""
         # Text with issuer information
         text_with_issuer = """
@@ -144,12 +148,13 @@ class TestTaggerAgent(unittest.TestCase):
         self.assertIn("issuer_source", update_data)
         self.assertIn("ACME", update_data["issuer_source"])
     
-    @patch('os.path.isfile')
-    @patch('os.makedirs')
-    @patch('os.path.getsize')
-    @patch('shutil.copy2')
-    @patch('os.remove')
-    def test_recipient_extraction(self, mock_remove, mock_copy2, mock_getsize, mock_makedirs, mock_isfile):
+    @patch('tagger_agent.os.remove')
+    @patch('tagger_agent.shutil.copy2')
+    @patch('tagger_agent.os.path.getsize', return_value=1024)
+    @patch('tagger_agent.os.path.exists', return_value=True)
+    @patch('tagger_agent.os.path.isfile', return_value=True)
+    @patch('tagger_agent.os.makedirs')
+    def test_recipient_extraction(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
         """Test extraction of document recipient."""
         # Text with recipient information
         text_with_recipient = """
@@ -189,12 +194,13 @@ class TestTaggerAgent(unittest.TestCase):
         self.assertIn("recipient", update_data)
         self.assertIn("John Doe", update_data["recipient"])
     
-    @patch('os.path.isfile')
-    @patch('os.makedirs')
-    @patch('os.path.getsize')
-    @patch('shutil.copy2')
-    @patch('os.remove')
-    def test_tag_extraction(self, mock_remove, mock_copy2, mock_getsize, mock_makedirs, mock_isfile):
+    @patch('tagger_agent.os.remove')
+    @patch('tagger_agent.shutil.copy2')
+    @patch('tagger_agent.os.path.getsize', return_value=1024)
+    @patch('tagger_agent.os.path.exists', return_value=True)
+    @patch('tagger_agent.os.path.isfile', return_value=True)
+    @patch('tagger_agent.os.makedirs')
+    def test_tag_extraction(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
         """Test extraction of predefined tags."""
         # Text with tag keywords
         text_with_tags = """
@@ -233,12 +239,13 @@ class TestTaggerAgent(unittest.TestCase):
         self.assertIn("confidential", tags)
         self.assertIn("important", tags)
     
-    @patch('os.path.isfile')
-    @patch('os.makedirs')
-    @patch('os.path.getsize')
-    @patch('shutil.copy2')
-    @patch('os.remove')
-    def test_filing_with_patient_id(self, mock_remove, mock_copy2, mock_getsize, mock_makedirs, mock_isfile):
+    @patch('tagger_agent.os.remove')
+    @patch('tagger_agent.shutil.copy2')
+    @patch('tagger_agent.os.path.getsize', return_value=1024)
+    @patch('tagger_agent.os.path.exists', return_value=True)
+    @patch('tagger_agent.os.path.isfile', return_value=True)
+    @patch('tagger_agent.os.makedirs')
+    def test_filing_with_patient_id(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
         """Test filing documents with patient ID using enhanced schema."""
         # Mock document with patient ID
         mock_isfile.return_value = True
@@ -293,10 +300,13 @@ class TestTaggerAgent(unittest.TestCase):
         # Verify makedirs was called to create directory structure
         mock_makedirs.assert_called()
     
-    @patch('os.path.isfile')
-    @patch('os.makedirs')
-    @patch('shutil.move')
-    def test_filing_without_patient_id(self, mock_move, mock_makedirs, mock_isfile):
+    @patch('tagger_agent.os.remove')
+    @patch('tagger_agent.shutil.copy2')
+    @patch('tagger_agent.os.path.getsize', return_value=1024)
+    @patch('tagger_agent.os.path.exists', return_value=True)
+    @patch('tagger_agent.os.path.isfile', return_value=True)
+    @patch('tagger_agent.os.makedirs')
+    def test_filing_without_patient_id(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
         """Test filing documents without patient ID using enhanced general archive schema."""
         # Mock document without patient ID but with document type and issuer
         mock_isfile.return_value = True
