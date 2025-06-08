@@ -81,6 +81,7 @@ class TestTaggerAgent(unittest.TestCase):
         def mock_copy2_side_effect(src, dst):
             # Simulate successful copy by adding dst to copied_files
             copied_files.add(dst)
+            # Also ensure mock_exists will return True for the destination after copy
             return None
         
         mock_exists.side_effect = mock_exists_side_effect
@@ -91,6 +92,7 @@ class TestTaggerAgent(unittest.TestCase):
             return '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc'])
         
         mock_isfile.side_effect = mock_isfile_side_effect
+        mock_getsize.return_value = 1024  # Mock consistent file size
         
         # Mock a document with this text
         mock_document = {
@@ -355,7 +357,12 @@ class TestTaggerAgent(unittest.TestCase):
         
         mock_exists.side_effect = mock_exists_side_effect
         mock_copy2.side_effect = mock_copy2_side_effect
-        mock_isfile.return_value = True
+        
+        # Mock isfile to return True for source files (watchfolder paths)
+        def mock_isfile_side_effect(path):
+            return '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc'])
+        
+        mock_isfile.side_effect = mock_isfile_side_effect
         mock_getsize.return_value = 1024  # Mock file size
         
         # Mock document with patient ID
@@ -433,7 +440,13 @@ class TestTaggerAgent(unittest.TestCase):
         
         mock_exists.side_effect = mock_exists_side_effect
         mock_copy2.side_effect = mock_copy2_side_effect
-        mock_isfile.return_value = True
+        
+        # Mock isfile to return True for source files (watchfolder paths)
+        def mock_isfile_side_effect(path):
+            return '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc'])
+        
+        mock_isfile.side_effect = mock_isfile_side_effect
+        mock_getsize.return_value = 1024  # Mock consistent file size
         
         # Mock document without patient ID but with document type and issuer
         mock_document = {
