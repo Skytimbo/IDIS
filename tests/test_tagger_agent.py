@@ -48,13 +48,8 @@ class TestTaggerAgent(unittest.TestCase):
         self.mock_context_store.update_document_fields.return_value = True
         self.mock_context_store.add_audit_log_entry.return_value = 1
     
-    @patch('tagger_agent.os.remove')
-    @patch('tagger_agent.shutil.copy2')
-    @patch('tagger_agent.os.path.getsize', return_value=1024)
-    @patch('tagger_agent.os.path.exists')
-    @patch('tagger_agent.os.path.isfile', return_value=True)
-    @patch('tagger_agent.os.makedirs')
-    def test_date_extraction(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
+    @patch('tagger_agent.TaggerAgent._safe_file_move', return_value=True)
+    def test_date_extraction(self, mock_safe_file_move):
         """Test extraction of various date formats."""
         # Text with different date formats
         text_with_dates = """
@@ -64,41 +59,6 @@ class TestTaggerAgent(unittest.TestCase):
         Letter sent on March 5, 2023
         Report completed: 04-10-2023
         """
-        
-        # Configure comprehensive mock to simulate all file system operations
-        copied_files = set()
-        
-        def mock_exists_side_effect(path):
-            # Source files exist
-            if '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc']):
-                return True
-            # Destination files exist after copy operation
-            if path in copied_files:
-                return True
-            return False
-        
-        def mock_copy2_side_effect(src, dst):
-            # Simulate successful copy
-            copied_files.add(dst)
-            return None
-        
-        def mock_isfile_side_effect(path):
-            # Source files are files
-            if '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc']):
-                return True
-            # Destination files are files after copy
-            if path in copied_files:
-                return True
-            return False
-        
-        def mock_getsize_side_effect(path):
-            # Return consistent size for all files
-            return 1024
-        
-        mock_exists.side_effect = mock_exists_side_effect
-        mock_copy2.side_effect = mock_copy2_side_effect
-        mock_isfile.side_effect = mock_isfile_side_effect
-        mock_getsize.side_effect = mock_getsize_side_effect
         
         # Mock a document with this text
         mock_document = {
@@ -137,13 +97,8 @@ class TestTaggerAgent(unittest.TestCase):
         
         self.assertTrue(due_date_found, "No due date was extracted from the text")
     
-    @patch('tagger_agent.os.remove')
-    @patch('tagger_agent.shutil.copy2')
-    @patch('tagger_agent.os.path.getsize', return_value=1024)
-    @patch('tagger_agent.os.path.exists')
-    @patch('tagger_agent.os.path.isfile', return_value=True)
-    @patch('tagger_agent.os.makedirs')
-    def test_issuer_extraction(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
+    @patch('tagger_agent.TaggerAgent._safe_file_move', return_value=True)
+    def test_issuer_extraction(self, mock_safe_file_move):
         """Test extraction of document issuer."""
         # Text with issuer information
         text_with_issuer = """
@@ -430,13 +385,11 @@ class TestTaggerAgent(unittest.TestCase):
     @patch('tagger_agent.os.makedirs')
     def test_filing_without_patient_id(self, mock_makedirs, mock_isfile, mock_exists, mock_getsize, mock_copy2, mock_remove):
         """Test filing documents without patient ID using enhanced general archive schema."""
-        # Configure mock to simulate safe file move behavior with state tracking
+        # Configure mocks for successful file operations
         copied_files = set()
         
         def mock_exists_side_effect(path):
-            if '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc']):
-                return True
-            if path in copied_files:
+            if '/tmp/' in path or path in copied_files:
                 return True
             return False
         
@@ -446,13 +399,6 @@ class TestTaggerAgent(unittest.TestCase):
         
         mock_exists.side_effect = mock_exists_side_effect
         mock_copy2.side_effect = mock_copy2_side_effect
-        
-        # Mock isfile to return True for source files (watchfolder paths)
-        def mock_isfile_side_effect(path):
-            return '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc'])
-        
-        mock_isfile.side_effect = mock_isfile_side_effect
-        mock_getsize.return_value = 1024  # Mock consistent file size
         
         # Mock document without patient ID but with document type and issuer
         mock_document = {
