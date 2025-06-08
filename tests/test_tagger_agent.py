@@ -166,7 +166,12 @@ class TestTaggerAgent(unittest.TestCase):
         
         mock_exists.side_effect = mock_exists_side_effect
         mock_copy2.side_effect = mock_copy2_side_effect
-        mock_isfile.return_value = True
+        
+        # Mock isfile to return True for source files (watchfolder paths)
+        def mock_isfile_side_effect(path):
+            return '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc'])
+        
+        mock_isfile.side_effect = mock_isfile_side_effect
         mock_getsize.return_value = 1024  # Mock file size
         
         # Mock a document with this text
@@ -229,7 +234,12 @@ class TestTaggerAgent(unittest.TestCase):
         
         mock_exists.side_effect = mock_exists_side_effect
         mock_copy2.side_effect = mock_copy2_side_effect
-        mock_isfile.return_value = True
+        
+        # Mock isfile to return True for source files (watchfolder paths)
+        def mock_isfile_side_effect(path):
+            return '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc'])
+        
+        mock_isfile.side_effect = mock_isfile_side_effect
         mock_getsize.return_value = 1024  # Mock file size
         
         # Mock a document with this text
@@ -287,7 +297,12 @@ class TestTaggerAgent(unittest.TestCase):
         
         mock_exists.side_effect = mock_exists_side_effect
         mock_copy2.side_effect = mock_copy2_side_effect
-        mock_isfile.return_value = True
+        
+        # Mock isfile to return True for source files (watchfolder paths)
+        def mock_isfile_side_effect(path):
+            return '/tmp/' in path and any(ext in path for ext in ['.pdf', '.txt', '.doc'])
+        
+        mock_isfile.side_effect = mock_isfile_side_effect
         mock_getsize.return_value = 1024  # Mock file size
         
         # Mock a document with this text
