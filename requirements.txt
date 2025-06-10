@@ -36,3 +36,4 @@ zopfli==0.2.3.post1
 watchdog
 python-dateutil
 python-dateutil
+streamlit
