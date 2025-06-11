@@ -123,7 +123,7 @@ def main():
     if run_search:
         conn = get_database_connection()
         query, params = build_search_query(search_term, selected_types, issuer_filter, tags_filter, after_date, before_date)
-        results_df = pd.read_sql_query(query, conn)
+        results_df = pd.read_sql_query(query, conn, params=params)
         
         st.success(f"📊 Found {len(results_df)} matching document(s)")
         
