@@ -6,7 +6,7 @@ demo_idis.db
 
 # Output Files / Generated Documents
 *.pdf
-
+*.md
 # Python Virtual Environment
 venv/
 
