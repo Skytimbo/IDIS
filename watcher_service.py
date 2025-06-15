@@ -95,6 +95,12 @@ class NewFileHandler(FileSystemEventHandler):
         
         file_path = event.src_path
         original_filename = os.path.basename(file_path)
+        
+        # Ignore temporary files created by scanner
+        if original_filename.endswith('.tmp'):
+            self.logger.info(f"Ignoring temporary file: {original_filename}")
+            return
+        
         self.logger.info(f"Detected new file: {file_path}. Immediately moving to staging area.")
         
         # Step 1: Immediate Move - Claim the file instantly to prevent scanner deletion
