@@ -104,20 +104,32 @@ class NewFileHandler(FileSystemEventHandler):
         self.logger.info(f"Detected new file: {file_path}. Immediately moving to staging area.")
         
         # Step 1: Immediate Move - Claim the file instantly to prevent scanner deletion
-        try:
-            # Generate unique filename with timestamp and UUID to prevent collisions
-            timestamp = int(time.time())
-            short_uuid = str(uuid.uuid4())[:8]
-            unique_filename = f"{timestamp}_{short_uuid}_{original_filename}"
-            processing_path = os.path.join(self.config_paths['processing_folder'], unique_filename)
-            
-            # Immediately attempt to move the file to processing folder
-            shutil.move(file_path, processing_path)
-            self.logger.info(f"File successfully moved to staging area: {processing_path}")
-            
-        except Exception as move_error:
-            self.logger.warning(f"Failed to move file {file_path} to staging area: {move_error}. "
-                              f"File may have been deleted by scanner or is locked. Skipping processing.")
+        # Generate unique filename with timestamp and UUID to prevent collisions
+        timestamp = int(time.time())
+        short_uuid = str(uuid.uuid4())[:8]
+        unique_filename = f"{timestamp}_{short_uuid}_{original_filename}"
+        processing_path = os.path.join(self.config_paths['processing_folder'], unique_filename)
+        
+        move_successful = False
+        for attempt in range(5):
+            try:
+                # Attempt to move the file to processing folder
+                shutil.move(file_path, processing_path)
+                self.logger.info(f"File successfully moved to staging area: {processing_path}")
+                move_successful = True
+                break
+                
+            except Exception as move_error:
+                if attempt < 4:  # Not the last attempt
+                    self.logger.debug(f"Move attempt {attempt + 1} failed for {file_path}: {move_error}. Retrying...")
+                    time.sleep(0.2)  # Wait 200ms before retry
+                else:
+                    self.logger.warning(f"Failed to move file {file_path} to staging area after {attempt + 1} attempts: {move_error}. "
+                                      f"File may have been deleted by scanner or is locked.")
+        
+        # Check if the file was successfully moved after all retries
+        if not move_successful:
+            self.logger.warning(f"Final failure: Unable to move {file_path} to staging area after all retry attempts. Skipping processing.")
             return
         
         # Step 2: Stability Check in Staging - All subsequent operations on the staged file
