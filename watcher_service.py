@@ -11,6 +11,8 @@ import os
 import time
 import logging
 import argparse
+import shutil
+import uuid
 from typing import Dict, List, Optional, Any
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
@@ -122,7 +124,22 @@ class NewFileHandler(FileSystemEventHandler):
                     break
             
             if stable_count >= 2:
-                self.logger.info(f"File {file_path} confirmed stable. Triggering pipeline.")
+                self.logger.info(f"File {file_path} confirmed stable. Moving to processing folder.")
+                
+                # Generate unique filename with timestamp and UUID to prevent collisions
+                timestamp = int(time.time())
+                short_uuid = str(uuid.uuid4())[:8]
+                original_filename = os.path.basename(file_path)
+                unique_filename = f"{timestamp}_{short_uuid}_{original_filename}"
+                processing_path = os.path.join(self.config_paths['processing_folder'], unique_filename)
+                
+                # Move file to processing folder
+                try:
+                    shutil.move(file_path, processing_path)
+                    self.logger.info(f"File moved to processing folder: {processing_path}")
+                except Exception as move_error:
+                    self.logger.error(f"Failed to move file to processing folder: {move_error}")
+                    return
                 
                 # Create a local ContextStore instance for this thread to avoid SQLite threading issues
                 local_context_store = ContextStore(db_path=self.config_paths['db_path'])
@@ -131,24 +148,25 @@ class NewFileHandler(FileSystemEventHandler):
                 session_id = local_context_store.create_session(
                     user_id=self.user_id_for_new_docs,
                     session_metadata={
-                        "source_file": os.path.basename(file_path),
+                        "source_file": original_filename,
+                        "processing_file": unique_filename,
                         "trigger": "watcher_service",
                         "processing_mode": "single_file"
                     }
                 )
                 
-                # Process the single file using specific file processing
+                # Process the single file using specific file processing from processing folder
                 try:
                     # Initialize ingestion agent for this file with thread-local context store
                     ingestion_agent = IngestionAgent(
                         context_store=local_context_store,
-                        watch_folder=self.config_paths['watch_folder'],
+                        watch_folder=self.config_paths['processing_folder'],  # Use processing folder as source
                         holding_folder=self.config_paths['holding_folder']
                     )
                     
                     # Use the new process_specific_files method for single file processing
                     ingestion_results = ingestion_agent.process_specific_files(
-                        file_paths=[file_path],
+                        file_paths=[processing_path],  # Use processing path instead of original path
                         session_id=session_id,
                         patient_id=self.patient_id_for_new_docs,
                         user_id=self.user_id_for_new_docs
@@ -262,6 +280,8 @@ def main():
                         help='Path to the folder to monitor for new documents')
     parser.add_argument('--holding-folder', type=str, required=True,
                         help='Path to the folder for processed/problematic documents')
+    parser.add_argument('--processing-folder', type=str, required=True,
+                        help='Path to the staging folder for file processing')
     parser.add_argument('--archive-folder', type=str, required=True,
                         help='Path to the folder for archived documents')
     parser.add_argument('--cover-sheets-folder', type=str, required=True,
@@ -283,6 +303,7 @@ def main():
     config_paths = {
         'watch_folder': args.watch_folder,
         'holding_folder': args.holding_folder,
+        'processing_folder': args.processing_folder,
         'archive_folder': args.archive_folder,
         'pdf_output_dir': args.cover_sheets_folder,
         'db_path': args.db_path

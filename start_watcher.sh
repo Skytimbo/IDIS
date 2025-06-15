@@ -40,6 +40,7 @@ fi
 echo "📁 Ensuring Dell testing directories exist..."
 mkdir -p ~/IDIS_Dell_Scan_Test/scanner_output
 mkdir -p ~/IDIS_Dell_Scan_Test/idis_holding
+mkdir -p ~/IDIS_Dell_Scan_Test/idis_processing
 mkdir -p ~/IDIS_Dell_Scan_Test/idis_archive
 mkdir -p ~/IDIS_Dell_Scan_Test/idis_coversheets
 mkdir -p ~/IDIS_Dell_Scan_Test/idis_db_storage
@@ -47,6 +48,7 @@ mkdir -p ~/IDIS_Dell_Scan_Test/idis_db_storage
 echo "🔄 Launching IDIS Watcher Service with Dell testing configuration..."
 echo "   Watch folder: ~/IDIS_Dell_Scan_Test/scanner_output"
 echo "   Holding folder: ~/IDIS_Dell_Scan_Test/idis_holding"
+echo "   Processing folder: ~/IDIS_Dell_Scan_Test/idis_processing"
 echo "   Archive folder: ~/IDIS_Dell_Scan_Test/idis_archive"
 echo "   Cover sheets: ~/IDIS_Dell_Scan_Test/idis_coversheets"
 echo "   Database: ~/IDIS_Dell_Scan_Test/idis_db_storage/idis_live_test.db"
@@ -56,6 +58,7 @@ echo ""
 python3 watcher_service.py \
     --watch-folder ~/IDIS_Dell_Scan_Test/scanner_output \
     --holding-folder ~/IDIS_Dell_Scan_Test/idis_holding \
+    --processing-folder ~/IDIS_Dell_Scan_Test/idis_processing \
     --archive-folder ~/IDIS_Dell_Scan_Test/idis_archive \
     --cover-sheets-folder ~/IDIS_Dell_Scan_Test/idis_coversheets \
     --db-path ~/IDIS_Dell_Scan_Test/idis_db_storage/idis_live_test.db \

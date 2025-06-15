@@ -2,7 +2,7 @@ modules = ["python-3.11"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["cacert", "cargo", "fontconfig", "freetype", "ghostscript", "glib", "glibcLocales", "gumbo", "harfbuzz", "jbig2dec", "lcms2", "libffi", "libiconv", "libimagequant", "libjpeg", "libjpeg_turbo", "libtiff", "libwebp", "libxcrypt", "mupdf", "openjpeg", "pango", "pkg-config", "rustc", "swig", "tcl", "tesseract", "tk", "xcbuild", "xcodebuild", "zlib"]
+packages = ["cacert", "cargo", "fontconfig", "freetype", "ghostscript", "glib", "glibcLocales", "gumbo", "harfbuzz", "jbig2dec", "lcms2", "libffi", "libiconv", "libimagequant", "libjpeg", "libjpeg_turbo", "libtiff", "libwebp", "libxcrypt", "mupdf", "openjpeg", "pango", "pkg-config", "rustc", "swig", "tcl", "tesseract", "tk", "xcbuild", "xcodebuild", "zlib", "nano"]
 
 [workflows]
 runButton = "Project"
