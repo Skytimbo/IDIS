@@ -33,11 +33,14 @@ IDIS follows a modular architecture with the following core components:
 ### Watcher Service with Staging Area
 - **Purpose**: Monitors watch folder and manages file processing pipeline
 - **Implementation**: watcher_service.py with NewFileHandler class
+- **Race Condition Prevention**: "Move First, Check Stability Later" strategy immediately claims files before scanner deletion
 - **Staging Area Enhancement**: Files are moved to a processing folder with unique timestamped names to prevent collisions
 - **Key Features**:
-  - File stability checking before processing
+  - Immediate file claiming to prevent scanner race conditions
+  - File stability checking performed on staged files
   - Unique filename generation with timestamp and UUID
   - Processing folder isolation for robust file handling
+  - Automatic cleanup of unstable files
   - Integration with start_watcher.sh script for Dell testing setup
 
 ### Database Schema

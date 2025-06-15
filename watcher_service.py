@@ -82,7 +82,10 @@ class NewFileHandler(FileSystemEventHandler):
     
     def on_created(self, event):
         """
-        Handle file creation events.
+        Handle file creation events using "Move First, Check Stability Later" strategy.
+        
+        This method immediately claims the file by moving it to the processing folder,
+        then performs stability checks on the staged file to eliminate race conditions.
         
         Args:
             event: File system event object
@@ -91,28 +94,47 @@ class NewFileHandler(FileSystemEventHandler):
             return
         
         file_path = event.src_path
-        self.logger.info(f"Detected new file: {file_path}. Starting stability check...")
+        original_filename = os.path.basename(file_path)
+        self.logger.info(f"Detected new file: {file_path}. Immediately moving to staging area.")
         
-        # Initial cooldown period
-        time.sleep(self.file_stability_delay)
-        
-        # Perform file stability check
+        # Step 1: Immediate Move - Claim the file instantly to prevent scanner deletion
         try:
-            if not os.path.exists(file_path):
-                self.logger.info(f"File {file_path} disappeared during cooldown.")
+            # Generate unique filename with timestamp and UUID to prevent collisions
+            timestamp = int(time.time())
+            short_uuid = str(uuid.uuid4())[:8]
+            unique_filename = f"{timestamp}_{short_uuid}_{original_filename}"
+            processing_path = os.path.join(self.config_paths['processing_folder'], unique_filename)
+            
+            # Immediately attempt to move the file to processing folder
+            shutil.move(file_path, processing_path)
+            self.logger.info(f"File successfully moved to staging area: {processing_path}")
+            
+        except Exception as move_error:
+            self.logger.warning(f"Failed to move file {file_path} to staging area: {move_error}. "
+                              f"File may have been deleted by scanner or is locked. Skipping processing.")
+            return
+        
+        # Step 2: Stability Check in Staging - All subsequent operations on the staged file
+        try:
+            # Initial cooldown period on the staged file
+            time.sleep(self.file_stability_delay)
+            
+            # Perform file stability check on the staged file
+            if not os.path.exists(processing_path):
+                self.logger.error(f"Staged file disappeared unexpectedly: {processing_path}")
                 return
             
-            last_size = os.path.getsize(file_path)
+            last_size = os.path.getsize(processing_path)
             stable_count = 0
             
             for _ in range(self.file_stability_checks):
                 time.sleep(self.file_stability_check_interval)
                 
-                if not os.path.exists(file_path):
-                    self.logger.info(f"File {file_path} disappeared during stability checks.")
+                if not os.path.exists(processing_path):
+                    self.logger.error(f"Staged file disappeared during stability checks: {processing_path}")
                     return
                 
-                current_size = os.path.getsize(file_path)
+                current_size = os.path.getsize(processing_path)
                 
                 if current_size == last_size and current_size > 0:
                     stable_count += 1
@@ -123,23 +145,9 @@ class NewFileHandler(FileSystemEventHandler):
                 if stable_count >= 2:  # Consider stable if size hasn't changed
                     break
             
+            # Step 3: Pipeline Execution - Process the stable staged file
             if stable_count >= 2:
-                self.logger.info(f"File {file_path} confirmed stable. Moving to processing folder.")
-                
-                # Generate unique filename with timestamp and UUID to prevent collisions
-                timestamp = int(time.time())
-                short_uuid = str(uuid.uuid4())[:8]
-                original_filename = os.path.basename(file_path)
-                unique_filename = f"{timestamp}_{short_uuid}_{original_filename}"
-                processing_path = os.path.join(self.config_paths['processing_folder'], unique_filename)
-                
-                # Move file to processing folder
-                try:
-                    shutil.move(file_path, processing_path)
-                    self.logger.info(f"File moved to processing folder: {processing_path}")
-                except Exception as move_error:
-                    self.logger.error(f"Failed to move file to processing folder: {move_error}")
-                    return
+                self.logger.info(f"Staged file {processing_path} confirmed stable. Starting pipeline processing.")
                 
                 # Create a local ContextStore instance for this thread to avoid SQLite threading issues
                 local_context_store = ContextStore(db_path=self.config_paths['db_path'])
@@ -243,7 +251,7 @@ class NewFileHandler(FileSystemEventHandler):
                         results = {'session_id': session_id, 'stats': {'ingested': 0}}
                     
                     self.logger.info(
-                        f"Pipeline processing completed for {file_path} under session {session_id}. "
+                        f"Pipeline processing completed for {original_filename} under session {session_id}. "
                         f"Results: {results['stats']}"
                     )
                     
@@ -252,7 +260,7 @@ class NewFileHandler(FileSystemEventHandler):
                         self.logger.info(f"Cover sheet generated: {results['cover_sheet_path']}")
                 
                 except Exception as pipeline_error:
-                    self.logger.error(f"Pipeline processing failed for {file_path}: {pipeline_error}")
+                    self.logger.error(f"Pipeline processing failed for {original_filename}: {pipeline_error}")
                     
                     # Update session with error status using thread-local context store
                     try:
@@ -264,10 +272,23 @@ class NewFileHandler(FileSystemEventHandler):
                         self.logger.error(f"Failed to update session with error: {update_error}")
             
             else:
-                self.logger.info(f"File {file_path} did not stabilize or is empty. Skipping.")
+                self.logger.info(f"Staged file {processing_path} did not stabilize or is empty. Skipping.")
+                # Clean up unstable file from processing folder
+                try:
+                    os.remove(processing_path)
+                    self.logger.info(f"Removed unstable file from staging area: {processing_path}")
+                except Exception as cleanup_error:
+                    self.logger.warning(f"Failed to clean up unstable file: {cleanup_error}")
         
         except Exception as e:
-            self.logger.error(f"Error during stability check or pipeline trigger for {file_path}: {e}")
+            self.logger.error(f"Error during staged file processing for {processing_path}: {e}")
+            # Attempt cleanup on error
+            try:
+                if os.path.exists(processing_path):
+                    os.remove(processing_path)
+                    self.logger.info(f"Cleaned up file after error: {processing_path}")
+            except Exception as cleanup_error:
+                self.logger.warning(f"Failed to clean up file after error: {cleanup_error}")
 
 
 def main():
