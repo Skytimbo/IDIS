@@ -30,6 +30,16 @@ IDIS follows a modular architecture with the following core components:
   - Audit trail management
   - JSON handling for metadata storage
 
+### Watcher Service with Staging Area
+- **Purpose**: Monitors watch folder and manages file processing pipeline
+- **Implementation**: watcher_service.py with NewFileHandler class
+- **Staging Area Enhancement**: Files are moved to a processing folder with unique timestamped names to prevent collisions
+- **Key Features**:
+  - File stability checking before processing
+  - Unique filename generation with timestamp and UUID
+  - Processing folder isolation for robust file handling
+  - Integration with start_watcher.sh script for Dell testing setup
+
 ### Database Schema
 The SQLite database includes the following key tables:
 1. **patients**: Stores patient information with fields like patient_id, patient_name, and timestamps
@@ -42,12 +52,14 @@ The SQLite database includes the following key tables:
 Unit tests for the Context Store are implemented in tests/test_context_store.py, using Python's unittest framework.
 
 ## Data Flow
-1. Documents are added to a designated "watchfolder" (for MVP) or uploaded via UI (future)
-2. The Ingestion Agent processes documents, extracting text and metadata
-3. Data is persisted in the Context Store
-4. Various micro-agents process the documents and generate insights
-5. All operations are logged in the audit trail
-6. Authorized users can retrieve processed information through defined interfaces
+1. Documents are added to a designated "watchfolder" 
+2. The Watcher Service detects new files and moves them to a processing folder with unique timestamped filenames
+3. The Ingestion Agent processes documents from the processing folder, extracting text and metadata
+4. Data is persisted in the Context Store with the processing folder path as the original_watchfolder_path
+5. Various micro-agents process the documents and generate insights
+6. The Tagger Agent archives documents and removes them from the processing folder
+7. All operations are logged in the audit trail
+8. Authorized users can retrieve processed information through the QuantaIQ Streamlit interface
 
 ## External Dependencies
 The system has minimal external dependencies for the MVP:

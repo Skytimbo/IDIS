@@ -10,6 +10,7 @@ services:
     volumes:
       - ./watch_folder:/app/watch_folder
       - ./holding_folder:/app/holding_folder
+      - ./processing_folder:/app/processing_folder
       - ./archive:/app/archive_folder
       - ./cover_sheets:/app/cover_sheets
       - ./database:/app/db
@@ -17,7 +18,8 @@ services:
     command: [
       "python3", "watcher_service.py",
       "--watch-folder", "/app/watch_folder",
-      "--holding-folder", "/app/holding_folder", 
+      "--holding-folder", "/app/holding_folder",
+      "--processing-folder", "/app/processing_folder",
       "--archive-folder", "/app/archive_folder",
       "--cover-sheets-folder", "/app/cover_sheets",
       "--db-path", "/app/db/idis.db",
