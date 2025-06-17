@@ -39,26 +39,26 @@ fi
 # Create Dell testing directories if they don't exist
 echo "📁 Ensuring Dell testing directories exist..."
 mkdir -p ~/IDIS_Dell_Scan_Test/scanner_output
+mkdir -p ~/IDIS_Dell_Scan_Test/idis_inbox
 mkdir -p ~/IDIS_Dell_Scan_Test/idis_holding
-mkdir -p ~/IDIS_Dell_Scan_Test/idis_processing
 mkdir -p ~/IDIS_Dell_Scan_Test/idis_archive
 mkdir -p ~/IDIS_Dell_Scan_Test/idis_coversheets
 mkdir -p ~/IDIS_Dell_Scan_Test/idis_db_storage
 
-echo "🔄 Launching IDIS Watcher Service with Dell testing configuration..."
+echo "🔄 Launching IDIS Watcher Service with Triage Architecture..."
 echo "   Watch folder: ~/IDIS_Dell_Scan_Test/scanner_output"
+echo "   Inbox folder: ~/IDIS_Dell_Scan_Test/idis_inbox"
 echo "   Holding folder: ~/IDIS_Dell_Scan_Test/idis_holding"
-echo "   Processing folder: ~/IDIS_Dell_Scan_Test/idis_processing"
 echo "   Archive folder: ~/IDIS_Dell_Scan_Test/idis_archive"
 echo "   Cover sheets: ~/IDIS_Dell_Scan_Test/idis_coversheets"
 echo "   Database: ~/IDIS_Dell_Scan_Test/idis_db_storage/idis_live_test.db"
 echo ""
 
-# Launch the watcher service with Dell testing paths
+# Launch the watcher service with Dell testing paths and triage architecture
 python3 watcher_service.py \
     --watch-folder ~/IDIS_Dell_Scan_Test/scanner_output \
+    --inbox-folder ~/IDIS_Dell_Scan_Test/idis_inbox \
     --holding-folder ~/IDIS_Dell_Scan_Test/idis_holding \
-    --processing-folder ~/IDIS_Dell_Scan_Test/idis_processing \
     --archive-folder ~/IDIS_Dell_Scan_Test/idis_archive \
     --cover-sheets-folder ~/IDIS_Dell_Scan_Test/idis_coversheets \
     --db-path ~/IDIS_Dell_Scan_Test/idis_db_storage/idis_live_test.db \

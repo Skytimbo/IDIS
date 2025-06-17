@@ -30,18 +30,20 @@ IDIS follows a modular architecture with the following core components:
   - Audit trail management
   - JSON handling for metadata storage
 
-### Watcher Service with Staging Area
-- **Purpose**: Monitors watch folder and manages file processing pipeline
-- **Implementation**: watcher_service.py with NewFileHandler class
-- **Race Condition Prevention**: "Move First, Check Stability Later" strategy immediately claims files before scanner deletion
-- **Staging Area Enhancement**: Files are moved to a processing folder with unique timestamped names to prevent collisions
+### Watcher Service with Triage Architecture
+- **Purpose**: Monitors watch folder and manages file processing pipeline using separated responsibilities
+- **Implementation**: watcher_service.py with NewFileHandler class and process_inbox_file function
+- **Architecture**: "Triage" design that completely eliminates race conditions by separating file watching from processing
+- **Two-Phase Operation**:
+  - **Simple Watcher**: NewFileHandler immediately moves files from watch folder to inbox folder with no processing logic
+  - **Timer-Based Processor**: Main loop checks inbox folder every 15 seconds and processes files through complete IDIS pipeline
 - **Key Features**:
-  - Immediate file claiming to prevent scanner race conditions
-  - File stability checking performed on staged files
-  - Unique filename generation with timestamp and UUID
-  - Processing folder isolation for robust file handling
-  - Automatic cleanup of unstable files
+  - No race conditions - system refuses to participate in timing conflicts with scanner software
+  - Temporary file filtering (ignores .tmp files from scanner)
+  - Inbox folder serves as processing queue
+  - Files are deleted from inbox after successful processing and archiving
   - Integration with start_watcher.sh script for Dell testing setup
+  - Robust error handling and comprehensive logging
 
 ### Database Schema
 The SQLite database includes the following key tables:

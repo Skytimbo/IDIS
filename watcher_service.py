@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-Watcher Service Module for Intelligent Document Insight System (IDIS)
+Watcher Service Module for Intelligent Document Insight System (IDIS) - Triage Architecture
 
 This module provides continuous monitoring of a specified watch folder for new files.
-When a new file is detected and deemed stable, it triggers the IDIS pipeline
-to process that single file through the complete agent workflow.
+It implements a "triage" architecture that separates file watching from processing:
+- A simple watcher moves files to an inbox folder
+- A timer-based processor handles the complete IDIS pipeline
 """
 
 import os
@@ -12,7 +13,6 @@ import time
 import logging
 import argparse
 import shutil
-import uuid
 from typing import Dict, List, Optional, Any
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
@@ -32,56 +32,6 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-
-
-class NewFileHandler(FileSystemEventHandler):
-    """
-    File system event handler for processing new files detected by the watcher service.
-    
-    This handler monitors file creation events, performs stability checks to ensure
-    files are fully written, and then triggers the IDIS pipeline for processing.
-    """
-    
-    def __init__(self, inbox_folder: str):
-        """
-        Initialize the simplified file handler for triage architecture.
-        
-        Args:
-            inbox_folder: Path to the inbox folder where files should be moved
-        """
-        super().__init__()
-        self.inbox_folder = inbox_folder
-        self.logger = logging.getLogger("NewFileHandler")
-    
-    def on_created(self, event):
-        """
-        Simple file triage - move PDF files to inbox folder immediately.
-        
-        This method has one job: grab PDF files and move them to the inbox.
-        No processing logic, no stability checks, just fast file claiming.
-        
-        Args:
-            event: File system event object
-        """
-        if event.is_directory:
-            return
-        
-        file_path = event.src_path
-        original_filename = os.path.basename(file_path)
-        
-        # Ignore temporary files created by scanner
-        if original_filename.endswith('.tmp'):
-            self.logger.debug(f"Ignoring temporary file: {original_filename}")
-            return
-        
-        # Simple move to inbox - no retries, no complex logic
-        inbox_path = os.path.join(self.inbox_folder, original_filename)
-        try:
-            shutil.move(file_path, inbox_path)
-            self.logger.info(f"File moved to inbox: {inbox_path}")
-        except Exception as e:
-            self.logger.debug(f"Failed to move {file_path} to inbox: {e}")
-            pass
 
 
 def process_inbox_file(
@@ -273,300 +223,108 @@ class NewFileHandler(FileSystemEventHandler):
         except Exception as e:
             self.logger.debug(f"Failed to move {file_path} to inbox: {e}")
             pass
-                if attempt < 4:  # Not the last attempt
-                    self.logger.debug(f"Move attempt {attempt + 1} failed for {file_path}: {move_error}. Retrying...")
-                    time.sleep(0.2)  # Wait 200ms before retry
-                else:
-                    self.logger.warning(f"Failed to move file {file_path} to staging area after {attempt + 1} attempts: {move_error}. "
-                                      f"File may have been deleted by scanner or is locked.")
-        
-        # Check if the file was successfully moved after all retries
-        if not move_successful:
-            self.logger.warning(f"Final failure: Unable to move {file_path} to staging area after all retry attempts. Skipping processing.")
-            return
-        
-        # Step 2: Stability Check in Staging - All subsequent operations on the staged file
-        try:
-            # Initial cooldown period on the staged file
-            time.sleep(self.file_stability_delay)
-            
-            # Perform file stability check on the staged file
-            if not os.path.exists(processing_path):
-                self.logger.error(f"Staged file disappeared unexpectedly: {processing_path}")
-                return
-            
-            last_size = os.path.getsize(processing_path)
-            stable_count = 0
-            
-            for _ in range(self.file_stability_checks):
-                time.sleep(self.file_stability_check_interval)
-                
-                if not os.path.exists(processing_path):
-                    self.logger.error(f"Staged file disappeared during stability checks: {processing_path}")
-                    return
-                
-                current_size = os.path.getsize(processing_path)
-                
-                if current_size == last_size and current_size > 0:
-                    stable_count += 1
-                else:
-                    last_size = current_size
-                    stable_count = 0  # Reset if size changes
-                
-                if stable_count >= 2:  # Consider stable if size hasn't changed
-                    break
-            
-            # Step 3: Pipeline Execution - Process the stable staged file
-            if stable_count >= 2:
-                self.logger.info(f"Staged file {processing_path} confirmed stable. Starting pipeline processing.")
-                
-                # Create a local ContextStore instance for this thread to avoid SQLite threading issues
-                local_context_store = ContextStore(db_path=self.config_paths['db_path'])
-                
-                # Create a new session for this file using the thread-local context store
-                session_id = local_context_store.create_session(
-                    user_id=self.user_id_for_new_docs,
-                    session_metadata={
-                        "source_file": original_filename,
-                        "processing_file": unique_filename,
-                        "trigger": "watcher_service",
-                        "processing_mode": "single_file"
-                    }
-                )
-                
-                # Process the single file using specific file processing from processing folder
-                try:
-                    # Initialize ingestion agent for this file with thread-local context store
-                    ingestion_agent = IngestionAgent(
-                        context_store=local_context_store,
-                        watch_folder=self.config_paths['processing_folder'],  # Use processing folder as source
-                        holding_folder=self.config_paths['holding_folder']
-                    )
-                    
-                    # Use the new process_specific_files method for single file processing
-                    ingestion_results = ingestion_agent.process_specific_files(
-                        file_paths=[processing_path],  # Use processing path instead of original path
-                        session_id=session_id,
-                        patient_id=self.patient_id_for_new_docs,
-                        user_id=self.user_id_for_new_docs
-                    )
-                    
-                    if ingestion_results > 0:
-                        # Continue with the rest of the pipeline using thread-local context store
-                        classifier_agent = ClassifierAgent(
-                            context_store=local_context_store,
-                            classification_rules=self.classification_rules
-                        )
-                        
-                        summarizer_agent = SummarizerAgent(
-                            context_store=local_context_store,
-                            openai_api_key=self.openai_api_key
-                        )
-                        
-                        tagger_agent = TaggerAgent(
-                            context_store=local_context_store,
-                            base_filed_folder=self.config_paths['archive_folder'],
-                            tag_definitions=self.tag_definitions
-                        )
-                        
-                        cover_sheet_renderer = SmartCoverSheetRenderer(context_store=local_context_store)
-                        
-                        # Run the pipeline steps
-                        classification_results = classifier_agent.process_documents_for_classification(
-                            user_id=self.user_id_for_new_docs,
-                            status_to_classify="ingested",
-                            new_status_after_classification="classified"
-                        )
-                        
-                        summarization_results = summarizer_agent.summarize_classified_documents(
-                            session_id=session_id,
-                            user_id=self.user_id_for_new_docs,
-                            status_to_summarize="classified"
-                        )
-                        
-                        tagging_results = tagger_agent.process_documents_for_tagging_and_filing(
-                            user_id=self.user_id_for_new_docs,
-                            status_to_process="summarized"
-                        )
-                        
-                        # Generate cover sheet
-                        documents = local_context_store.get_documents_for_session(session_id)
-                        document_ids = [doc["document_id"] for doc in documents]
-                        
-                        cover_sheet_pdf_path = None
-                        if document_ids:
-                            cover_sheet_pdf_path = os.path.join(
-                                self.config_paths['pdf_output_dir'],
-                                f"Watcher_Cover_Sheet_{session_id}.pdf"
-                            )
-                            
-                            success = cover_sheet_renderer.generate_cover_sheet(
-                                document_ids=document_ids,
-                                output_pdf_filename=cover_sheet_pdf_path,
-                                session_id=session_id,
-                                user_id=self.user_id_for_new_docs
-                            )
-                        
-                        results = {
-                            'session_id': session_id,
-                            'documents': documents,
-                            'cover_sheet_path': cover_sheet_pdf_path if document_ids else None,
-                            'stats': {
-                                'ingested': ingestion_results,
-                                'classified': classification_results,
-                                'summarized': summarization_results,
-                                'tagged': tagging_results
-                            }
-                        }
-                    else:
-                        results = {'session_id': session_id, 'stats': {'ingested': 0}}
-                    
-                    self.logger.info(
-                        f"Pipeline processing completed for {original_filename} under session {session_id}. "
-                        f"Results: {results['stats']}"
-                    )
-                    
-                    # Log cover sheet generation if successful
-                    if results.get('cover_sheet_path'):
-                        self.logger.info(f"Cover sheet generated: {results['cover_sheet_path']}")
-                
-                except Exception as pipeline_error:
-                    self.logger.error(f"Pipeline processing failed for {original_filename}: {pipeline_error}")
-                    
-                    # Update session with error status using thread-local context store
-                    try:
-                        local_context_store.update_session_metadata(
-                            session_id, 
-                            {"processing_error": str(pipeline_error)}
-                        )
-                    except Exception as update_error:
-                        self.logger.error(f"Failed to update session with error: {update_error}")
-            
-            else:
-                self.logger.info(f"Staged file {processing_path} did not stabilize or is empty. Skipping.")
-                # Clean up unstable file from processing folder
-                try:
-                    os.remove(processing_path)
-                    self.logger.info(f"Removed unstable file from staging area: {processing_path}")
-                except Exception as cleanup_error:
-                    self.logger.warning(f"Failed to clean up unstable file: {cleanup_error}")
-        
-        except Exception as e:
-            self.logger.error(f"Error during staged file processing for {processing_path}: {e}")
-            # Attempt cleanup on error
-            try:
-                if os.path.exists(processing_path):
-                    os.remove(processing_path)
-                    self.logger.info(f"Cleaned up file after error: {processing_path}")
-            except Exception as cleanup_error:
-                self.logger.warning(f"Failed to clean up file after error: {cleanup_error}")
+
+
+def setup_folder_paths(args):
+    """Set up and validate folder paths from command line arguments."""
+    config_paths = {
+        'watch_folder': args.watch_folder,
+        'inbox_folder': args.inbox_folder,
+        'holding_folder': args.holding_folder,
+        'archive_folder': args.archive_folder,
+        'cover_sheets_folder': args.cover_sheets_folder,
+        'pdf_output_dir': args.cover_sheets_folder,  # Use cover sheets folder for PDF output
+        'db_path': args.db_path,
+    }
+    
+    # Create directories if they don't exist
+    for path_name, path_value in config_paths.items():
+        if path_name != 'db_path' and not os.path.exists(path_value):
+            os.makedirs(path_value, exist_ok=True)
+            logging.info(f"Created directory: {path_value}")
+    
+    return config_paths
 
 
 def main():
-    """
-    Main function to set up and run the watcher service.
-    """
-    # Set up command line argument parsing
-    parser = argparse.ArgumentParser(description="IDIS Watcher Service - Continuous Document Monitoring")
-    parser.add_argument('--watch-folder', type=str, required=True,
-                        help='Path to the folder to monitor for new documents')
-    parser.add_argument('--holding-folder', type=str, required=True,
-                        help='Path to the folder for processed/problematic documents')
-    parser.add_argument('--processing-folder', type=str, required=True,
-                        help='Path to the staging folder for file processing')
-    parser.add_argument('--archive-folder', type=str, required=True,
-                        help='Path to the folder for archived documents')
-    parser.add_argument('--cover-sheets-folder', type=str, required=True,
-                        help='Path to the folder for generated cover sheets')
-    parser.add_argument('--db-path', type=str, required=True,
-                        help='Path to the SQLite database file')
-    parser.add_argument('--openai', action='store_true',
-                        help='Enable OpenAI for summarization')
-    parser.add_argument('--default-patient-id', type=str,
-                        help='Optional default patient ID for new documents')
+    """Main function to run the triage-based watcher service."""
+    parser = argparse.ArgumentParser(description='IDIS Watcher Service - Triage Architecture')
+    parser.add_argument('--watch-folder', required=True, help='Folder to monitor for new files')
+    parser.add_argument('--inbox-folder', required=True, help='Folder where files are moved for processing')
+    parser.add_argument('--holding-folder', required=True, help='Folder for files that failed processing')
+    parser.add_argument('--archive-folder', required=True, help='Folder for successfully processed files')
+    parser.add_argument('--cover-sheets-folder', required=True, help='Folder for generated cover sheet PDFs')
+    parser.add_argument('--db-path', required=True, help='Path to the SQLite database file')
+    parser.add_argument('--openai', action='store_true', help='Enable OpenAI API for summarization')
+    parser.add_argument('--patient-id', help='Default patient ID for new documents')
+    parser.add_argument('--user-id', default='watcher_service_user', help='User ID for audit trail')
     
     args = parser.parse_args()
     
     # Set up logging
     logger = logging.getLogger("WatcherService")
-    logger.info("Starting IDIS Watcher Service")
+    logger.info("Starting IDIS Watcher Service with Triage Architecture")
     
-    # Build config paths dictionary
-    config_paths = {
-        'watch_folder': args.watch_folder,
-        'holding_folder': args.holding_folder,
-        'processing_folder': args.processing_folder,
-        'archive_folder': args.archive_folder,
-        'pdf_output_dir': args.cover_sheets_folder,
-        'db_path': args.db_path
-    }
-    
-    # Ensure all directories exist
-    for folder_name, folder_path in config_paths.items():
-        if folder_name != 'db_path':  # Skip database path
-            os.makedirs(folder_path, exist_ok=True)
-            logger.info(f"Ensured directory exists: {folder_path}")
-    
-    # Ensure database directory exists
-    db_dir = os.path.dirname(config_paths['db_path'])
-    if db_dir:
-        os.makedirs(db_dir, exist_ok=True)
-    
-    # Initialize Context Store
-    try:
-        context_store = ContextStore(db_path=config_paths['db_path'])
-        logger.info(f"Initialized Context Store with database: {config_paths['db_path']}")
-    except Exception as e:
-        logger.error(f"Failed to initialize Context Store: {e}")
-        return 1
-    
-    # Initialize Permissions Manager
-    try:
-        permissions_manager = PermissionsManager(rules_file_path=PERMISSIONS_RULES_FILE)
-        logger.info("Initialized Permissions Manager")
-    except Exception as e:
-        logger.warning(f"Failed to initialize Permissions Manager: {e}")
+    # Set up folder paths
+    config_paths = setup_folder_paths(args)
+    logger.info(f"Watching folder: {config_paths['watch_folder']}")
+    logger.info(f"Inbox folder: {config_paths['inbox_folder']}")
     
     # Get OpenAI API key if requested
     openai_api_key = None
     if args.openai:
         openai_api_key = os.environ.get('OPENAI_API_KEY')
-        if openai_api_key:
-            logger.info("OpenAI integration enabled")
-        else:
-            logger.warning("--openai flag used but no OPENAI_API_KEY environment variable found")
+        if not openai_api_key:
+            logger.warning("OpenAI API requested but OPENAI_API_KEY environment variable not set")
     
-    # Create file event handler
-    event_handler = NewFileHandler(
-        context_store_instance=context_store,
-        config_paths=config_paths,
-        classification_rules=CLASSIFICATION_RULES,
-        tag_definitions=TAG_DEFINITIONS,
-        openai_api_key=openai_api_key,
-        patient_id_for_new_docs=args.default_patient_id,
-        user_id_for_new_docs="watcher_service_user"
-    )
-    
-    # Initialize and start the watchdog observer
+    # Set up file watcher
+    event_handler = NewFileHandler(inbox_folder=config_paths['inbox_folder'])
     observer = Observer()
-    observer.schedule(event_handler, args.watch_folder, recursive=False)
+    observer.schedule(event_handler, config_paths['watch_folder'], recursive=False)
     observer.start()
-    
-    logger.info(f"Watcher service started. Monitoring folder: {args.watch_folder}")
-    logger.info("Press Ctrl+C to stop the service.")
+    logger.info("File watcher started")
     
     try:
+        # Main processor loop - runs every 15 seconds
         while True:
-            time.sleep(5)  # Keep main thread alive
+            time.sleep(15)  # Wait 15 seconds between processing runs
+            
+            # Check inbox folder for files to process
+            try:
+                if os.path.exists(config_paths['inbox_folder']):
+                    inbox_files = os.listdir(config_paths['inbox_folder'])
+                    if inbox_files:
+                        logger.info(f"Found {len(inbox_files)} files in inbox for processing")
+                        
+                        for filename in inbox_files:
+                            file_path = os.path.join(config_paths['inbox_folder'], filename)
+                            if os.path.isfile(file_path):
+                                # Process the file
+                                result = process_inbox_file(
+                                    file_path=file_path,
+                                    config_paths=config_paths,
+                                    classification_rules=CLASSIFICATION_RULES,
+                                    tag_definitions=TAG_DEFINITIONS,
+                                    openai_api_key=openai_api_key,
+                                    patient_id_for_new_docs=args.patient_id,
+                                    user_id_for_new_docs=args.user_id
+                                )
+                                
+                                if 'error' in result:
+                                    logger.error(f"Failed to process file {filename}: {result['error']}")
+                                else:
+                                    logger.info(f"Successfully processed file {filename}")
+                    
+            except Exception as e:
+                logger.exception(f"Error in main processor loop: {e}")
+                
     except KeyboardInterrupt:
-        logger.info("Watcher service shutting down...")
-        observer.stop()
+        logger.info("Shutting down watcher service...")
     finally:
+        observer.stop()
         observer.join()
-        logger.info("Watcher service stopped.")
-    
-    return 0
+        logger.info("Watcher service stopped")
 
 
 if __name__ == "__main__":
-    exit(main())
+    main()
