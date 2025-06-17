@@ -18,7 +18,7 @@ from context_store import ContextStore
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
@@ -502,18 +502,23 @@ class IngestionAgent:
             
             # If little/no text was extracted, try OCR on each page
             self.logger.info(f"PDF appears to be image-based, attempting OCR: {file_path}")
+            self.logger.debug("Attempting OCR fallback...")
             import pytesseract
             full_text = ""
             confidences = []
             
             for page_num in range(len(doc)):
+                self.logger.debug(f"Processing page {page_num}...")
                 page = doc.load_page(page_num)
+                self.logger.debug("...getting pixmap.")
                 pix = page.get_pixmap()
                 
                 # Convert pixmap to PIL Image
+                self.logger.debug("...converting to image.")
                 img = Image.open(io.BytesIO(pix.tobytes("png")))
                 
                 # Perform OCR on the image
+                self.logger.debug("...calling pytesseract.image_to_data.")
                 ocr_data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT, lang='eng')
                 
                 # Calculate confidence for this page
@@ -522,8 +527,11 @@ class IngestionAgent:
                     confidences.extend(page_confidences)
                 
                 # Get text for this page
+                self.logger.debug("...calling pytesseract.image_to_string.")
                 page_text = pytesseract.image_to_string(img, lang='eng')
                 full_text += page_text + "\n\n"
+            
+            self.logger.debug(f"OCR finished. Total extracted text length: {len(full_text)}")
             
             # Calculate overall confidence
             avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
@@ -534,5 +542,5 @@ class IngestionAgent:
             return None, None
             
         except Exception as e:
-            self.logger.error(f"Error processing PDF {file_path}: {str(e)}")
+            self.logger.exception(f"A new, unhandled error occurred in PDF processing for {file_path}")
             return None, None
