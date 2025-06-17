@@ -42,50 +42,23 @@ class NewFileHandler(FileSystemEventHandler):
     files are fully written, and then triggers the IDIS pipeline for processing.
     """
     
-    def __init__(
-        self,
-        context_store_instance: ContextStore,
-        config_paths: Dict[str, str],
-        classification_rules: Dict[str, List[str]],
-        tag_definitions: Dict[str, List[str]],
-        openai_api_key: Optional[str],
-        patient_id_for_new_docs: Optional[str] = None,
-        user_id_for_new_docs: str = "watcher_service_user"
-    ):
+    def __init__(self, inbox_folder: str):
         """
-        Initialize the file handler with pipeline configuration.
+        Initialize the simplified file handler for triage architecture.
         
         Args:
-            context_store_instance: Initialized ContextStore instance
-            config_paths: Dictionary containing folder paths configuration
-            classification_rules: Document classification rules
-            tag_definitions: Tag extraction definitions
-            openai_api_key: Optional OpenAI API key for summarization
-            patient_id_for_new_docs: Optional default patient ID for new documents
-            user_id_for_new_docs: User ID for audit trail purposes
+            inbox_folder: Path to the inbox folder where files should be moved
         """
         super().__init__()
-        self.context_store_instance = context_store_instance
-        self.config_paths = config_paths
-        self.classification_rules = classification_rules
-        self.tag_definitions = tag_definitions
-        self.openai_api_key = openai_api_key
-        self.patient_id_for_new_docs = patient_id_for_new_docs
-        self.user_id_for_new_docs = user_id_for_new_docs
-        
-        # File stability configuration
-        self.file_stability_delay = 10  # seconds - initial cooldown
-        self.file_stability_checks = 3  # number of size checks
-        self.file_stability_check_interval = 2  # seconds between checks
-        
+        self.inbox_folder = inbox_folder
         self.logger = logging.getLogger("NewFileHandler")
     
     def on_created(self, event):
         """
-        Handle file creation events using "Move First, Check Stability Later" strategy.
+        Simple file triage - move PDF files to inbox folder immediately.
         
-        This method immediately claims the file by moving it to the processing folder,
-        then performs stability checks on the staged file to eliminate race conditions.
+        This method has one job: grab PDF files and move them to the inbox.
+        No processing logic, no stability checks, just fast file claiming.
         
         Args:
             event: File system event object
@@ -98,28 +71,208 @@ class NewFileHandler(FileSystemEventHandler):
         
         # Ignore temporary files created by scanner
         if original_filename.endswith('.tmp'):
-            self.logger.info(f"Ignoring temporary file: {original_filename}")
+            self.logger.debug(f"Ignoring temporary file: {original_filename}")
             return
         
-        self.logger.info(f"Detected new file: {file_path}. Immediately moving to staging area.")
+        # Simple move to inbox - no retries, no complex logic
+        inbox_path = os.path.join(self.inbox_folder, original_filename)
+        try:
+            shutil.move(file_path, inbox_path)
+            self.logger.info(f"File moved to inbox: {inbox_path}")
+        except Exception as e:
+            self.logger.debug(f"Failed to move {file_path} to inbox: {e}")
+            pass
+
+
+def process_inbox_file(
+    file_path: str,
+    config_paths: Dict[str, str],
+    classification_rules: Dict[str, List[str]],
+    tag_definitions: Dict[str, List[str]],
+    openai_api_key: Optional[str],
+    patient_id_for_new_docs: Optional[str] = None,
+    user_id_for_new_docs: str = "watcher_service_user"
+) -> Dict[str, Any]:
+    """
+    Process a single file from the inbox folder through the complete IDIS pipeline.
+    
+    Args:
+        file_path: Full path to the file in the inbox folder
+        config_paths: Dictionary containing folder paths configuration
+        classification_rules: Document classification rules
+        tag_definitions: Tag extraction definitions
+        openai_api_key: Optional OpenAI API key for summarization
+        patient_id_for_new_docs: Optional default patient ID for new documents
+        user_id_for_new_docs: User ID for audit trail purposes
         
-        # Step 1: Immediate Move - Claim the file instantly to prevent scanner deletion
-        # Generate unique filename with timestamp and UUID to prevent collisions
-        timestamp = int(time.time())
-        short_uuid = str(uuid.uuid4())[:8]
-        unique_filename = f"{timestamp}_{short_uuid}_{original_filename}"
-        processing_path = os.path.join(self.config_paths['processing_folder'], unique_filename)
+    Returns:
+        Dictionary containing processing results and statistics
+    """
+    logger = logging.getLogger("InboxProcessor")
+    original_filename = os.path.basename(file_path)
+    
+    try:
+        logger.info(f"Processing inbox file: {original_filename}")
         
-        move_successful = False
-        for attempt in range(5):
-            try:
-                # Attempt to move the file to processing folder
-                shutil.move(file_path, processing_path)
-                self.logger.info(f"File successfully moved to staging area: {processing_path}")
-                move_successful = True
-                break
+        # Create a local ContextStore instance for this processing session
+        local_context_store = ContextStore(db_path=config_paths['db_path'])
+        
+        # Create a new session for this file
+        session_id = local_context_store.create_session(
+            user_id=user_id_for_new_docs,
+            session_metadata={
+                "source_file": original_filename,
+                "trigger": "inbox_processor",
+                "processing_mode": "single_file"
+            }
+        )
+        
+        # Initialize agents
+        ingestion_agent = IngestionAgent(
+            context_store=local_context_store,
+            watch_folder=os.path.dirname(file_path),  # Use inbox folder as source
+            holding_folder=config_paths['holding_folder']
+        )
+        
+        # Process the specific file
+        ingestion_results = ingestion_agent.process_specific_files(
+            file_paths=[file_path],
+            session_id=session_id,
+            patient_id=patient_id_for_new_docs,
+            user_id=user_id_for_new_docs
+        )
+        
+        if ingestion_results > 0:
+            # Continue with the rest of the pipeline
+            classifier_agent = ClassifierAgent(
+                context_store=local_context_store,
+                classification_rules=classification_rules
+            )
+            
+            summarizer_agent = SummarizerAgent(
+                context_store=local_context_store,
+                openai_api_key=openai_api_key
+            )
+            
+            tagger_agent = TaggerAgent(
+                context_store=local_context_store,
+                base_filed_folder=config_paths['archive_folder'],
+                tag_definitions=tag_definitions
+            )
+            
+            cover_sheet_renderer = SmartCoverSheetRenderer(context_store=local_context_store)
+            
+            # Run the pipeline steps
+            classification_results = classifier_agent.process_documents_for_classification(
+                user_id=user_id_for_new_docs,
+                status_to_classify="ingested",
+                new_status_after_classification="classified"
+            )
+            
+            summarization_results = summarizer_agent.summarize_classified_documents(
+                session_id=session_id,
+                user_id=user_id_for_new_docs,
+                status_to_summarize="classified"
+            )
+            
+            tagging_results = tagger_agent.process_documents_for_tagging_and_filing(
+                user_id=user_id_for_new_docs,
+                status_to_process="summarized"
+            )
+            
+            # Generate cover sheet
+            documents = local_context_store.get_documents_for_session(session_id)
+            document_ids = [doc["document_id"] for doc in documents]
+            
+            cover_sheet_pdf_path = None
+            if document_ids:
+                cover_sheet_pdf_path = os.path.join(
+                    config_paths['pdf_output_dir'],
+                    f"Inbox_Cover_Sheet_{session_id}.pdf"
+                )
                 
-            except Exception as move_error:
+                cover_sheet_renderer.generate_cover_sheet(
+                    document_ids=document_ids,
+                    output_pdf_filename=cover_sheet_pdf_path,
+                    session_id=session_id,
+                    user_id=user_id_for_new_docs
+                )
+            
+            # Delete the original file from inbox after successful processing
+            try:
+                os.remove(file_path)
+                logger.info(f"Successfully processed and removed inbox file: {original_filename}")
+            except Exception as e:
+                logger.warning(f"Failed to remove processed file {file_path}: {e}")
+            
+            return {
+                'session_id': session_id,
+                'documents': documents,
+                'cover_sheet_path': cover_sheet_pdf_path,
+                'stats': {
+                    'ingested': ingestion_results,
+                    'classified': classification_results,
+                    'summarized': summarization_results,
+                    'tagged': tagging_results
+                }
+            }
+        else:
+            logger.warning(f"Failed to ingest file: {original_filename}")
+            return {'session_id': session_id, 'stats': {'ingested': 0}}
+            
+    except Exception as e:
+        logger.exception(f"Error processing inbox file {file_path}: {e}")
+        return {'error': str(e), 'file': original_filename}
+
+
+class NewFileHandler(FileSystemEventHandler):
+    """
+    Simplified file system event handler for triage architecture.
+    
+    This handler has one job: move files from the watch folder to the inbox folder.
+    All complex processing logic has been moved to the process_inbox_file function.
+    """
+    
+    def __init__(self, inbox_folder: str):
+        """
+        Initialize the simplified file handler for triage architecture.
+        
+        Args:
+            inbox_folder: Path to the inbox folder where files should be moved
+        """
+        super().__init__()
+        self.inbox_folder = inbox_folder
+        self.logger = logging.getLogger("NewFileHandler")
+    
+    def on_created(self, event):
+        """
+        Simple file triage - move PDF files to inbox folder immediately.
+        
+        This method has one job: grab PDF files and move them to the inbox.
+        No processing logic, no stability checks, just fast file claiming.
+        
+        Args:
+            event: File system event object
+        """
+        if event.is_directory:
+            return
+        
+        file_path = event.src_path
+        original_filename = os.path.basename(file_path)
+        
+        # Ignore temporary files created by scanner
+        if original_filename.endswith('.tmp'):
+            self.logger.debug(f"Ignoring temporary file: {original_filename}")
+            return
+        
+        # Simple move to inbox - no retries, no complex logic
+        inbox_path = os.path.join(self.inbox_folder, original_filename)
+        try:
+            shutil.move(file_path, inbox_path)
+            self.logger.info(f"File moved to inbox: {inbox_path}")
+        except Exception as e:
+            self.logger.debug(f"Failed to move {file_path} to inbox: {e}")
+            pass
                 if attempt < 4:  # Not the last attempt
                     self.logger.debug(f"Move attempt {attempt + 1} failed for {file_path}: {move_error}. Retrying...")
                     time.sleep(0.2)  # Wait 200ms before retry
