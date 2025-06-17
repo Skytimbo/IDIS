@@ -223,6 +223,36 @@ class NewFileHandler(FileSystemEventHandler):
         except Exception as e:
             self.logger.debug(f"Failed to move {file_path} to inbox: {e}")
             pass
+    
+    def on_modified(self, event):
+        """
+        Simple file triage - move PDF files to inbox folder immediately.
+        
+        This method has one job: grab PDF files and move them to the inbox.
+        No processing logic, no stability checks, just fast file claiming.
+        
+        Args:
+            event: File system event object
+        """
+        if event.is_directory:
+            return
+        
+        file_path = event.src_path
+        original_filename = os.path.basename(file_path)
+        
+        # Ignore temporary files created by scanner
+        if original_filename.endswith('.tmp'):
+            self.logger.debug(f"Ignoring temporary file: {original_filename}")
+            return
+        
+        # Simple move to inbox - no retries, no complex logic
+        inbox_path = os.path.join(self.inbox_folder, original_filename)
+        try:
+            shutil.move(file_path, inbox_path)
+            self.logger.info(f"File moved to inbox: {inbox_path}")
+        except Exception as e:
+            self.logger.debug(f"Failed to move {file_path} to inbox: {e}")
+            pass
 
 
 def setup_folder_paths(args):
