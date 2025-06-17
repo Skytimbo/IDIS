@@ -43,7 +43,8 @@ CLASSIFICATION_RULES = {
     "Invoice": ["invoice #", "total due", "bill to"],
     "Medical Record": ["patient name:", "diagnosis", "chief complaint"],
     "Letter": ["dear sir", "sincerely", "yours truly"],
-    "Report": ["executive summary", "findings", "analysis section"]
+    "Report": ["executive summary", "findings", "analysis section"],
+    "Credit Card Statement": ["visa signature", "new balance", "minimum payment due", "account summary", "closing date", "reward points"]
 }
 
 # Tag definitions for the Tagger Agent
