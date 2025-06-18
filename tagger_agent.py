@@ -62,6 +62,14 @@ class TaggerAgent:
         # Create the base filing directory if it doesn't exist
         os.makedirs(self.base_filed_folder, exist_ok=True)
         
+        # Known issuers for high-confidence identification
+        self.KNOWN_ISSUERS = {
+            "Fidelity": ["Fidelity® Rewards Visa Signature", "Fidelity Rewards Visa"],
+            "Spenard Builders Supply": ["Spenard Builders Supply", "SPENARD BUILDERS SUPPLY"],
+            "GCI": ["GCI", "General Communication, Inc."],
+            "Waste Management": ["Waste Management", "WM"]
+        }
+        
         # Document type abbreviations for filename generation
         self.doc_type_abbreviations = {
             "Invoice": "INV",
@@ -71,6 +79,7 @@ class TaggerAgent:
             "Insurance Document": "INS",
             "Legal Document": "LEGAL",
             "Receipt": "RCPT",
+            "Credit Card Statement": "CCSTMT",
             "Unclassified": "UNC"
         }
         
@@ -857,6 +866,13 @@ class TaggerAgent:
         lines = [line.strip() for line in text.split('\n') if line.strip()]
         if not lines:
             return None
+        
+        # Pass 0: Check for known issuers (high-confidence identification)
+        text_lower = text.lower()
+        for issuer_name, keywords in self.KNOWN_ISSUERS.items():
+            for keyword in keywords:
+                if keyword.lower() in text_lower:
+                    return issuer_name
         
         # Pass 1: Search header (first ~7 lines) for high-confidence signals
         header_lines = lines[:7]
