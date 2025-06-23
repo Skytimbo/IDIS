@@ -12,8 +12,12 @@ from typing import List, Tuple, Optional, Dict, Any
 import os
 
 # --- Database Configuration ---
-# This path should point to the database file you are actively using with your watcher service.
-DB_PATH = os.path.expanduser("~/IDIS_Dell_Scan_Test/idis_db_storage/idis_live_test.db")
+# Build a reliable, absolute path to the database
+# REPL_HOME is a Replit environment variable pointing to the project root
+project_root = os.environ.get('REPL_HOME', os.getcwd())
+db_dir = os.path.join(project_root, 'data', 'idis_db_storage')
+os.makedirs(db_dir, exist_ok=True)
+DB_PATH = os.path.join(db_dir, 'idis_live_test.db')
 
 # --- Page Configuration ---
 st.set_page_config(

@@ -11,8 +11,10 @@ def initialize_demo_database():
     """
     print("Initializing demo database...")
     
-    # Create the database path
     db_path = os.path.expanduser('~/IDIS_Dell_Scan_Test/idis_db_storage/idis_live_test.db')
+    
+    # Ensure the directory exists
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
     
     # If DB exists, remove it for a clean start
     if os.path.exists(db_path):

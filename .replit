@@ -18,39 +18,7 @@ args = "Run Context Store Tests"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "test_context_store"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Run Demo Script"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "test_ingestion_agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "test_classifier_agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "test_summarizer_agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "test_tagger_agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "Run IDIS Demo"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Test Cover Sheet"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Run Cover Sheet Demo"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
@@ -59,14 +27,6 @@ args = "Run IDIS Pipeline Demo"
 [[workflows.workflow.tasks]]
 task = "workflow.run"
 args = "Run IDIS Demo with PDF Output"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "test_permissions"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "test_end_to_end"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
@@ -85,76 +45,12 @@ task = "shell.exec"
 args = "python -m unittest discover tests"
 
 [[workflows.workflow]]
-name = "test_context_store"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd tests && python -m unittest test_context_store.py"
-
-[[workflows.workflow]]
-name = "Run Demo Script"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python demo_context_store.py"
-
-[[workflows.workflow]]
-name = "test_ingestion_agent"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd tests && python -m unittest test_ingestion_agent.py"
-
-[[workflows.workflow]]
-name = "test_classifier_agent"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd tests && python -m unittest test_classifier_agent.py"
-
-[[workflows.workflow]]
-name = "test_summarizer_agent"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd tests && python -m unittest test_summarizer_agent.py"
-
-[[workflows.workflow]]
-name = "test_tagger_agent"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd tests && python -m unittest test_tagger_agent.py"
-
-[[workflows.workflow]]
 name = "Run IDIS Demo"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python run_idis_pipeline.py --create-docs --clean --openai"
-
-[[workflows.workflow]]
-name = "Test Cover Sheet"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd tests && python -m unittest test_cover_sheet.py"
-
-[[workflows.workflow]]
-name = "Run Cover Sheet Demo"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "python demo_cover_sheet.py --db-path ./idis_demo.db --output-pdf ./idis_cover_sheet.pdf --create-demo"
 
 [[workflows.workflow]]
 name = "Run IDIS Pipeline Demo"
@@ -173,22 +69,6 @@ task = "shell.exec"
 args = "python demo_idis_pipeline.py --clean --openai --output-pdf ./demo_output.pdf"
 
 [[workflows.workflow]]
-name = "test_permissions"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd tests && python -m unittest test_permissions.py"
-
-[[workflows.workflow]]
-name = "test_end_to_end"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd tests && python -m unittest test_end_to_end.py"
-
-[[workflows.workflow]]
 name = "Run Watcher Service Demo"
 author = "agent"
 
@@ -202,12 +82,17 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0"
+args = "cd quanta_ui && echo \"\" | streamlit run app.py --server.port 5000 --server.address 0.0.0.0"
 waitForPort = 5000
 
 [deployment]
 run = ["sh", "-c", "python -m unittest discover tests"]
+deploymentTarget = "cloudrun"
 
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 8501
+externalPort = 3000
