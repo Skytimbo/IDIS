@@ -80,7 +80,7 @@ class TestContextStore(unittest.TestCase):
         patient_id = self.context_store.add_patient(patient_data)
         
         self.assertIsNotNone(patient_id)
-        self.assertTrue(len(patient_id) > 0)
+        self.assertTrue(patient_id > 0)
     
     def test_get_patient(self):
         """Test retrieving a patient."""
@@ -134,7 +134,7 @@ class TestContextStore(unittest.TestCase):
         session_id = self.context_store.create_session("test_user", session_metadata)
         
         self.assertIsNotNone(session_id)
-        self.assertTrue(len(session_id) > 0)
+        self.assertTrue(session_id > 0)
     
     def test_get_session(self):
         """Test retrieving a session."""
@@ -232,7 +232,7 @@ class TestContextStore(unittest.TestCase):
         document_id = self.context_store.add_document(document_data)
         
         self.assertIsNotNone(document_id)
-        self.assertTrue(len(document_id) > 0)
+        self.assertTrue(document_id > 0)
     
     def test_get_document(self):
         """Test retrieving a document."""
@@ -335,7 +335,7 @@ class TestContextStore(unittest.TestCase):
         )
         
         self.assertIsNotNone(output_id)
-        self.assertTrue(len(output_id) > 0)
+        self.assertTrue(output_id > 0)
     
     def test_get_agent_outputs_for_document(self):
         """Test retrieving agent outputs for a document."""

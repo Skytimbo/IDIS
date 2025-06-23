@@ -51,7 +51,7 @@ class ContextStore:
         # Create patients table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS patients (
-                patient_id TEXT PRIMARY KEY,
+                id INTEGER PRIMARY KEY,
                 patient_name TEXT,
                 creation_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                 last_modified_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -66,7 +66,7 @@ class ContextStore:
         # Create sessions table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS sessions (
-                session_id TEXT PRIMARY KEY,
+                id INTEGER PRIMARY KEY,
                 user_id TEXT,
                 creation_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                 status TEXT,
@@ -82,30 +82,29 @@ class ContextStore:
             CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status)
         ''')
         
-        # Create documents table
+        # Create documents table with hybrid schema for V1.3
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS documents (
-                document_id TEXT PRIMARY KEY,
-                patient_id TEXT,
-                session_id TEXT,
-                file_name TEXT,
+                id INTEGER PRIMARY KEY,
+                document_id INTEGER, -- Legacy alias for id
+                file_name TEXT NOT NULL,
                 original_file_type TEXT,
                 original_watchfolder_path TEXT,
-                upload_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                 ingestion_status TEXT,
-                extracted_text TEXT,
-                ocr_confidence_percent REAL,
-                document_type TEXT,
-                classification_confidence TEXT,
                 processing_status TEXT,
+                patient_id INTEGER,
+                session_id INTEGER,
+                extracted_data TEXT, -- Full JSON object from cognitive agent
+                full_text TEXT, -- Primary text storage
+                document_type TEXT, -- UI-friendly classification
+                classification_confidence TEXT,
                 document_dates TEXT,
-                issuer_source TEXT,
-                recipient TEXT,
-                tags_extracted TEXT,
-                filed_path TEXT,
-                last_modified_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (patient_id) REFERENCES patients(patient_id),
-                FOREIGN KEY (session_id) REFERENCES sessions(session_id)
+                associated_entity TEXT, -- JSON for HITL workflow
+                upload_timestamp TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_modified_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (patient_id) REFERENCES patients (id),
+                FOREIGN KEY (session_id) REFERENCES sessions (id)
             )
         ''')
         
@@ -119,29 +118,25 @@ class ContextStore:
             ON documents(session_id)
         ''')
         cursor.execute('''
-            CREATE INDEX IF NOT EXISTS idx_documents_document_type 
-            ON documents(document_type)
-        ''')
-        cursor.execute('''
-            CREATE INDEX IF NOT EXISTS idx_documents_upload_timestamp 
-            ON documents(upload_timestamp)
-        ''')
-        cursor.execute('''
             CREATE INDEX IF NOT EXISTS idx_documents_processing_status 
             ON documents(processing_status)
+        ''')
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_documents_created_at 
+            ON documents(created_at)
         ''')
         
         # Create agent_outputs table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS agent_outputs (
-                output_id TEXT PRIMARY KEY,
-                document_id TEXT,
+                output_id INTEGER PRIMARY KEY,
+                document_id INTEGER,
                 agent_id TEXT,
                 output_type TEXT,
                 output_data TEXT,
                 confidence REAL,
                 creation_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (document_id) REFERENCES documents(document_id)
+                FOREIGN KEY (document_id) REFERENCES documents(id)
             )
         ''')
         
@@ -197,7 +192,7 @@ class ContextStore:
     
     # Patient Methods
     
-    def add_patient(self, patient_data: Dict[str, Any]) -> str:
+    def add_patient(self, patient_data: Dict[str, Any]) -> int:
         """
         Add a new patient to the database.
         
@@ -206,29 +201,29 @@ class ContextStore:
                           Required keys: 'patient_name'
         
         Returns:
-            str: The newly created patient_id
+            int: The newly created patient ID
             
         Raises:
             sqlite3.Error: If there's a database error
         """
-        patient_id = str(uuid.uuid4())
-        
         try:
             cursor = self.conn.cursor()
             cursor.execute(
                 '''
-                INSERT INTO patients (patient_id, patient_name)
-                VALUES (?, ?)
+                INSERT INTO patients (patient_name)
+                VALUES (?)
                 ''',
-                (patient_id, patient_data.get('patient_name'))
+                (patient_data.get('patient_name'),)
             )
             self.conn.commit()
-            return patient_id
+            if cursor.lastrowid is None:
+                raise sqlite3.Error("Failed to get patient ID after insert")
+            return cursor.lastrowid
         except sqlite3.Error as e:
             self.conn.rollback()
             raise e
     
-    def get_patient(self, patient_id: str) -> Optional[Dict[str, Any]]:
+    def get_patient(self, patient_id: int) -> Optional[Dict[str, Any]]:
         """
         Retrieve a patient by ID.
         
@@ -244,54 +239,44 @@ class ContextStore:
         try:
             cursor = self.conn.cursor()
             cursor.execute(
-                "SELECT * FROM patients WHERE patient_id = ?", 
+                "SELECT * FROM patients WHERE id = ?", 
                 (patient_id,)
             )
             row = cursor.fetchone()
             
             if row:
-                return dict(row)
+                result = dict(row)
+                # Add patient_id field for backward compatibility
+                result['patient_id'] = result['id']
+                return result
             return None
         except sqlite3.Error as e:
             raise e
     
-    def update_patient(self, patient_id: str, update_data: Dict[str, Any]) -> bool:
+    def update_patient(self, patient_id: int, update_data: Dict[str, Any]) -> bool:
         """
-        Update a patient's information.
-        
-        Args:
-            patient_id: The patient's unique identifier
-            update_data: Dictionary with fields to update
-        
-        Returns:
-            bool: True if successful, False if patient not found
-            
-        Raises:
-            sqlite3.Error: If there's a database error
+        Update a patient's information safely.
         """
+        allowed_keys = {'patient_name'} # Whitelist of columns that can be updated
+        
+        # Filter out any keys that are not allowed
+        valid_update_data = {k: v for k, v in update_data.items() if k in allowed_keys}
+
+        if not valid_update_data:
+            # No valid fields to update
+            return False
+
+        # Build the SET part of the query
+        set_clause = ", ".join([f"{key} = ?" for key in valid_update_data.keys()])
+        params = list(valid_update_data.values())
+        
+        sql = f"UPDATE patients SET {set_clause}, last_modified_timestamp = CURRENT_TIMESTAMP WHERE id = ?"
+        params.append(patient_id)
+        
         try:
             cursor = self.conn.cursor()
-            
-            # Start constructing the SQL query
-            sql = "UPDATE patients SET "
-            params = []
-            
-            # Add each field to be updated
-            for key, value in update_data.items():
-                if key != 'patient_id':  # Prevent updating the primary key
-                    sql += f"{key} = ?, "
-                    params.append(value)
-            
-            # Add last_modified_timestamp
-            sql += "last_modified_timestamp = CURRENT_TIMESTAMP "
-            
-            # Add WHERE clause and execute
-            sql += "WHERE patient_id = ?"
-            params.append(patient_id)
-            
-            cursor.execute(sql, params)
+            cursor.execute(sql, tuple(params))
             self.conn.commit()
-            
             return cursor.rowcount > 0
         except sqlite3.Error as e:
             self.conn.rollback()
@@ -299,7 +284,7 @@ class ContextStore:
     
     # Session Methods
     
-    def create_session(self, user_id: str, session_metadata: Optional[Dict[str, Any]] = None) -> str:
+    def create_session(self, user_id: str, session_metadata: Optional[Dict[str, Any]] = None) -> int:
         """
         Create a new session.
         
@@ -308,12 +293,11 @@ class ContextStore:
             session_metadata: Optional dictionary of session metadata
         
         Returns:
-            str: The newly created session_id
+            int: The newly created session ID
             
         Raises:
             sqlite3.Error: If there's a database error
         """
-        session_id = str(uuid.uuid4())
         metadata_json = json.dumps(session_metadata) if session_metadata else None
         
         try:
@@ -321,18 +305,20 @@ class ContextStore:
             cursor.execute(
                 '''
                 INSERT INTO sessions 
-                (session_id, user_id, status, session_metadata)
-                VALUES (?, ?, ?, ?)
+                (user_id, status, session_metadata)
+                VALUES (?, ?, ?)
                 ''',
-                (session_id, user_id, 'active', metadata_json)
+                (user_id, 'active', metadata_json)
             )
             self.conn.commit()
-            return session_id
+            if cursor.lastrowid is None:
+                raise sqlite3.Error("Failed to get session ID after insert")
+            return cursor.lastrowid
         except sqlite3.Error as e:
             self.conn.rollback()
             raise e
     
-    def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
+    def get_session(self, session_id: int) -> Optional[Dict[str, Any]]:
         """
         Retrieve a session by ID.
         
@@ -348,24 +334,29 @@ class ContextStore:
         try:
             cursor = self.conn.cursor()
             cursor.execute(
-                "SELECT * FROM sessions WHERE session_id = ?",
+                "SELECT * FROM sessions WHERE id = ?",
                 (session_id,)
             )
             row = cursor.fetchone()
             
             if row:
                 result = dict(row)
+                # Add session_id field for backward compatibility
+                result['session_id'] = result['id']
                 
                 # Parse metadata JSON if it exists
                 if result.get('session_metadata'):
-                    result['session_metadata'] = json.loads(result['session_metadata'])
+                    try:
+                        result['session_metadata'] = json.loads(result['session_metadata'])
+                    except (json.JSONDecodeError, TypeError):
+                        result['session_metadata'] = None
                 
                 return result
             return None
         except sqlite3.Error as e:
             raise e
     
-    def update_session_status(self, session_id: str, status: str) -> bool:
+    def update_session_status(self, session_id: int, status: str) -> bool:
         """
         Update a session's status.
         
@@ -385,7 +376,7 @@ class ContextStore:
                 '''
                 UPDATE sessions
                 SET status = ?
-                WHERE session_id = ?
+                WHERE id = ?
                 ''',
                 (status, session_id)
             )
@@ -395,7 +386,7 @@ class ContextStore:
             self.conn.rollback()
             raise e
             
-    def update_session_metadata(self, session_id: str, metadata_update: Dict[str, Any]) -> bool:
+    def update_session_metadata(self, session_id: int, metadata_update: Dict[str, Any]) -> bool:
         """
         Updates the JSON metadata for a given session.
         Fetches existing metadata, updates it with new key-value pairs, and saves it back.
@@ -429,7 +420,7 @@ class ContextStore:
                 '''
                 UPDATE sessions
                 SET session_metadata = ?
-                WHERE session_id = ?
+                WHERE id = ?
                 ''',
                 (json.dumps(current_metadata), session_id)
             )
@@ -441,60 +432,57 @@ class ContextStore:
     
     # Document Methods
     
-    def add_document(self, document_data: Dict[str, Any]) -> str:
+    def add_document(self, doc_data: dict) -> int:
         """
-        Add a new document to the database.
-        
-        Args:
-            document_data: Dictionary containing document information
-                Required keys: 'file_name', 'original_file_type', 'ingestion_status'
-                Optional keys: 'patient_id', 'session_id', 'extracted_text',
-                               'document_type', 'classification_confidence',
-                               'processing_status', 'document_dates', 'issuer_source',
-                               'recipient', 'tags_extracted', 'filed_path'
-        
-        Returns:
-            str: The newly created document_id
-            
-        Raises:
-            sqlite3.Error: If there's a database error
+        Adds a new document to the database. Expects a dictionary containing
+        the file_name and the full extracted_data JSON object.
         """
-        document_id = str(uuid.uuid4())
+        sql = ''' INSERT INTO documents(file_name, original_file_type, ingestion_status, document_type, classification_confidence, processing_status, patient_id, session_id, extracted_data, full_text, document_dates)
+                  VALUES(?,?,?,?,?,?,?,?,?,?,?) '''
         
-        # Handle JSON fields
-        if 'document_dates' in document_data and document_data['document_dates']:
-            document_data['document_dates'] = json.dumps(document_data['document_dates'])
+        # Handle extracted_data field - create JSON structure if needed
+        extracted_data = doc_data.get('extracted_data')
+        if not extracted_data and (doc_data.get('tags_extracted') or doc_data.get('document_dates')):
+            # Create extracted_data from legacy fields
+            extracted_data_obj = {}
+            if doc_data.get('tags_extracted'):
+                extracted_data_obj['tags'] = doc_data['tags_extracted']
+            if doc_data.get('document_dates'):
+                extracted_data_obj.update(doc_data['document_dates'])
+            extracted_data = json.dumps(extracted_data_obj) if extracted_data_obj else None
+        elif extracted_data and not isinstance(extracted_data, str):
+            # Convert dict to JSON string
+            extracted_data = json.dumps(extracted_data)
         
-        if 'tags_extracted' in document_data and document_data['tags_extracted']:
-            document_data['tags_extracted'] = json.dumps(document_data['tags_extracted'])
+        # Handle document_dates field
+        document_dates = doc_data.get('document_dates')
+        if document_dates and not isinstance(document_dates, str):
+            document_dates = json.dumps(document_dates)
         
         try:
-            cursor = self.conn.cursor()
-            
-            # Build dynamic query based on provided fields
-            fields = ['document_id']
-            values = [document_id]
-            placeholders = ['?']
-            
-            for key, value in document_data.items():
-                if key not in ['document_id']:  # Skip document_id as we generated it
-                    fields.append(key)
-                    values.append(value)
-                    placeholders.append('?')
-            
-            query = f'''
-                INSERT INTO documents ({', '.join(fields)})
-                VALUES ({', '.join(placeholders)})
-            '''
-            
-            cursor.execute(query, values)
+            cur = self.conn.cursor()
+            cur.execute(sql, (
+                doc_data.get('file_name'),
+                doc_data.get('original_file_type'),
+                doc_data.get('ingestion_status'),
+                doc_data.get('document_type'),
+                doc_data.get('classification_confidence'),
+                doc_data.get('processing_status'),
+                doc_data.get('patient_id'),
+                doc_data.get('session_id'),
+                extracted_data,
+                doc_data.get('extracted_text') or doc_data.get('full_text'),  # Support both field names
+                document_dates
+            ))
             self.conn.commit()
-            return document_id
-        except sqlite3.Error as e:
-            self.conn.rollback()
+            if cur.lastrowid is None:
+                raise sqlite3.Error("Failed to get document ID after insert")
+            return cur.lastrowid
+        except Exception as e:
+            print(f"Database error in add_document: {e}")
             raise e
     
-    def get_document(self, document_id: str) -> Optional[Dict[str, Any]]:
+    def get_document(self, document_id: int) -> Optional[Dict[str, Any]]:
         """
         Retrieve a document by ID.
         
@@ -510,27 +498,42 @@ class ContextStore:
         try:
             cursor = self.conn.cursor()
             cursor.execute(
-                "SELECT * FROM documents WHERE document_id = ?",
+                "SELECT * FROM documents WHERE id = ?",
                 (document_id,)
             )
             row = cursor.fetchone()
             
             if row:
                 result = dict(row)
+                # Add document_id field for backward compatibility
+                result['document_id'] = result['id']
                 
                 # Parse JSON fields
                 if result.get('document_dates'):
-                    result['document_dates'] = json.loads(result['document_dates'])
+                    try:
+                        result['document_dates'] = json.loads(result['document_dates'])
+                    except (json.JSONDecodeError, TypeError):
+                        result['document_dates'] = None
                 
-                if result.get('tags_extracted'):
-                    result['tags_extracted'] = json.loads(result['tags_extracted'])
+                # Add extracted_text field for backward compatibility (maps to full_text)
+                result['extracted_text'] = result.get('full_text')
+                
+                # Add tags_extracted field for backward compatibility
+                if result.get('extracted_data'):
+                    try:
+                        extracted_data = json.loads(result['extracted_data'])
+                        result['tags_extracted'] = extracted_data.get('tags', [])
+                    except (json.JSONDecodeError, TypeError):
+                        result['tags_extracted'] = []
+                else:
+                    result['tags_extracted'] = []
                 
                 return result
             return None
         except sqlite3.Error as e:
             raise e
     
-    def update_document_fields(self, document_id: str, fields_to_update: Dict[str, Any]) -> bool:
+    def update_document_fields(self, document_id: int, fields_to_update: Dict[str, Any]) -> bool:
         """
         Update specific fields of a document.
         
@@ -544,42 +547,68 @@ class ContextStore:
         Raises:
             sqlite3.Error: If there's a database error
         """
-        # Handle JSON fields
-        if 'document_dates' in fields_to_update and fields_to_update['document_dates']:
-            fields_to_update['document_dates'] = json.dumps(fields_to_update['document_dates'])
+        # Security whitelist: Only allow updates to these specific columns
+        allowed_keys = {
+            'file_name', 'original_file_type', 'original_watchfolder_path',
+            'ingestion_status', 'processing_status', 'patient_id', 'session_id',
+            'extracted_data', 'full_text', 'document_type', 'classification_confidence',
+            'document_dates', 'associated_entity', 'upload_timestamp'
+        }
         
-        if 'tags_extracted' in fields_to_update and fields_to_update['tags_extracted']:
-            fields_to_update['tags_extracted'] = json.dumps(fields_to_update['tags_extracted'])
+        # Filter out any keys that are not allowed
+        valid_update_data = {k: v for k, v in fields_to_update.items() if k in allowed_keys}
+
+        if not valid_update_data:
+            # No valid fields to update
+            return False
+
+        # Handle JSON fields
+        if 'document_dates' in valid_update_data and valid_update_data['document_dates']:
+            valid_update_data['document_dates'] = json.dumps(valid_update_data['document_dates'])
+        
+        # Handle tags_extracted field - store in extracted_data JSON for V1.3 schema compatibility
+        if 'tags_extracted' in fields_to_update:
+            tags = fields_to_update['tags_extracted']
+            
+            # Get existing extracted_data or create new
+            existing_data = {}
+            if 'extracted_data' in valid_update_data:
+                try:
+                    existing_data = json.loads(valid_update_data['extracted_data'])
+                except (json.JSONDecodeError, TypeError):
+                    existing_data = {}
+            else:
+                # Get from database if not in update
+                try:
+                    cursor = self.conn.cursor()
+                    cursor.execute("SELECT extracted_data FROM documents WHERE id = ?", (document_id,))
+                    row = cursor.fetchone()
+                    if row and row['extracted_data']:
+                        existing_data = json.loads(row['extracted_data'])
+                except (sqlite3.Error, json.JSONDecodeError, TypeError):
+                    existing_data = {}
+            
+            # Update tags in extracted_data (completely replace, not merge)
+            existing_data['tags'] = tags if isinstance(tags, list) else []
+            valid_update_data['extracted_data'] = json.dumps(existing_data)
+
+        # Build the SET part of the query
+        set_clause = ", ".join([f"{key} = ?" for key in valid_update_data.keys()])
+        params = list(valid_update_data.values())
+        
+        sql = f"UPDATE documents SET {set_clause}, last_modified_timestamp = CURRENT_TIMESTAMP WHERE id = ?"
+        params.append(document_id)
         
         try:
             cursor = self.conn.cursor()
-            
-            # Start constructing the SQL query
-            sql = "UPDATE documents SET "
-            params = []
-            
-            # Add each field to be updated
-            for key, value in fields_to_update.items():
-                if key != 'document_id':  # Prevent updating the primary key
-                    sql += f"{key} = ?, "
-                    params.append(value)
-            
-            # Add last_modified_timestamp
-            sql += "last_modified_timestamp = CURRENT_TIMESTAMP "
-            
-            # Add WHERE clause and execute
-            sql += "WHERE document_id = ?"
-            params.append(document_id)
-            
-            cursor.execute(sql, params)
+            cursor.execute(sql, tuple(params))
             self.conn.commit()
-            
             return cursor.rowcount > 0
         except sqlite3.Error as e:
             self.conn.rollback()
             raise e
     
-    def link_document_to_session(self, document_id: str, session_id: str) -> bool:
+    def link_document_to_session(self, document_id: int, session_id: int) -> bool:
         """
         Link an existing document to a session.
         
@@ -599,7 +628,7 @@ class ContextStore:
                 '''
                 UPDATE documents
                 SET session_id = ?, last_modified_timestamp = CURRENT_TIMESTAMP
-                WHERE document_id = ?
+                WHERE id = ?
                 ''',
                 (session_id, document_id)
             )
@@ -609,7 +638,7 @@ class ContextStore:
             self.conn.rollback()
             raise e
     
-    def get_documents_for_session(self, session_id: str) -> List[Dict[str, Any]]:
+    def get_documents_for_session(self, session_id: int) -> List[Dict[str, Any]]:
         """
         Retrieve all documents associated with a session.
         
@@ -633,6 +662,8 @@ class ContextStore:
             result = []
             for row in rows:
                 doc = dict(row)
+                # Add document_id field for backward compatibility
+                doc['document_id'] = doc['id']
                 
                 # Parse JSON fields
                 if doc.get('document_dates'):
@@ -651,12 +682,12 @@ class ContextStore:
     
     def save_agent_output(
         self, 
-        document_id: str, 
+        document_id: int, 
         agent_id: str, 
         output_type: str, 
         output_data: str, 
         confidence: Optional[float] = None
-    ) -> str:
+    ) -> int:
         """
         Save output from an agent processing a document.
         
@@ -680,20 +711,22 @@ class ContextStore:
             cursor.execute(
                 '''
                 INSERT INTO agent_outputs
-                (output_id, document_id, agent_id, output_type, output_data, confidence)
-                VALUES (?, ?, ?, ?, ?, ?)
+                (document_id, agent_id, output_type, output_data, confidence)
+                VALUES (?, ?, ?, ?, ?)
                 ''',
-                (output_id, document_id, agent_id, output_type, output_data, confidence)
+                (document_id, agent_id, output_type, output_data, confidence)
             )
             self.conn.commit()
-            return output_id
+            if cursor.lastrowid is None:
+                raise sqlite3.Error("Failed to get agent output ID after insert")
+            return cursor.lastrowid
         except sqlite3.Error as e:
             self.conn.rollback()
             raise e
     
     def get_agent_outputs_for_document(
         self, 
-        document_id: str, 
+        document_id: int, 
         agent_id: Optional[str] = None, 
         output_type: Optional[str] = None
     ) -> List[Dict[str, Any]]:
@@ -716,7 +749,7 @@ class ContextStore:
             
             # Build the query based on provided filters
             query = "SELECT * FROM agent_outputs WHERE document_id = ?"
-            params = [document_id]
+            params: List[Union[int, str]] = [document_id]
             
             if agent_id:
                 query += " AND agent_id = ?"
@@ -805,8 +838,9 @@ class ContextStore:
             # Select essential fields needed by agents for processing
             cursor.execute(
                 """
-                SELECT document_id, extracted_text, file_name, patient_id, session_id,
-                       original_file_type, document_type, classification_confidence, original_watchfolder_path
+                SELECT id as document_id, file_name, patient_id, session_id,
+                       original_file_type, document_type, classification_confidence, original_watchfolder_path,
+                       full_text
                 FROM documents
                 WHERE processing_status = ?
                 ORDER BY upload_timestamp ASC
@@ -820,6 +854,8 @@ class ContextStore:
             results = []
             for row in rows:
                 result = dict(row)
+                # Add extracted_text field for backward compatibility (maps to full_text)
+                result['extracted_text'] = result.get('full_text')
                 results.append(result)
                 
             return results
@@ -849,7 +885,7 @@ class ContextStore:
             cursor = self.conn.cursor()
             cursor.execute(
                 '''
-                SELECT document_id, file_name, document_type, 
+                SELECT id as document_id, file_name, document_type, 
                        processing_status, upload_timestamp
                 FROM documents
                 WHERE patient_id = ?
@@ -862,3 +898,35 @@ class ContextStore:
             return [dict(row) for row in rows]
         except sqlite3.Error as e:
             raise e
+    def update_document_categorization(self, document_id: int, entity_json: str) -> bool:
+        """
+        Updates a document's associated entity and sets its status to complete.
+        This is called by the UI after the user review (HITL) step.
+
+        Args:
+            document_id: The ID of the document to update.
+            entity_json: A JSON string representing the associated_entity object.
+
+        Returns:
+            True if the update was successful, False otherwise.
+        """
+        sql = ''' UPDATE documents
+                  SET associated_entity = ?,
+                      processing_status = ?
+                  WHERE id = ? '''
+        
+        try:
+            cur = self.conn.cursor()
+            cur.execute(sql, (entity_json, 'processing_complete', document_id))
+            self.conn.commit()
+            
+            # Check if the update was successful
+            if cur.rowcount == 0:
+                print(f"Warning: No document found with ID {document_id} to update.")
+                return False
+                
+            print(f"Successfully categorized document ID: {document_id}")
+            return True
+        except Exception as e:
+            print(f"Database error in update_document_categorization: {e}")
+            return False

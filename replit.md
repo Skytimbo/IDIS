@@ -9,7 +9,7 @@ Preferred communication style: Simple, everyday language.
 ## System Architecture
 IDIS follows a modular architecture with the following core components:
 
-1. **Context Store**: SQLite database that serves as the persistent storage layer, tracking patients, sessions, documents, agent outputs, and audit trails. This is the central data repository.
+1. **Context Store**: SQLite database that serves as the persistent storage layer, tracking patients, sessions, documents, agent outputs, and audit trails. This is the central data repository. **[HARDENED - June 2025]**: Complete security refactor with type safety, SQL injection prevention, and V1.3 schema compatibility.
 
 2. **MCP Host Controller**: For Phase 1 MVP, this will be implemented as a simple script (run_mvp.py) that sequentially calls micro-agents rather than a complex orchestrator.
 
@@ -21,14 +21,26 @@ IDIS follows a modular architecture with the following core components:
 
 ## Key Components
 
+### Unified Cognitive Agent System
+- **Purpose**: LLM-powered document processing using OpenAI GPT-4o for structured data extraction
+- **Implementation**: 
+  - `agents/cognitive_agent.py` - Core LLM integration with V1.3 JSON schema
+  - `unified_ingestion_agent.py` - Complete pipeline combining text extraction with cognitive processing
+  - `prompts/V1_Cognitive_Agent_Prompt.txt` - Master prompt template for structured extraction
+- **Key Features**:
+  - Real OpenAI API integration with GPT-4o model
+  - V1.3 JSON schema for consistent structured data output
+  - Unified processing replacing rule-based agents
+  - Support for PDF, DOCX, TXT, and image files via OCR
+
 ### Context Store
-- **Purpose**: Manages all persistent data storage using SQLite
+- **Purpose**: Manages all persistent data storage using SQLite with hybrid V1.3 schema
 - **Implementation**: context_store.py with the ContextStore class
 - **Key Functions**:
-  - Database initialization and schema management
+  - V1.3 schema with both legacy compatibility and modern JSON structure
   - CRUD operations for patients, sessions, documents, and agent outputs
-  - Audit trail management
-  - JSON handling for metadata storage
+  - Hybrid column support: `document_type` for UI, `extracted_data` for cognitive agent
+  - Audit trail management and comprehensive metadata storage
 
 ### Watcher Service with Triage Architecture
 - **Purpose**: Monitors watch folder and manages file processing pipeline using separated responsibilities
@@ -56,15 +68,19 @@ The SQLite database includes the following key tables:
 ### Testing Framework
 Unit tests for the Context Store are implemented in tests/test_context_store.py, using Python's unittest framework.
 
-## Data Flow
+## Data Flow - Unified Cognitive Processing with V1 HITL Workflow
 1. Documents are added to a designated "watchfolder" 
 2. The Watcher Service detects new files and moves them to a processing folder with unique timestamped filenames
-3. The Ingestion Agent processes documents from the processing folder, extracting text and metadata
-4. Data is persisted in the Context Store with the processing folder path as the original_watchfolder_path
-5. Various micro-agents process the documents and generate insights
-6. The Tagger Agent archives documents and removes them from the processing folder
-7. All operations are logged in the audit trail
-8. Authorized users can retrieve processed information through the QuantaIQ Streamlit interface
+3. **UnifiedIngestionAgent** processes documents through complete LLM-powered pipeline:
+   - Text extraction from PDF, DOCX, TXT, and image files (via OCR)
+   - **CognitiveAgent** sends text to OpenAI GPT-4o API for structured data extraction
+   - V1.3 JSON schema output with comprehensive document metadata
+   - Storage of both raw text and structured JSON data in Context Store
+   - **V1 HITL Logic**: Documents with ambiguous categorization are flagged with `processing_status = 'pending_categorization'`
+4. Data is persisted with hybrid schema supporting legacy UI and modern JSON structure
+5. **Human-in-the-Loop Review**: Documents requiring manual review can be processed through the UI using `update_document_categorization()` method
+6. All operations are logged in the audit trail with comprehensive error handling
+7. Authorized users can retrieve processed information through the QuantaIQ Streamlit interface with enhanced search capabilities
 
 ## External Dependencies
 The system has minimal external dependencies for the MVP:

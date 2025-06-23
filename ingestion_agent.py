@@ -13,8 +13,9 @@ import io
 from typing import Optional, Tuple, List, Set, Dict, Any
 from PIL import Image
 
-# Import the ContextStore class
+# Import the ContextStore class and CognitiveAgent
 from context_store import ContextStore
+from agents.cognitive_agent import CognitiveAgent
 
 # Configure logging
 logging.basicConfig(
