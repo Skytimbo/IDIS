@@ -1,71 +1,43 @@
-# Python cache files
+# Git and version control
+.git
+.gitignore
+.github
+
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-.pytest_cache/
-*.cover
-.coverage
-coverage.xml
-*.spec
-
-# Virtual environments
 venv/
 env/
 ENV/
-.env/
-.venv/
 
-# Git files
-.git/
-.gitignore
-.gitattributes
-
-# Database files
-*.db
-*.sqlite3
-*.sqlite
-
-# Generated PDFs and output files
-*.pdf
-**/cover_sheets/
-*_output.pdf
-*_output.md
-idis_cover_sheet.pdf
-idis_demo_cover_sheet.pdf
-demo_output.pdf
-
-# Demo directories 
-idis_demo/
-
-# Replit specific
-generated-icon.png
-.replit
-replit.nix
-uv.lock
-
-# Local development
-.idea/
+# IDEs
 .vscode/
+.idea/
 *.swp
 *.swo
-*~
 
-# Temp files
-tmp/
-temp/
-.tmp/
-**/holding_folder/
+# OS
+.DS_Store
+Thumbs.db
 
-# Documentation
-docs/
-*.md
-!README.md
-!README.docker.md
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
 
-# Docker files (include them in build context)
-!Dockerfile
-!docker-compose.yml
-!docker_*.py
-!healthcheck.py
+# Temporary files
+*.tmp
+*.log
+/tmp/
+
+# Test databases
+*.db
+test_*.db
+demo_*.db
+
+# Replit specific
+.replit
+replit.nix

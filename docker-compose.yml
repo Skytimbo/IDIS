@@ -1,27 +1,49 @@
 version: '3.8'
 
 services:
-  idis:
-    build:
-      context: .
-      dockerfile: Dockerfile
+  # IDIS Watcher Service - Processes documents automatically
+  idis-watcher:
+    build: .
+    container_name: idis-watcher
     environment:
+      - PYTHONUNBUFFERED=1
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     volumes:
-      - ./watch_folder:/app/watch_folder
-      - ./holding_folder:/app/holding_folder
-      - ./processing_folder:/app/processing_folder
-      - ./archive:/app/archive_folder
-      - ./cover_sheets:/app/cover_sheets
-      - ./database:/app/db
+      # Mount directories for document processing
+      - ./data/watch:/app/watch
+      - ./data/inbox:/app/inbox
+      - ./data/holding:/app/holding
+      - ./data/archive:/app/archive
+      - ./data/coversheets:/app/coversheets
+      - ./data/db:/app/db
+    command: >
+      python3 watcher_service.py
+      --watch-folder /app/watch
+      --inbox-folder /app/inbox
+      --holding-folder /app/holding
+      --archive-folder /app/archive
+      --cover-sheets-folder /app/coversheets
+      --db-path /app/db/idis_live_test.db
+      --openai
     restart: unless-stopped
-    command: [
-      "python3", "watcher_service.py",
-      "--watch-folder", "/app/watch_folder",
-      "--holding-folder", "/app/holding_folder",
-      "--processing-folder", "/app/processing_folder",
-      "--archive-folder", "/app/archive_folder",
-      "--cover-sheets-folder", "/app/cover_sheets",
-      "--db-path", "/app/db/idis.db",
-      "--openai"
-    ]
+
+  # QuantaIQ Web UI - Document search and review interface
+  quantaiq-ui:
+    build: .
+    container_name: quantaiq-ui
+    ports:
+      - "8501:8501"
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./data/db:/app/db
+    working_dir: /app/quanta_ui
+    command: streamlit run app.py --server.port 8501 --server.address 0.0.0.0
+    restart: unless-stopped
+    depends_on:
+      - idis-watcher
+
+volumes:
+  # Named volumes for persistent data
+  idis_data:
+    driver: local

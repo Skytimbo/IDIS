@@ -1,45 +1,28 @@
-FROM python:3.11-bullseye
+# 1. Start with a lightweight, official Python base image
+FROM python:3.11-slim
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV TESSDATA_PREFIX=/usr/share/tesseract-ocr/5/tessdata
+# 2. Set environment variables to prevent interactive prompts during installation
+ENV PYTHONUNBUFFERED=1 \
+    DEBIAN_FRONTEND=noninteractive
 
-# Install system dependencies
+# 3. Install necessary system dependencies, including Tesseract OCR
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
-    libcairo2 \
-    libpango-1.0-0 \
-    libpangocairo-1.0-0 \
-    libgdk-pixbuf2.0-0 \
-    libffi-dev \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
-RUN useradd -u 1001 -m scanner
-
-# Set working directory
+# 4. Set the working directory inside the container
 WORKDIR /app
 
-# Copy requirements file
+# 5. Copy and install Python dependencies first (for better layer caching)
 COPY requirements.txt .
-
-# Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+# 6. Copy the rest of the application source code into the container
 COPY . .
 
-# Create required directories
-RUN mkdir -p /app/watch_folder /app/holding_folder /app/archive_folder /app/cover_sheets /app/db \
-    && chown -R scanner:scanner /app
+# 7. Make shell scripts executable
+RUN chmod +x ./start_watcher.sh ./run_ui.sh
 
-# Switch to non-root user
-USER scanner
-
-# Define healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
-  CMD ["python", "healthcheck.py"]
-
-# Define default command
+# 8. Set the default command to run when the container starts.
+# Note: The actual arguments will be overridden by docker-compose.
 CMD ["python3", "watcher_service.py"]
