@@ -10,14 +10,50 @@ import json
 from datetime import datetime, date
 from typing import List, Tuple, Optional, Dict, Any
 import os
+import sys
 
-# --- Database Configuration ---
-# Build a reliable, absolute path to the database
-# REPL_HOME is a Replit environment variable pointing to the project root
-project_root = os.environ.get('REPL_HOME', os.getcwd())
-db_dir = os.path.join(project_root, 'data', 'idis_db_storage')
-os.makedirs(db_dir, exist_ok=True)
-DB_PATH = os.path.join(db_dir, 'idis_live_test.db')
+# --- Dynamic Application Configuration ---
+
+def initialize_app_config():
+    """
+    Parses command-line arguments to get the database and archive paths.
+    This allows Docker to configure the running application.
+    """
+    db_path_arg = None
+    archive_path_arg = None
+    
+    # Manually parse sys.argv to find our custom flags, which is more reliable inside Streamlit
+    try:
+        db_index = sys.argv.index('--database-path')
+        db_path_arg = sys.argv[db_index + 1]
+    except (ValueError, IndexError):
+        pass  # Argument not found
+
+    try:
+        archive_index = sys.argv.index('--archive-path')
+        archive_path_arg = sys.argv[archive_index + 1]
+    except (ValueError, IndexError):
+        pass # Argument not found
+        
+    # Provide default paths for local development (when not run via docker-compose)
+    # This makes the app runnable with just `streamlit run app.py`
+    if not db_path_arg:
+        project_root = os.getcwd()
+        default_db_path = os.path.join(project_root, 'data', 'idis_db_storage', 'idis.db')
+        st.warning(f"Using default database path: {default_db_path}")
+        db_path_arg = default_db_path
+
+    if not archive_path_arg:
+        project_root = os.getcwd()
+        default_archive_path = os.path.join(project_root, 'data', 'idis_archive')
+        st.warning(f"Using default archive path: {default_archive_path}")
+        archive_path_arg = default_archive_path
+
+    return db_path_arg, archive_path_arg
+
+# Initialize configuration when the script is loaded
+DB_PATH, ARCHIVE_PATH = initialize_app_config()
+
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -32,7 +68,7 @@ st.set_page_config(
 def get_database_connection():
     """Get a connection to the SQLite database. Using Streamlit's cache to maintain connection."""
     if not os.path.exists(DB_PATH):
-        st.error(f"Database file not found: {DB_PATH}. Please run the watcher_service.py to process documents first.")
+        st.error(f"Database file not found: {DB_PATH}. Please ensure the watcher service is running and has processed at least one document.")
         st.stop()
     return sqlite3.connect(DB_PATH, check_same_thread=False)
 
@@ -79,7 +115,6 @@ def get_document_summary(document_id: str) -> Optional[str]:
     """Get the AI-generated summary for a document from agent_outputs."""
     try:
         conn = get_database_connection()
-        # **FIXED TABLE NAME from 'outputs' to 'agent_outputs'**
         query = """
             SELECT output_data 
             FROM agent_outputs 
@@ -91,7 +126,7 @@ def get_document_summary(document_id: str) -> Optional[str]:
         return summary_df['output_data'].iloc[0] if not summary_df.empty else "No summary available."
     except Exception as e:
         st.warning(f"Could not fetch summary: {str(e)}")
-        return None
+        return "Error fetching summary."
 
 # --- UI Helper Functions ---
 def format_json_display(json_string: Optional[str], default_text="Not available") -> str:
@@ -124,11 +159,16 @@ def main():
     
     run_search = st.sidebar.button("🔍 Search", type="primary")
 
+    if 'results' not in st.session_state:
+        st.session_state.results = None
+
     if run_search:
         conn = get_database_connection()
         query, params = build_search_query(search_term, selected_types, issuer_filter, tags_filter, after_date, before_date)
-        results_df = pd.read_sql_query(query, conn, params=params)
-        
+        st.session_state.results = pd.read_sql_query(query, conn, params=params)
+
+    if st.session_state.results is not None:
+        results_df = st.session_state.results
         st.success(f"📊 Found {len(results_df)} matching document(s)")
         
         for index, row in results_df.iterrows():

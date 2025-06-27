@@ -1,49 +1,39 @@
 version: '3.8'
 
 services:
-  # IDIS Watcher Service - Processes documents automatically
-  idis-watcher:
+  watcher-service:
     build: .
-    container_name: idis-watcher
-    environment:
-      - PYTHONUNBUFFERED=1
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    container_name: idis_watcher
+    restart: unless-stopped
     volumes:
-      # Mount directories for document processing
-      - ./data/watch:/app/watch
-      - ./data/inbox:/app/inbox
-      - ./data/holding:/app/holding
-      - ./data/archive:/app/archive
-      - ./data/coversheets:/app/coversheets
-      - ./data/db:/app/db
+      - ./data:/app/data
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
     command: >
       python3 watcher_service.py
-      --watch-folder /app/watch
-      --inbox-folder /app/inbox
-      --holding-folder /app/holding
-      --archive-folder /app/archive
-      --cover-sheets-folder /app/coversheets
-      --db-path /app/db/idis_live_test.db
+      --watch-folder /app/data/scanner_output
+      --inbox-folder /app/data/idis_inbox
+      --holding-folder /app/data/idis_holding
+      --archive-folder /app/data/idis_archive
+      --cover-sheets-folder /app/data/idis_coversheets
+      --db-path /app/data/idis_db_storage/idis.db
       --openai
-    restart: unless-stopped
 
-  # QuantaIQ Web UI - Document search and review interface
-  quantaiq-ui:
+  ui-service:
     build: .
-    container_name: quantaiq-ui
+    container_name: idis_ui
+    restart: unless-stopped
     ports:
       - "8501:8501"
-    environment:
-      - PYTHONUNBUFFERED=1
     volumes:
-      - ./data/db:/app/db
-    working_dir: /app/quanta_ui
-    command: streamlit run app.py --server.port 8501 --server.address 0.0.0.0
-    restart: unless-stopped
-    depends_on:
-      - idis-watcher
+      - ./data:/app/data
+    command: >
+      streamlit run app.py
+      --server.port 8501
+      --server.address 0.0.0.0
+      --
+      --database-path /app/data/idis_db_storage/idis.db
+      --archive-path /app/data/idis_archive
 
 volumes:
-  # Named volumes for persistent data
-  idis_data:
-    driver: local
+  data:
