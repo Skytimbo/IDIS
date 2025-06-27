@@ -97,6 +97,7 @@ class ContextStore:
                 extracted_data TEXT, -- Full JSON object from cognitive agent
                 full_text TEXT, -- Primary text storage
                 document_type TEXT, -- UI-friendly classification
+                issuer_source TEXT,
                 classification_confidence TEXT,
                 document_dates TEXT,
                 associated_entity TEXT, -- JSON for HITL workflow
