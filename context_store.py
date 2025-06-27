@@ -82,25 +82,27 @@ class ContextStore:
             CREATE INDEX IF NOT EXISTS idx_sessions_status ON sessions(status)
         ''')
         
-        # Create documents table with hybrid schema for V1.3
+        # Create documents table with comprehensive schema
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS documents (
                 id INTEGER PRIMARY KEY,
-                document_id INTEGER, -- Legacy alias for id
+                document_id TEXT, -- For UUIDs
                 file_name TEXT NOT NULL,
                 original_file_type TEXT,
                 original_watchfolder_path TEXT,
+                filed_path TEXT, -- The final path in the archive
                 ingestion_status TEXT,
                 processing_status TEXT,
                 patient_id INTEGER,
                 session_id INTEGER,
                 extracted_data TEXT, -- Full JSON object from cognitive agent
                 full_text TEXT, -- Primary text storage
-                document_type TEXT, -- UI-friendly classification
-                issuer_source TEXT,
-                classification_confidence TEXT,
-                document_dates TEXT,
-                associated_entity TEXT, -- JSON for HITL workflow
+                document_type TEXT,
+                classification_confidence REAL,
+                issuer_source TEXT, -- The document issuer
+                recipient TEXT,
+                document_dates TEXT, -- JSON of extracted dates
+                tags_extracted TEXT, -- JSON of extracted tags
                 upload_timestamp TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_modified_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
