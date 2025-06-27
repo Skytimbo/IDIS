@@ -495,7 +495,7 @@ class IngestionAgent:
             doc = fitz.open(file_path)
             text = ""
             for page in doc:
-                text += page.get_text()
+                text += page.get_text("text")
             
             # If we got substantial text, return it with 100% confidence
             if len(text.strip()) > 50:  # Arbitrary threshold for "substantial" text

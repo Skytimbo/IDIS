@@ -261,7 +261,7 @@ class UnifiedIngestionAgent:
             doc = fitz.open(file_path)
             text = ""
             for page in doc:
-                text += page.get_text()
+                text += page.get_text("text")
             doc.close()
             return text
         except ImportError:
