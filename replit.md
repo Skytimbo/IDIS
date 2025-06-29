@@ -113,6 +113,7 @@ Future phases may include:
 - Optional cloud integration with privacy controls
 
 ## Recent Changes
+- **June 2025**: Enhanced SummarizerAgent with comprehensive improvements: tiktoken-based token management for accurate token counting, cost optimization with dynamic model selection (gpt-3.5-turbo for simple docs, gpt-4o for complex), and customizable summary styles/lengths
 - **June 2025**: Comprehensive documents table schema update - added missing columns: filed_path, issuer_source, recipient, tags_extracted, and changed classification_confidence to REAL type for complete UI compatibility
 - **June 2025**: Fixed PDF text extraction bug by changing page.get_text() to page.get_text("text") for improved reliability with text-based PDFs
 - **June 2025**: Updated app.py with command-line argument parsing for Docker deployment compatibility and dynamic database path configuration

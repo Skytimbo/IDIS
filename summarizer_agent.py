@@ -9,6 +9,7 @@ import os
 import logging
 from typing import Dict, List, Tuple, Any, Optional
 import json
+import tiktoken
 
 from openai import OpenAI
 from context_store import ContextStore
@@ -209,32 +210,54 @@ class SummarizerAgent:
         
         return (successfully_summarized_doc_count, batch_summary_generated_bool_as_int)
     
-    def _generate_summary(self, text: str) -> Tuple[str, float]:
+    def _generate_summary(self, text: str, style: str = "neutral", length: str = "2-3 sentences") -> Tuple[str, float]:
         """
         Generate a summary for a document using OpenAI's GPT-4o.
         
         Args:
             text: The document text to summarize
+            style: Summary style (default: "neutral")
+            length: Summary length specification (default: "2-3 sentences")
             
         Returns:
             Tuple containing (summary_text, confidence)
             confidence will be 1.0 for successful API calls, 0.0 for failed calls
         """
-        # Truncate text if very long to manage token limits
-        truncated_text = text[:4000] if len(text) > 4000 else text
+        # Token-based truncation using tiktoken
+        try:
+            encoding = tiktoken.encoding_for_model("gpt-4o")
+            tokens = encoding.encode(text)
+            if len(tokens) > 3500:  # Leave room for prompt and response
+                truncated_text = encoding.decode(tokens[:3500])
+            else:
+                truncated_text = text
+        except Exception as e:
+            self.logger.warning(f"tiktoken encoding failed, falling back to character limit: {e}")
+            truncated_text = text[:4000] if len(text) > 4000 else text
         
-        # Create prompt for summarization
-        prompt_text = f"Summarize the following document text in 2-3 neutral, fact-based sentences:\n\n---\n{truncated_text}\n---"
+        # Create prompt for summarization with customizable parameters
+        prompt_text = f"Summarize the following document text in {length} {style}, fact-based sentences:\n\n---\n{truncated_text}\n---"
+        
+        # Select model based on text complexity and length
+        if len(truncated_text) < 1000:
+            model = "gpt-3.5-turbo"  # Cheaper for short documents
+            max_tokens = 150
+        else:
+            model = "gpt-4o"  # Better for complex/long documents
+            max_tokens = 200
+        
+        # Add logging for model selection
+        self.logger.debug(f"Using model {model} for document of length {len(truncated_text)}")
         
         try:
             # Call OpenAI API
             # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
             # do not change this unless explicitly requested by the user
             response = self.openai_client.chat.completions.create(
-                model="gpt-4o",
+                model=model,  # Now dynamic
                 messages=[{"role": "user", "content": prompt_text}],
                 temperature=0.3,
-                max_tokens=150
+                max_tokens=max_tokens
             )
             
             # Extract summary from response
@@ -247,38 +270,62 @@ class SummarizerAgent:
             self.logger.error(f"Error generating summary with OpenAI: {str(e)}")
             return f"Error generating summary: {str(e)[:100]}...", 0.0
     
-    def _generate_batch_summary(self, per_doc_summaries: List[str], dominant_types: str) -> Tuple[str, float]:
+    def _generate_batch_summary(self, per_doc_summaries: List[str], dominant_types: str, style: str = "neutral", length: str = "1-2 sentence") -> Tuple[str, float]:
         """
         Generate a batch-level summary for a set of documents.
         
         Args:
             per_doc_summaries: List of per-document summaries
             dominant_types: String containing the dominant document types
+            style: Summary style (default: "neutral")
+            length: Summary length specification (default: "1-2 sentence")
             
         Returns:
             Tuple containing (batch_summary_text, confidence)
             confidence will be 1.0 for successful API calls, 0.0 for failed calls
         """
-        # Combine per-document summaries, but limit length
+        # Combine per-document summaries with token-based truncation
         combined_summaries = "; ".join(per_doc_summaries)
-        truncated_summaries = combined_summaries[:1000] if len(combined_summaries) > 1000 else combined_summaries
         
-        # Create prompt for batch summarization
+        # Token-based truncation for combined summaries
+        try:
+            encoding = tiktoken.encoding_for_model("gpt-4o")
+            tokens = encoding.encode(combined_summaries)
+            if len(tokens) > 800:  # Leave more room for batch context
+                truncated_summaries = encoding.decode(tokens[:800])
+            else:
+                truncated_summaries = combined_summaries
+        except Exception as e:
+            self.logger.warning(f"tiktoken encoding failed for batch summary, falling back to character limit: {e}")
+            truncated_summaries = combined_summaries[:1000] if len(combined_summaries) > 1000 else combined_summaries
+        
+        # Create prompt for batch summarization with customizable parameters
         prompt_text = (
-            f"Provide a brief (1-2 sentence) neutral, fact-based overview of a batch of documents. "
+            f"Provide a brief ({length}) {style}, fact-based overview of a batch of documents. "
             f"The batch includes: {len(per_doc_summaries)} documents, with types like {dominant_types}. "
             f"The content is generally about: {truncated_summaries}"
         )
+        
+        # Select model based on complexity (batch summaries are typically simpler)
+        if len(truncated_summaries) < 500:
+            model = "gpt-3.5-turbo"  # Cheaper for simple batch summaries
+            max_tokens = 80
+        else:
+            model = "gpt-4o"  # Better for complex batch analysis
+            max_tokens = 100
+        
+        # Add logging for model selection
+        self.logger.debug(f"Using model {model} for batch summary of length {len(truncated_summaries)}")
         
         try:
             # Call OpenAI API
             # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
             # do not change this unless explicitly requested by the user
             response = self.openai_client.chat.completions.create(
-                model="gpt-4o",
+                model=model,  # Now dynamic
                 messages=[{"role": "user", "content": prompt_text}],
                 temperature=0.3,
-                max_tokens=100
+                max_tokens=max_tokens
             )
             
             # Extract batch summary from response
