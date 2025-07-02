@@ -580,7 +580,11 @@ class TaggerAgent:
                     patient_folder_name = self._get_patient_folder_name(patient_id)
                     relative_folder = os.path.join("patients", patient_folder_name, year_month_folder)
                 else:
-                    relative_folder = os.path.join("general_archive", year_month_folder)
+                    # For general documents, create fallback structure for unclassified items
+                    if document_type == "Unclassified" or not issuer:
+                        relative_folder = os.path.join("general_archive", "Uncategorized", year_month_folder)
+                    else:
+                        relative_folder = os.path.join("general_archive", year_month_folder)
                 
                 # Create full path
                 filing_dir = os.path.join(self.base_filed_folder, relative_folder)
