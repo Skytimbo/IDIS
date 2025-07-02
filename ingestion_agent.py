@@ -499,6 +499,7 @@ class IngestionAgent:
             
             # If we got substantial text, return it with 100% confidence
             if len(text.strip()) > 50:  # Arbitrary threshold for "substantial" text
+                doc.close()
                 return text, 100.0
             
             # If little/no text was extracted, try OCR on each page
@@ -536,6 +537,8 @@ class IngestionAgent:
             
             # Calculate overall confidence
             avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
+            
+            doc.close()
             
             if full_text.strip():
                 return full_text, avg_confidence

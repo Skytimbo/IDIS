@@ -255,15 +255,57 @@ class UnifiedIngestionAgent:
             return None
     
     def _extract_text_from_pdf(self, file_path: str) -> Optional[str]:
-        """Extract text from PDF files using PyMuPDF."""
+        """Extract text from PDF files using PyMuPDF with OCR fallback for image-based PDFs."""
         try:
             import fitz  # PyMuPDF
+            import io
+            
+            # Try direct text extraction with PyMuPDF
             doc = fitz.open(file_path)
             text = ""
             for page in doc:
                 text += page.get_text("text")
-            doc.close()
-            return text
+            
+            # If we got substantial text, return it
+            if len(text.strip()) > 50:  # Threshold for "substantial" text
+                doc.close()
+                self.logger.info(f"Successfully extracted text from PDF using direct method: {file_path}")
+                return text
+            
+            # If little/no text was extracted, try OCR on each page
+            self.logger.info(f"PDF appears to be image-based, attempting OCR fallback: {file_path}")
+            try:
+                import pytesseract
+                from PIL import Image
+                
+                full_text = ""
+                for page_num in range(len(doc)):
+                    self.logger.debug(f"Processing page {page_num + 1} of {len(doc)} with OCR...")
+                    page = doc.load_page(page_num)
+                    pix = page.get_pixmap()
+                    
+                    # Convert pixmap to PIL Image
+                    img = Image.open(io.BytesIO(pix.tobytes("png")))
+                    
+                    # Perform OCR on the image
+                    page_text = pytesseract.image_to_string(img, lang='eng')
+                    full_text += page_text + "\n\n"
+                
+                doc.close()
+                
+                if full_text.strip():
+                    self.logger.info(f"Successfully extracted text from PDF using OCR fallback: {file_path}")
+                    self.logger.info(f"OCR extracted text length: {len(full_text)} characters")
+                    return full_text
+                else:
+                    self.logger.warning(f"OCR extraction failed to produce text for PDF: {file_path}")
+                    return None
+                    
+            except ImportError:
+                self.logger.error("pytesseract not installed. Cannot perform OCR fallback for image-based PDFs.")
+                doc.close()
+                return None
+                
         except ImportError:
             self.logger.error("PyMuPDF not installed. Cannot process PDF files.")
             return None
