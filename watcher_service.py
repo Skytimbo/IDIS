@@ -87,7 +87,7 @@ def process_inbox_file(
         # Process the specific file
         ingestion_results = ingestion_agent.process_specific_files(
             file_paths=[file_path],
-            session_id=session_id,
+            session_id=str(session_id),
             patient_id=patient_id_for_new_docs,
             user_id=user_id_for_new_docs
         )
@@ -120,7 +120,7 @@ def process_inbox_file(
             )
             
             summarization_results = summarizer_agent.summarize_classified_documents(
-                session_id=session_id,
+                session_id=str(session_id),
                 user_id=user_id_for_new_docs,
                 status_to_summarize="classified"
             )
@@ -144,16 +144,30 @@ def process_inbox_file(
                 cover_sheet_renderer.generate_cover_sheet(
                     document_ids=document_ids,
                     output_pdf_filename=cover_sheet_pdf_path,
-                    session_id=session_id,
+                    session_id=str(session_id),
                     user_id=user_id_for_new_docs
                 )
             
-            # Delete the original file from inbox after successful processing
-            try:
-                os.remove(file_path)
-                logger.info(f"Successfully processed and removed inbox file: {original_filename}")
-            except Exception as e:
-                logger.warning(f"Failed to remove processed file {file_path}: {e}")
+            # Conditional cleanup based on TaggerAgent results
+            successfully_processed_count, failed_count = tagging_results
+            
+            if successfully_processed_count > 0:
+                # Success: Remove the file from inbox
+                try:
+                    os.remove(file_path)
+                    logger.info(f"Successfully processed and removed inbox file: {original_filename}")
+                except Exception as e:
+                    logger.warning(f"Failed to remove processed file {file_path}: {e}")
+            else:
+                # Failure: Move file to holding folder for manual inspection
+                try:
+                    holding_path = os.path.join(config_paths['holding_folder'], original_filename)
+                    shutil.move(file_path, holding_path)
+                    logger.error(f"FILING FAILED: Moved {original_filename} to holding folder for manual inspection")
+                    logger.error(f"TaggerAgent failed to archive document. Failed count: {failed_count}")
+                except Exception as e:
+                    logger.error(f"CRITICAL: Failed to move {original_filename} to holding folder: {e}")
+                    logger.error(f"File remains in inbox: {file_path}")
             
             return {
                 'session_id': session_id,
@@ -167,11 +181,29 @@ def process_inbox_file(
                 }
             }
         else:
+            # Ingestion failed: Move file to holding folder for manual inspection
             logger.warning(f"Failed to ingest file: {original_filename}")
+            try:
+                holding_path = os.path.join(config_paths['holding_folder'], original_filename)
+                shutil.move(file_path, holding_path)
+                logger.error(f"INGESTION FAILED: Moved {original_filename} to holding folder for manual inspection")
+            except Exception as e:
+                logger.error(f"CRITICAL: Failed to move {original_filename} to holding folder: {e}")
+                logger.error(f"File remains in inbox: {file_path}")
             return {'session_id': session_id, 'stats': {'ingested': 0}}
             
     except Exception as e:
         logger.exception(f"Error processing inbox file {file_path}: {e}")
+        
+        # Move file to holding folder due to processing error
+        try:
+            holding_path = os.path.join(config_paths['holding_folder'], original_filename)
+            shutil.move(file_path, holding_path)
+            logger.error(f"PROCESSING ERROR: Moved {original_filename} to holding folder due to exception")
+        except Exception as move_error:
+            logger.error(f"CRITICAL: Failed to move {original_filename} to holding folder after processing error: {move_error}")
+            logger.error(f"File remains in inbox: {file_path}")
+        
         return {'error': str(e), 'file': original_filename}
 
 
@@ -342,8 +374,10 @@ def main():
                                 
                                 if 'error' in result:
                                     logger.error(f"Failed to process file {filename}: {result['error']}")
+                                    # File should already be moved to holding folder by process_inbox_file
                                 else:
                                     logger.info(f"Successfully processed file {filename}")
+                                    # File should already be removed from inbox by process_inbox_file
                     
             except Exception as e:
                 logger.exception(f"Error in main processor loop: {e}")
