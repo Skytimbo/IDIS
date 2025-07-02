@@ -181,8 +181,11 @@ def main():
                     st.markdown(f"**Type:** `{row['document_type'] or 'N/A'}`")
                     st.markdown(f"**Source:** `{row['issuer_source'] or 'N/A'}`")
                 with col2:
-                    upload_dt = pd.to_datetime(row['upload_timestamp'])
-                    st.markdown(f"**Processed:** `{upload_dt.strftime('%Y-%m-%d %H:%M')}`")
+                    processed_date_str = "N/A"
+                    if pd.notna(row['upload_timestamp']):
+                        upload_dt = pd.to_datetime(row['upload_timestamp'])
+                        processed_date_str = upload_dt.strftime('%Y-%m-%d %H:%M')
+                    st.markdown(f"**Processed:** `{processed_date_str}`")
                     st.markdown(f"**Tags:** `{format_json_display(row['tags_extracted'], 'None')}`")
                 
                 with st.expander("View Details"):
