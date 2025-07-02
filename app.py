@@ -84,11 +84,11 @@ def get_document_types() -> List[str]:
 
 def build_search_query(search_term, doc_types, issuer_filter, tags_filter, after_date, before_date) -> Tuple[str, List[Any]]:
     """Build the SQL query and parameters for searching documents."""
-    query_parts = ["SELECT document_id, file_name, document_type, upload_timestamp, issuer_source, filed_path, extracted_text, document_dates, tags_extracted FROM documents WHERE 1=1"]
+    query_parts = ["SELECT document_id, file_name, document_type, upload_timestamp, issuer_source, filed_path, full_text, document_dates, tags_extracted FROM documents WHERE 1=1"]
     params = []
 
     if search_term:
-        query_parts.append("AND extracted_text LIKE ?")
+        query_parts.append("AND full_text LIKE ?")
         params.append(f"%{search_term}%")
     if doc_types:
         placeholders = ",".join(["?" for _ in doc_types])
@@ -194,7 +194,7 @@ def main():
                     st.code(format_json_display(row['document_dates'], 'None'))
                     
                     st.subheader("📝 Extracted Text")
-                    st.text_area("Full Text", value=row['extracted_text'], height=250, key=f"text_{row['document_id']}")
+                    st.text_area("Full Text", value=row['full_text'], height=250, key=f"text_{row['document_id']}")
 
                     if row['filed_path']:
                         st.subheader("📁 File Location")
