@@ -517,37 +517,15 @@ class TaggerAgent:
             file_name = document.get("file_name", "unknown_file")
             document_type = document.get("document_type", "Unclassified")
             
-            # Skip documents with no extracted text
-            if not extracted_text:
-                self.logger.warning(f"Document {document_id} ({file_name}) has no extracted text")
-                
-                # Update document status to indicate it was skipped
-                self.context_store.update_document_fields(
-                    document_id, 
-                    {"processing_status": "tagging_skipped_no_text"}
-                )
-                
-                # Add audit log entry
-                self.context_store.add_audit_log_entry(
-                    user_id=user_id,
-                    event_type="AGENT_ACTIVITY",
-                    event_name="DOCUMENT_TAGGING_SKIPPED",
-                    status="SKIPPED",
-                    resource_type="document",
-                    resource_id=document_id,
-                    details="Document skipped due to no extracted text"
-                )
-                
-                failed_count += 1
-                continue
-            
             # Extract metadata from document text using enhanced methods
-            extracted_dates_dict = self._extract_dates(extracted_text)
-            issuer = self._extract_issuer(extracted_text)
-            recipient = self._extract_recipient(extracted_text)
+            # Handle cases where extracted_text might be None or empty
+            text_to_process: str = extracted_text or ""
+            extracted_dates_dict = self._extract_dates(text_to_process)
+            issuer = self._extract_issuer(text_to_process)
+            recipient = self._extract_recipient(text_to_process)
             
             # Use enhanced semantic tagging based on document type
-            semantic_tags = self._extract_semantic_tags(extracted_text, document_type)
+            semantic_tags = self._extract_semantic_tags(text_to_process, document_type)
             
             # Validate all extracted data for quality
             validated_data = self._validate_extracted_data(
