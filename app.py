@@ -155,7 +155,7 @@ def main():
     issuer_filter = st.sidebar.text_input("Issuer / Source")
     tags_filter = st.sidebar.text_input("Tags (comma-separated)")
     after_date = st.sidebar.date_input("Uploaded After", value=None)
-    before_date = st.sidebar.date_input("Uploaded Before", value=date.today())
+    before_date = st.sidebar.date_input("Uploaded Before", value=None)
     
     run_search = st.sidebar.button("🔍 Search", type="primary")
 
