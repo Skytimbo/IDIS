@@ -113,6 +113,8 @@ Future phases may include:
 - Optional cloud integration with privacy controls
 
 ## Recent Changes
+- **July 2025**: Critical data loss prevention fix implemented with two-part solution: removed TaggerAgent text validation block that was skipping documents, added conditional cleanup in watcher service to only delete files after successful archiving, failed files now moved to holding folder for manual inspection
+- **July 2025**: Made view_text.py utility configurable by removing hardcoded database path and adding --db-path command-line argument for Docker/Mac compatibility
 - **June 2025**: Enhanced SummarizerAgent with comprehensive improvements: tiktoken-based token management for accurate token counting, cost optimization with dynamic model selection (gpt-3.5-turbo for simple docs, gpt-4o for complex), and customizable summary styles/lengths
 - **June 2025**: Comprehensive documents table schema update - added missing columns: filed_path, issuer_source, recipient, tags_extracted, and changed classification_confidence to REAL type for complete UI compatibility
 - **June 2025**: Fixed PDF text extraction bug by changing page.get_text() to page.get_text("text") for improved reliability with text-based PDFs

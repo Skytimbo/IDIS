@@ -22,11 +22,16 @@ def main():
         required=True,
         help="Document ID to retrieve text for"
     )
+    parser.add_argument(
+        "--db-path",
+        required=True,
+        help="Path to the SQLite database file"
+    )
     
     args = parser.parse_args()
     
-    # Hardcoded database path for Dell testing setup
-    db_path = os.path.expanduser("~/IDIS_Dell_Scan_Test/idis_db_storage/idis_live_test.db")
+    # Use database path from command-line argument
+    db_path = args.db_path
     
     # Check if database exists
     if not os.path.exists(db_path):
