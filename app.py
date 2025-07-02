@@ -197,7 +197,7 @@ def main():
                     st.code(format_json_display(row['document_dates'], 'None'))
                     
                     st.subheader("📝 Extracted Text")
-                    st.text_area("Full Text", value=row['full_text'], height=250, key=f"text_{row['document_id']}")
+                    st.text_area("Full Text", value=row['full_text'], height=250, key=f"text_{row['document_id']}_{index}")
 
                     if row['filed_path']:
                         st.subheader("📁 File Location")
