@@ -483,10 +483,10 @@ class IngestionAgent:
         """
         direct_text = ""
         ocr_text = ""
-
+        
         try:
             import fitz  # PyMuPDF
-
+            
             with fitz.open(file_path) as doc:
                 # Method 1: Direct Text Extraction
                 try:
