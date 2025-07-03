@@ -255,62 +255,66 @@ class UnifiedIngestionAgent:
             return None
     
     def _extract_text_from_pdf(self, file_path: str) -> Optional[str]:
-        """Extract text from PDF files using PyMuPDF with OCR fallback for image-based PDFs."""
+        """
+        Extract text from PDF files using competitive extraction strategy.
+        
+        This method always attempts both direct text extraction and OCR, then returns
+        the result with more content. This handles mixed-content PDFs that have
+        minimal text metadata but contain primarily image content.
+        """
         try:
-            import fitz  # PyMuPDF
+            import fitz
+            import pytesseract
             import io
+            from PIL import Image
             
-            # Try direct text extraction with PyMuPDF
-            doc = fitz.open(file_path)
-            text = ""
-            for page in doc:
-                text += page.get_text("text")
-            
-            # If we got substantial text, return it
-            if len(text.strip()) > 50:  # Threshold for "substantial" text
-                doc.close()
-                self.logger.info(f"Successfully extracted text from PDF using direct method: {file_path}")
-                return text
-            
-            # If little/no text was extracted, try OCR on each page
-            self.logger.info(f"PDF appears to be image-based, attempting OCR fallback: {file_path}")
-            try:
-                import pytesseract
-                from PIL import Image
+            # Use context manager for proper resource cleanup
+            with fitz.open(file_path) as doc:
+                self.logger.info(f"Starting competitive PDF extraction for: {file_path}")
                 
-                full_text = ""
+                # Step 1: Direct text extraction
+                direct_text = ""
+                for page in doc:
+                    direct_text += page.get_text("text")
+                
+                self.logger.debug(f"Direct extraction yielded {len(direct_text.strip())} characters")
+                
+                # Step 2: OCR extraction
+                ocr_text = ""
+                
                 for page_num in range(len(doc)):
-                    self.logger.debug(f"Processing page {page_num + 1} of {len(doc)} with OCR...")
+                    self.logger.debug(f"OCR processing page {page_num + 1} of {len(doc)}...")
                     page = doc.load_page(page_num)
                     pix = page.get_pixmap()
                     
-                    # Convert pixmap to PIL Image
+                    # Convert to PIL Image
                     img = Image.open(io.BytesIO(pix.tobytes("png")))
                     
-                    # Perform OCR on the image
+                    # Extract text for this page
                     page_text = pytesseract.image_to_string(img, lang='eng')
-                    full_text += page_text + "\n\n"
+                    ocr_text += page_text + "\n\n"
                 
-                doc.close()
+                self.logger.debug(f"OCR extraction yielded {len(ocr_text.strip())} characters")
                 
-                if full_text.strip():
-                    self.logger.info(f"Successfully extracted text from PDF using OCR fallback: {file_path}")
-                    self.logger.info(f"OCR extracted text length: {len(full_text)} characters")
-                    return full_text
+                # Step 3: Compare and return the better result
+                direct_text_length = len(direct_text.strip())
+                ocr_text_length = len(ocr_text.strip())
+                
+                if direct_text_length > ocr_text_length:
+                    self.logger.info(f"Using direct extraction: {direct_text_length} chars vs OCR: {ocr_text_length} chars")
+                    return direct_text
+                elif ocr_text_length > 0:
+                    self.logger.info(f"Using OCR extraction: {ocr_text_length} chars vs direct: {direct_text_length} chars")
+                    return ocr_text
                 else:
-                    self.logger.warning(f"OCR extraction failed to produce text for PDF: {file_path}")
+                    self.logger.warning(f"Both extraction methods failed for: {file_path}")
                     return None
                     
-            except ImportError:
-                self.logger.error("pytesseract not installed. Cannot perform OCR fallback for image-based PDFs.")
-                doc.close()
-                return None
-                
         except ImportError:
-            self.logger.error("PyMuPDF not installed. Cannot process PDF files.")
+            self.logger.error("Required libraries (PyMuPDF or pytesseract) not installed for PDF processing")
             return None
         except Exception as e:
-            self.logger.error(f"Error extracting text from PDF {file_path}: {e}")
+            self.logger.error(f"Error in competitive PDF extraction for {file_path}: {e}")
             return None
     
     def _extract_text_from_docx(self, file_path: str) -> Optional[str]:

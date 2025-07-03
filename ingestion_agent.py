@@ -478,73 +478,77 @@ class IngestionAgent:
     
     def _extract_text_from_pdf(self, file_path: str) -> Tuple[Optional[str], Optional[float]]:
         """
-        Extract text from a PDF file, attempting direct extraction first, then OCR if needed.
+        Extract text from a PDF file using competitive extraction strategy.
+        
+        This method always attempts both direct text extraction and OCR, then returns
+        the result with more content. This handles mixed-content PDFs that have
+        minimal text metadata but contain primarily image content.
         
         Args:
             file_path: Path to the PDF file
             
         Returns:
             Tuple containing:
-                - Extracted text (or None if extraction failed)
-                - Confidence percentage (0-100, or None if extraction failed)
+                - Extracted text (or None if both methods failed)
+                - Confidence percentage (100 for direct extraction, OCR confidence for OCR)
         """
         try:
-            # Import fitz (PyMuPDF) here to avoid requiring it for non-PDF processing
             import fitz
-            # Try direct text extraction with PyMuPDF
-            doc = fitz.open(file_path)
-            text = ""
-            for page in doc:
-                text += page.get_text("text")
-            
-            # If we got substantial text, return it with 100% confidence
-            if len(text.strip()) > 50:  # Arbitrary threshold for "substantial" text
-                doc.close()
-                return text, 100.0
-            
-            # If little/no text was extracted, try OCR on each page
-            self.logger.info(f"PDF appears to be image-based, attempting OCR: {file_path}")
-            self.logger.debug("Attempting OCR fallback...")
             import pytesseract
-            full_text = ""
-            confidences = []
             
-            for page_num in range(len(doc)):
-                self.logger.debug(f"Processing page {page_num}...")
-                page = doc.load_page(page_num)
-                self.logger.debug("...getting pixmap.")
-                pix = page.get_pixmap()
+            # Use context manager for proper resource cleanup
+            with fitz.open(file_path) as doc:
+                self.logger.info(f"Starting competitive PDF extraction for: {file_path}")
                 
-                # Convert pixmap to PIL Image
-                self.logger.debug("...converting to image.")
-                img = Image.open(io.BytesIO(pix.tobytes("png")))
+                # Step 1: Direct text extraction
+                direct_text = ""
+                for page in doc:
+                    direct_text += page.get_text("text")
                 
-                # Perform OCR on the image
-                self.logger.debug("...calling pytesseract.image_to_data.")
-                ocr_data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT, lang='eng')
+                self.logger.debug(f"Direct extraction yielded {len(direct_text.strip())} characters")
                 
-                # Calculate confidence for this page
-                page_confidences = [float(conf) for conf in ocr_data['conf'] if conf != '-1']
-                if page_confidences:
-                    confidences.extend(page_confidences)
+                # Step 2: OCR extraction
+                ocr_text = ""
+                ocr_confidences = []
                 
-                # Get text for this page
-                self.logger.debug("...calling pytesseract.image_to_string.")
-                page_text = pytesseract.image_to_string(img, lang='eng')
-                full_text += page_text + "\n\n"
-            
-            self.logger.debug(f"OCR finished. Total extracted text length: {len(full_text)}")
-            
-            # Calculate overall confidence
-            avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
-            
-            doc.close()
-            
-            if full_text.strip():
-                return full_text, avg_confidence
-            
+                for page_num in range(len(doc)):
+                    self.logger.debug(f"OCR processing page {page_num + 1} of {len(doc)}...")
+                    page = doc.load_page(page_num)
+                    pix = page.get_pixmap()
+                    
+                    # Convert to PIL Image
+                    img = Image.open(io.BytesIO(pix.tobytes("png")))
+                    
+                    # Get OCR confidence data
+                    ocr_data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT, lang='eng')
+                    page_confidences = [float(conf) for conf in ocr_data['conf'] if conf != '-1']
+                    if page_confidences:
+                        ocr_confidences.extend(page_confidences)
+                    
+                    # Extract text for this page
+                    page_text = pytesseract.image_to_string(img, lang='eng')
+                    ocr_text += page_text + "\n\n"
+                
+                self.logger.debug(f"OCR extraction yielded {len(ocr_text.strip())} characters")
+                
+                # Step 3: Compare and return the better result
+                direct_text_length = len(direct_text.strip())
+                ocr_text_length = len(ocr_text.strip())
+                
+                if direct_text_length > ocr_text_length:
+                    self.logger.info(f"Using direct extraction: {direct_text_length} chars vs OCR: {ocr_text_length} chars")
+                    return direct_text, 100.0
+                elif ocr_text_length > 0:
+                    avg_confidence = sum(ocr_confidences) / len(ocr_confidences) if ocr_confidences else 75.0
+                    self.logger.info(f"Using OCR extraction: {ocr_text_length} chars vs direct: {direct_text_length} chars")
+                    return ocr_text, avg_confidence
+                else:
+                    self.logger.warning(f"Both extraction methods failed for: {file_path}")
+                    return None, None
+                    
+        except ImportError:
+            self.logger.error("Required libraries (PyMuPDF or pytesseract) not installed for PDF processing")
             return None, None
-            
         except Exception as e:
-            self.logger.exception(f"A new, unhandled error occurred in PDF processing for {file_path}")
+            self.logger.error(f"Error in competitive PDF extraction for {file_path}: {e}")
             return None, None
