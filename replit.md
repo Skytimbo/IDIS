@@ -113,7 +113,7 @@ Future phases may include:
 - Optional cloud integration with privacy controls
 
 ## Recent Changes  
-- **July 2025**: Implemented competitive PDF extraction strategy in both IngestionAgent and UnifiedIngestionAgent - system now performs both direct text extraction and OCR on every PDF, returning the result with more content to handle mixed-content PDFs that have minimal text metadata but primarily image content
+- **July 2025**: Implemented comprehensive competitive PDF extraction strategy in both IngestionAgent and UnifiedIngestionAgent - system always attempts both direct text extraction and OCR methods, then intelligently selects the result with more content, solving mixed-content PDF issues where minimal text metadata exists but primary content is image-based
 - **July 2025**: Critical data loss prevention fix implemented with two-part solution: removed TaggerAgent text validation block that was skipping documents, added conditional cleanup in watcher service to only delete files after successful archiving, failed files now moved to holding folder for manual inspection
 - **July 2025**: Made view_text.py utility configurable by removing hardcoded database path and adding --db-path command-line argument for Docker/Mac compatibility
 - **June 2025**: Enhanced SummarizerAgent with comprehensive improvements: tiktoken-based token management for accurate token counting, cost optimization with dynamic model selection (gpt-3.5-turbo for simple docs, gpt-4o for complex), and customizable summary styles/lengths
