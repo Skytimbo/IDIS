@@ -481,13 +481,12 @@ class IngestionAgent:
         Extract text from a PDF using a competitive strategy: try both direct
         extraction and OCR, then return the result with the most text.
         """
-        import os
         direct_text = ""
         ocr_text = ""
-        
+
         try:
             import fitz  # PyMuPDF
-            
+
             with fitz.open(file_path) as doc:
                 # Method 1: Direct Text Extraction
                 try:
@@ -516,13 +515,14 @@ class IngestionAgent:
             self.logger.exception(f"A critical error occurred opening or processing PDF {file_path}")
             return None, None
 
-        # Compare results and return the best one
+        # Compare results and return the best one with a confidence score
+        import os
         if len(direct_text.strip()) > len(ocr_text.strip()):
             self.logger.info(f"Using direct extraction result for {os.path.basename(file_path)}")
             return direct_text, 100.0
         elif len(ocr_text.strip()) > 0:
             self.logger.info(f"Using OCR extraction result for {os.path.basename(file_path)}")
-            return ocr_text, 75.0
+            return ocr_text, 75.0  # Assign a lower confidence for OCR
         else:
             self.logger.error(f"Both direct and OCR text extraction failed for {file_path}")
             return None, None
