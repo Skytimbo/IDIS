@@ -113,6 +113,7 @@ Future phases may include:
 - Optional cloud integration with privacy controls
 
 ## Recent Changes  
+- **July 2025**: **CRITICAL PIPELINE FIX COMPLETE** - Diagnosed and fixed column name mismatch that was breaking text flow through the pipeline: synchronized all agents to use 'full_text' column consistently (IngestionAgent saves to full_text, ClassifierAgent/SummarizerAgent/TaggerAgent read from full_text), eliminating the bug where extracted text wasn't reaching downstream agents
 - **July 2025**: **COMPREHENSIVE FIX COMPLETE** - Implemented robust competitive PDF extraction strategy in both IngestionAgent and UnifiedIngestionAgent with correct return formats: IngestionAgent returns (text, confidence) tuple while UnifiedIngestionAgent returns text string, both agents always perform direct text extraction AND OCR then intelligently select the result with more content, definitively solving mixed-content PDF processing failures
 - **July 2025**: Critical data loss prevention fix implemented with two-part solution: removed TaggerAgent text validation block that was skipping documents, added conditional cleanup in watcher service to only delete files after successful archiving, failed files now moved to holding folder for manual inspection
 - **July 2025**: Made view_text.py utility configurable by removing hardcoded database path and adding --db-path command-line argument for Docker/Mac compatibility

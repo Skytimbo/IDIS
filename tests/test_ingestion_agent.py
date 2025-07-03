@@ -97,7 +97,7 @@ class TestIngestionAgent(unittest.TestCase):
         self.mock_context_store.update_document_fields.assert_called_with(
             "test_document_id",
             {
-                'extracted_text': "Extracted text content",
+                'full_text': "Extracted text content",
                 'ocr_confidence_percent': 100.0,
                 'ingestion_status': 'ingestion_successful',
                 'processing_status': 'ingested'

@@ -68,7 +68,7 @@ class TestSummarizerAgent(unittest.TestCase):
             # Prepare mock document data
             mock_documents = [{
                 "document_id": "test_doc_id",
-                "extracted_text": "This is the document text to summarize.",
+                "full_text": "This is the document text to summarize.",
                 "file_name": "test_doc.pdf",
                 "document_type": "Medical Record"
             }]

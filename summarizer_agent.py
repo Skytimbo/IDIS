@@ -95,7 +95,7 @@ class SummarizerAgent:
         # Process each document
         for document in documents:
             document_id = document["document_id"]
-            extracted_text = document.get("extracted_text")
+            extracted_text = document.get("full_text")
             file_name = document.get("file_name", "Unknown")
             document_type = document.get("document_type", "Unknown")
             

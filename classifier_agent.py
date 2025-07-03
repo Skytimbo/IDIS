@@ -87,7 +87,7 @@ class ClassifierAgent:
         # Process each document
         for document in documents:
             document_id = document["document_id"]
-            extracted_text = document.get("extracted_text")
+            extracted_text = document.get("full_text")
             file_name = document.get("file_name", "Unknown")
             
             # Skip documents with no extracted text

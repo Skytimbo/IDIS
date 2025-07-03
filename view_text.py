@@ -59,7 +59,7 @@ def main():
         print("-" * 80)
         
         # Display extracted text
-        extracted_text = document.get('extracted_text')
+        extracted_text = document.get('full_text')
         if extracted_text:
             print("EXTRACTED TEXT:")
             print("-" * 80)

@@ -511,7 +511,7 @@ class TaggerAgent:
         # Process each document
         for document in documents:
             document_id = document["document_id"]
-            extracted_text = document.get("extracted_text")
+            extracted_text = document.get("full_text")
             original_watchfolder_path = document.get("original_watchfolder_path")
             patient_id = document.get("patient_id")
             file_name = document.get("file_name", "unknown_file")
