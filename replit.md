@@ -113,6 +113,7 @@ Future phases may include:
 - Optional cloud integration with privacy controls
 
 ## Recent Changes  
+- **July 2025**: **CRITICAL FILING BUG FIX** - Fixed TaggerAgent file location detection failure in inbox workflow: agent now searches multiple potential file locations (inbox, watch folders) instead of only looking at original_watchfolder_path, resolving "FILING FAILED" errors and preventing documents from being incorrectly moved to holding folder
 - **July 2025**: **CRITICAL DATABASE BUG FIX** - Fixed IngestionAgent database persistence failure caused by attempting to update non-existent 'ocr_confidence_percent' column, preventing extracted text from being saved and causing documents to incorrectly move to holding folder
 - **July 2025**: **CRITICAL PIPELINE FIX COMPLETE** - Diagnosed and fixed column name mismatch that was breaking text flow through the pipeline: synchronized all agents to use 'full_text' column consistently (IngestionAgent saves to full_text, ClassifierAgent/SummarizerAgent/TaggerAgent read from full_text), eliminating the bug where extracted text wasn't reaching downstream agents
 - **July 2025**: **MODULAR ARCHITECTURE COMPLETE** - Transformed IDIS into a multi-module platform: created modules/ directory structure, moved document search to modules/search_ui.py, implemented Medicaid Navigator UI at modules/medicaid_navigator/ui.py, and converted app.py into application router with sidebar module selection for scalable platform expansion

@@ -577,26 +577,62 @@ class TaggerAgent:
                 )
                 new_filed_path = os.path.join(filing_dir, filed_filename)
                 
-                # Add detailed logging for debugging file path issues
-                self.logger.info(f"TAGGER: Attempting to process document_id: {document_id}")
-                self.logger.info(f"TAGGER: Original watchfolder path from DB: '{original_watchfolder_path}'")
-                if original_watchfolder_path:  # Add a check to ensure path is not None
-                    self.logger.info(f"TAGGER: Does original file exist at that path? {os.path.exists(original_watchfolder_path)}")
-                else:
-                    self.logger.warning("TAGGER: original_watchfolder_path is None or empty.")
+                # Comprehensive file location detection for inbox workflow compatibility
+                current_file_path = None
+                self.logger.info(f"TAGGER: Processing document_id: {document_id}, filename: {file_name}")
                 
-                # Move file if original path exists using safe file movement
-                if original_watchfolder_path and os.path.isfile(original_watchfolder_path):
-                    filing_successful = self._safe_file_move(original_watchfolder_path, new_filed_path)
+                # Try multiple potential file locations in order of likelihood
+                search_locations = []
+                
+                # 1. Original watchfolder path (if provided)
+                if original_watchfolder_path:
+                    search_locations.append(original_watchfolder_path)
+                
+                # 2. Check common inbox patterns based on original path
+                if original_watchfolder_path:
+                    original_dir = os.path.dirname(original_watchfolder_path)
+                    # Look for inbox folder in same parent directory
+                    parent_dir = os.path.dirname(original_dir)
+                    potential_inbox_locations = [
+                        os.path.join(parent_dir, "demo_inbox", file_name),
+                        os.path.join(parent_dir, "inbox", file_name),
+                        os.path.join(original_dir, "inbox", file_name),
+                        # Also check if it's still in a watch folder variant
+                        os.path.join(parent_dir, "watch", file_name),
+                        os.path.join(parent_dir, "demo_watch", file_name)
+                    ]
+                    search_locations.extend(potential_inbox_locations)
+                
+                # 3. Fallback: search in common project locations
+                project_locations = [
+                    os.path.join(".", "demo_inbox", file_name),
+                    os.path.join(".", "inbox", file_name),
+                    os.path.join(".", "demo_watch", file_name),
+                    os.path.join(".", "watch", file_name)
+                ]
+                search_locations.extend(project_locations)
+                
+                # Find the actual file location
+                for potential_path in search_locations:
+                    if potential_path and os.path.isfile(potential_path):
+                        current_file_path = potential_path
+                        self.logger.info(f"TAGGER: Found file at: {current_file_path}")
+                        break
+                
+                # Attempt file movement if we found the file
+                if current_file_path:
+                    filing_successful = self._safe_file_move(current_file_path, new_filed_path)
                     if filing_successful:
-                        self.logger.info(f"Successfully moved document {document_id} to {new_filed_path}")
+                        self.logger.info(f"Successfully moved document {document_id} from {current_file_path} to {new_filed_path}")
                     else:
-                        self.logger.error(f"Failed to safely move document {document_id}")
+                        self.logger.error(f"Failed to safely move document {document_id} from {current_file_path}")
                         new_filed_path = None
                         filing_successful = False
                 else:
-                    # If no original file exists, still consider processing successful for metadata extraction
-                    self.logger.warning(f"Original file not found for document {document_id}, updating metadata only")
+                    # File not found in any location - log for debugging and continue with metadata-only processing
+                    self.logger.warning(f"File '{file_name}' not found in any expected location for document {document_id}")
+                    self.logger.info(f"Searched locations: {search_locations[:3]}... (and {len(search_locations)-3} more)")
+                    self.logger.info("Continuing with metadata-only processing")
                     filing_successful = True  # Allow metadata-only processing to succeed
                     new_filed_path = None
             
