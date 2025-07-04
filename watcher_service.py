@@ -9,6 +9,7 @@ It implements a "triage" architecture that separates file watching from processi
 """
 
 import os
+import sys
 import time
 import logging
 import argparse
@@ -27,16 +28,7 @@ from cover_sheet import SmartCoverSheetRenderer
 from permissions import PermissionsManager
 from run_mvp import execute_pipeline_for_files, CLASSIFICATION_RULES, TAG_DEFINITIONS, PERMISSIONS_RULES_FILE
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-
-# Comprehensive suppression of noisy third-party PDF and font libraries
-noisy_loggers = ['fontTools', 'fpdf2', 'reportlab']
-for logger_name in noisy_loggers:
-    logging.getLogger(logger_name).setLevel(logging.WARNING)
+# Note: Logging is now configured in the main() function using environment variables
 
 
 def process_inbox_file(
@@ -327,6 +319,22 @@ def main():
     parser.add_argument('--user-id', default='watcher_service_user', help='User ID for audit trail')
     
     args = parser.parse_args()
+    
+    # Get logging level from environment variable, default to INFO
+    log_level_name = os.getenv("LOGGING_LEVEL", "INFO").upper()
+    log_level = getattr(logging, log_level_name, logging.INFO)
+
+    # Basic logging config
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        stream=sys.stdout,
+    )
+
+    # Suppress noisy third-party loggers
+    noisy_loggers = ['fontTools', 'fpdf2', 'reportlab', 'httpx', 'openai']
+    for logger_name in noisy_loggers:
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
     
     # Set up logging
     logger = logging.getLogger("WatcherService")

@@ -74,7 +74,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python watcher_service.py --watch-folder ./demo_watch --holding-folder ./demo_holding --archive-folder ./demo_archive --cover-sheets-folder ./demo_coversheets --db-path ./watcher_demo.db --openai"
+args = "python watcher_service.py --watch-folder ./demo_watch --inbox-folder ./demo_inbox --holding-folder ./demo_holding --archive-folder ./demo_archive --cover-sheets-folder ./demo_coversheets --db-path ./watcher_demo.db --openai"
 
 [[workflows.workflow]]
 name = "QuantaIQ UI"
