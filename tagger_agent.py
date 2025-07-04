@@ -173,6 +173,9 @@ class TaggerAgent:
         Returns:
             Sanitized folder name in format: PatientName_first6chars or patient_id if name not found
         """
+        # Convert patient_id to string right away to prevent TypeErrors
+        patient_id = str(patient_id)
+        
         try:
             # Convert patient_id to int if it's a string (database expects integer)
             if isinstance(patient_id, str):
