@@ -142,7 +142,7 @@ class IngestionAgent:
                 if extracted_text:
                     # Update document with extracted text and successful status
                     update_data = {
-                        'extracted_text': extracted_text,
+                        'full_text': extracted_text,
                         'ocr_confidence_percent': confidence,
                         'ingestion_status': 'ingestion_successful',
                         'processing_status': 'ingested'
