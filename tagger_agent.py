@@ -174,7 +174,16 @@ class TaggerAgent:
             Sanitized folder name in format: PatientName_first6chars or patient_id if name not found
         """
         try:
-            patient_data = self.context_store.get_patient(patient_id)
+            # Convert patient_id to int if it's a string (database expects integer)
+            if isinstance(patient_id, str):
+                try:
+                    patient_id_int = int(patient_id)
+                except ValueError:
+                    # If patient_id is not a valid integer string, return fallback
+                    return patient_id
+            else:
+                patient_id_int = patient_id
+            patient_data = self.context_store.get_patient(patient_id_int)
             if patient_data and patient_data.get('patient_name'):
                 sanitized_name = self._sanitize_for_filename(patient_data['patient_name'])
                 id_prefix = patient_id[:6] if len(patient_id) >= 6 else patient_id
@@ -575,7 +584,7 @@ class TaggerAgent:
                 
                 # Generate new descriptive filename using enhanced naming convention
                 filed_filename = self._generate_new_filename(
-                    document_id, file_name, document_type, primary_date, patient_id, issuer
+                    str(document_id), file_name, document_type, primary_date, patient_id, issuer
                 )
                 new_filed_path = os.path.join(filing_dir, filed_filename)
                 
