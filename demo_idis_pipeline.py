@@ -25,6 +25,10 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+
+# Silence excessive fontTools debug messages
+logging.getLogger('fontTools').setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 def create_demo_documents(demo_folder: str) -> List[str]:

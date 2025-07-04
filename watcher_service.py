@@ -33,6 +33,9 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
+# Silence excessive fontTools debug messages
+logging.getLogger('fontTools').setLevel(logging.WARNING)
+
 
 def process_inbox_file(
     file_path: str,

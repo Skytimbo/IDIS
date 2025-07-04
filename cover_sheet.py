@@ -23,6 +23,9 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
+# Silence excessive fontTools debug messages
+logging.getLogger('fontTools').setLevel(logging.WARNING)
+
 class SmartCoverSheetRenderer:
     """
     Agent responsible for generating professional PDF cover sheets from document metadata.
