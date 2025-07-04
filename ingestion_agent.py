@@ -143,12 +143,25 @@ class IngestionAgent:
                     # Update document with extracted text and successful status
                     update_data = {
                         'full_text': extracted_text,
-                        'ocr_confidence_percent': confidence,
                         'ingestion_status': 'ingestion_successful',
                         'processing_status': 'ingested'
                     }
                     
-                    self.context_store.update_document_fields(document_id, update_data)
+                    # Update the document in the database with error handling
+                    try:
+                        update_success = self.context_store.update_document_fields(document_id, update_data)
+                        if not update_success:
+                            self.logger.error(f"Failed to update document {document_id} in database - update returned False")
+                            raise Exception("Database update returned False")
+                        else:
+                            self.logger.info(f"Successfully saved {len(extracted_text)} characters to full_text for document {document_id}")
+                    except Exception as e:
+                        self.logger.error(f"Critical error updating document {document_id} in database: {e}")
+                        # Move file to holding folder since database update failed
+                        holding_path = os.path.join(self.holding_folder, filename)
+                        shutil.move(file_path, holding_path)
+                        self.logger.error(f"Moved {filename} to holding folder due to database update failure")
+                        continue
                     
                     # Add audit log entry for successful processing
                     self.context_store.add_audit_log_entry(
