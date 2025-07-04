@@ -23,8 +23,10 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
-# Silence excessive fontTools debug messages
-logging.getLogger('fontTools').setLevel(logging.WARNING)
+# Comprehensive suppression of noisy third-party PDF and font libraries
+noisy_loggers = ['fontTools', 'fpdf2', 'reportlab']
+for logger_name in noisy_loggers:
+    logging.getLogger(logger_name).setLevel(logging.WARNING)
 
 
 class TaggerAgent:
