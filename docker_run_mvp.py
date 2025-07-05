@@ -44,12 +44,16 @@ OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
 # Classification rules for the Classifier Agent
 CLASSIFICATION_RULES = {
-    "Invoice": ["invoice #", "total due", "bill to", "payment", "amount"],
-    "Medical Record": ["patient name:", "diagnosis", "chief complaint", "medical record", "treatment"],
-    "Letter": ["dear sir", "sincerely", "yours truly", "regards", "recipient"],
-    "Report": ["executive summary", "findings", "analysis section", "conclusion", "recommendations"],
-    "Credit Card Statement": ["visa signature", "new balance", "minimum payment due", "account summary", "closing date", "reward points"],
-    "Business License": ["certificate of organization", "business license"]
+    "Invoice": ["invoice #", "total due", "bill to"],
+    "Medical Record": ["patient name:", "diagnosis", "chief complaint"],
+    "Letter": ["dear sir", "sincerely", "yours truly"],
+    "Report": ["executive summary", "findings", "analysis section"],
+    "Credit Card Statement": ["visa signature", "new balance", "minimum payment due", "bank of america"],
+    "Business License": ["certificate of organization", "business license"],
+    "Bank Statement": ["bank statement", "summary of account", "global credit union"],
+    "Utility Bill": ["utility bill", "gci", "homer electric association"],
+    "Insurance Document": ["state farm", "insurance policy", "declaration page"],
+    "Receipt": ["receipt", "safeway", "purchase summary"]
 }
 
 # Tag definitions for the Tagger Agent

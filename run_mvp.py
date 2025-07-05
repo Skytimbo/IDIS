@@ -44,8 +44,12 @@ CLASSIFICATION_RULES = {
     "Medical Record": ["patient name:", "diagnosis", "chief complaint"],
     "Letter": ["dear sir", "sincerely", "yours truly"],
     "Report": ["executive summary", "findings", "analysis section"],
-    "Credit Card Statement": ["visa signature", "new balance", "minimum payment due", "account summary", "closing date", "reward points"],
-    "Business License": ["certificate of organization", "business license"]
+    "Credit Card Statement": ["visa signature", "new balance", "minimum payment due", "bank of america"],
+    "Business License": ["certificate of organization", "business license"],
+    "Bank Statement": ["bank statement", "summary of account", "global credit union"],
+    "Utility Bill": ["utility bill", "gci", "homer electric association"],
+    "Insurance Document": ["state farm", "insurance policy", "declaration page"],
+    "Receipt": ["receipt", "safeway", "purchase summary"]
 }
 
 # Tag definitions for the Tagger Agent

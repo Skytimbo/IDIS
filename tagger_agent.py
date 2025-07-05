@@ -69,17 +69,22 @@ class TaggerAgent:
         
         # Known issuers for high-confidence identification
         self.KNOWN_ISSUERS = {
-            "Fidelity": ["Fidelity® Rewards Visa Signature", "Fidelity Rewards Visa"],
-            "Spenard Builders Supply": ["Spenard Builders Supply", "SPENARD BUILDERS SUPPLY"],
+            "Fidelity": ["Fidelity", "Fidelity Rewards"],
+            "Spenard Builders Supply": ["Spenard Builders Supply"],
             "GCI": ["GCI", "General Communication, Inc."],
             "Waste Management": ["Waste Management", "WM"],
-            "State of Alaska": ["state of alaska", "department of commerce, community, and economic development"]
+            "State of Alaska": ["state of alaska", "department of commerce"],
+            "Homer Electric Association": ["homer electric association", "hea"],
+            "Bank of America": ["bank of america"],
+            "Global Credit Union": ["global credit union"],
+            "State Farm": ["state farm"],
+            "Safeway": ["safeway"]
         }
         
         # Document type abbreviations for filename generation
         self.doc_type_abbreviations = {
             "Invoice": "INV",
-            "Medical Record": "MEDREC", 
+            "Medical Record": "MEDREC",
             "Letter": "LTR",
             "Report": "RPT",
             "Insurance Document": "INS",
@@ -87,6 +92,8 @@ class TaggerAgent:
             "Receipt": "RCPT",
             "Credit Card Statement": "CCSTMT",
             "Business License": "BIZLIC",
+            "Bank Statement": "BNKSTMT",
+            "Utility Bill": "UTIL",
             "Unclassified": "UNC"
         }
         
