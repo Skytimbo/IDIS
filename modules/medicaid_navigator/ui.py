@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import os
 
 def render_navigator_ui():
     """
@@ -56,8 +57,17 @@ def render_navigator_ui():
     # --- 3. Processing ---
     st.header("3. Process and Prepare Packet")
     if st.button("✨ Analyze My Documents", type="primary", disabled=(not uploaded_files)):
-        with st.spinner("Analyzing documents... This may take a few minutes."):
-            # Placeholder for calling the backend processing pipeline
-            st.success("Analysis Complete!")
+        with st.spinner("Submitting documents to the processing pipeline..."):
+            # Define the path to the main watch folder
+            watch_folder = os.path.join("data", "scanner_output")
+            os.makedirs(watch_folder, exist_ok=True)
+            
+            # Save each uploaded file to the watch folder
+            for uploaded_file in uploaded_files or []:
+                dest_path = os.path.join(watch_folder, uploaded_file.name)
+                with open(dest_path, "wb") as f:
+                    f.write(uploaded_file.getvalue())
+                st.write(f"✅ Submitted {uploaded_file.name} for processing.")
+                
+            st.success("All documents submitted! The checklist will update as each document is analyzed.")
             st.balloons()
-            # In the future, this will update the checklist above

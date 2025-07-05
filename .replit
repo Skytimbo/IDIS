@@ -34,7 +34,11 @@ args = "Run Watcher Service Demo"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "QuantaIQ UI"
+args = "Production Watcher Service"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "QuantaIQ UI - Production"
 
 [[workflows.workflow]]
 name = "Run Context Store Tests"
@@ -77,12 +81,20 @@ task = "shell.exec"
 args = "python watcher_service.py --watch-folder ./demo_watch --inbox-folder ./demo_inbox --holding-folder ./demo_holding --archive-folder ./demo_archive --cover-sheets-folder ./demo_coversheets --db-path ./watcher_demo.db --openai"
 
 [[workflows.workflow]]
-name = "QuantaIQ UI"
+name = "Production Watcher Service"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd quanta_ui && echo \"\" | streamlit run app.py --server.port 5000 --server.address 0.0.0.0"
+args = "./start_production_watcher.sh"
+
+[[workflows.workflow]]
+name = "QuantaIQ UI - Production"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd quanta_ui && echo \"\" | streamlit run app.py --server.port 5000 --server.address 0.0.0.0 --server.enableCORS false --server.enableWebsocketCompression false"
 waitForPort = 5000
 
 [deployment]
