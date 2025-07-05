@@ -1,0 +1,1 @@
+Testing the permanent TaggerAgent fix - direct database lookup approach
