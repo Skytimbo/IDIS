@@ -315,7 +315,7 @@ def render_search_ui():
                         
                         # Use a simpler scrollable container
                         st.markdown(
-                            f"<div style='height: 250px; overflow-y: scroll; border: 1px solid #444; padding: 5px;'>{html_text_with_breaks}</div>", 
+                            f"<div style='height: 250px; overflow-y: scroll; border: 1px solid #444; padding: 5px; color: black; background-color: #f9f9f9;'>{html_text_with_breaks}</div>", 
                             unsafe_allow_html=True
                         )
                     else:
