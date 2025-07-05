@@ -1,0 +1,1 @@
+Testing the race condition fix - this file should process cleanly without removal warnings

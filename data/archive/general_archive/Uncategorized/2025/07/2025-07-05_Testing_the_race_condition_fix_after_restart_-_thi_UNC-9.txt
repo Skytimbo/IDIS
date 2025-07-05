@@ -1,0 +1,1 @@
+Testing the race condition fix after restart - this should process without any removal warnings

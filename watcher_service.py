@@ -164,12 +164,10 @@ def process_inbox_file(
             
             # CRITICAL FIX: Only delete file if ALL documents were successfully archived AND no failures occurred
             if successfully_processed_count > 0 and failed_count == 0:
-                # Success: All documents archived successfully, safe to remove from inbox
-                try:
-                    os.remove(file_path)
-                    logger.info(f"Successfully processed and removed inbox file: {original_filename}")
-                except Exception as e:
-                    logger.warning(f"Failed to remove processed file {file_path}: {e}")
+                # Success: All documents archived successfully
+                # NOTE: TaggerAgent's _safe_file_move already removed the file during archiving
+                # No need for redundant cleanup here - this prevents race condition warnings
+                logger.info(f"Successfully processed inbox file: {original_filename}")
             else:
                 # Failure: Move file to holding folder for manual inspection to prevent data loss
                 try:
