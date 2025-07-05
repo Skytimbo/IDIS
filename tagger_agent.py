@@ -72,7 +72,8 @@ class TaggerAgent:
             "Fidelity": ["Fidelity® Rewards Visa Signature", "Fidelity Rewards Visa"],
             "Spenard Builders Supply": ["Spenard Builders Supply", "SPENARD BUILDERS SUPPLY"],
             "GCI": ["GCI", "General Communication, Inc."],
-            "Waste Management": ["Waste Management", "WM"]
+            "Waste Management": ["Waste Management", "WM"],
+            "State of Alaska": ["state of alaska", "department of commerce, community, and economic development"]
         }
         
         # Document type abbreviations for filename generation
@@ -85,6 +86,7 @@ class TaggerAgent:
             "Legal Document": "LEGAL",
             "Receipt": "RCPT",
             "Credit Card Statement": "CCSTMT",
+            "Business License": "BIZLIC",
             "Unclassified": "UNC"
         }
         

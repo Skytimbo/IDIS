@@ -48,7 +48,8 @@ CLASSIFICATION_RULES = {
     "Medical Record": ["patient name:", "diagnosis", "chief complaint", "medical record", "treatment"],
     "Letter": ["dear sir", "sincerely", "yours truly", "regards", "recipient"],
     "Report": ["executive summary", "findings", "analysis section", "conclusion", "recommendations"],
-    "Credit Card Statement": ["visa signature", "new balance", "minimum payment due", "account summary", "closing date", "reward points"]
+    "Credit Card Statement": ["visa signature", "new balance", "minimum payment due", "account summary", "closing date", "reward points"],
+    "Business License": ["certificate of organization", "business license"]
 }
 
 # Tag definitions for the Tagger Agent
