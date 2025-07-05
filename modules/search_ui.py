@@ -7,6 +7,7 @@ import streamlit as st
 import sqlite3
 import pandas as pd
 import json
+import re
 from datetime import datetime, date
 from typing import List, Tuple, Optional, Dict, Any
 import os
@@ -249,6 +250,8 @@ def render_search_ui():
         conn = get_database_connection()
         query, params = build_search_query(search_term, selected_types, issuer_filter, tags_filter, after_date, before_date)
         st.session_state.results = pd.read_sql_query(query, conn, params=params)
+        # Store search term for highlighting
+        st.session_state.search_term_input = search_term
 
     if st.session_state.results is not None:
         results_df = st.session_state.results
@@ -292,7 +295,26 @@ def render_search_ui():
                     
                     st.subheader("📝 Extracted Text")
                     full_text = str(row['full_text']) if pd.notna(row['full_text']) else ""
-                    st.text_area("Full Text", value=full_text, height=250, key=f"text_{document_id}_{index}")
+                    
+                    # Get the search term for highlighting
+                    search_term = st.session_state.get('search_term_input', '')
+                    
+                    if search_term and search_term.strip():
+                        # Use re.sub for case-insensitive replacement and to preserve original casing
+                        highlighted_text = re.sub(
+                            f'({re.escape(search_term.strip())})', 
+                            r"<span style='background-color: #FFFF00; padding: 1px 2px;'>\1</span>", 
+                            full_text, 
+                            flags=re.IGNORECASE
+                        )
+                        # Display the highlighted text in a scrollable container
+                        st.markdown(
+                            f"<div style='height: 250px; overflow-y: scroll; border: 1px solid #ddd; padding: 10px; background-color: #f9f9f9; border-radius: 5px; white-space: pre-wrap; font-family: monospace; font-size: 14px;'>{highlighted_text}</div>", 
+                            unsafe_allow_html=True
+                        )
+                    else:
+                        # Fallback to a normal text area if no search term
+                        st.text_area("Full Text", value=full_text, height=250, key=f"text_{document_id}_{index}")
 
                     if filed_path:
                         st.subheader("📁 File Location")

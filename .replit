@@ -40,6 +40,10 @@ args = "Production Watcher Service"
 task = "workflow.run"
 args = "QuantaIQ UI - Production"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "QuantaIQ UI - Search Test"
+
 [[workflows.workflow]]
 name = "Run Context Store Tests"
 author = "agent"
@@ -95,6 +99,15 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd quanta_ui && echo \"\" | streamlit run app.py --server.port 5000 --server.address 0.0.0.0 --server.enableCORS false --server.enableWebsocketCompression false"
+waitForPort = 5000
+
+[[workflows.workflow]]
+name = "QuantaIQ UI - Search Test"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd modules && streamlit run search_ui.py --server.port 5000 --server.address 0.0.0.0 --server.enableCORS false --server.enableWebsocketCompression false"
 waitForPort = 5000
 
 [deployment]
