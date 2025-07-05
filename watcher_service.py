@@ -89,6 +89,20 @@ def process_inbox_file(
             user_id=user_id_for_new_docs
         )
         
+        # Fix Part 1: Update document's original_watchfolder_path to point to actual current location
+        if ingestion_results > 0:
+            # Find the document that was just ingested and update its path
+            recent_documents = local_context_store.get_documents_for_session(session_id)
+            if recent_documents:
+                # Get the most recent document (should be the one we just processed)
+                # Use the 'id' field which is the actual primary key, not 'document_id'
+                document_primary_id = recent_documents[-1]["id"]
+                inbox_file_path = os.path.join(config_paths['inbox_folder'], original_filename)
+                local_context_store.update_document_fields(
+                    document_primary_id, {'original_watchfolder_path': inbox_file_path}
+                )
+                logger.info(f"Updated document {document_primary_id} path to: {inbox_file_path}")
+        
         if ingestion_results > 0:
             # Continue with the rest of the pipeline
             classifier_agent = ClassifierAgent(

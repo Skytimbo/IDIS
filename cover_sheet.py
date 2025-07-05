@@ -17,11 +17,20 @@ from weasyprint import HTML
 
 from context_store import ContextStore
 
+# Part 2 Fix: Custom filter class to explicitly block messages from noisy loggers
+class NoisyLibraryFilter(logging.Filter):
+    def filter(self, record):
+        noisy_loggers = ['fontTools', 'fpdf2', 'reportlab', 'PIL']
+        return not any(record.name.startswith(logger) for logger in noisy_loggers)
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
+
+# Apply the custom filter to the root logger
+logging.getLogger().addFilter(NoisyLibraryFilter())
 
 # Comprehensive suppression of noisy third-party PDF and font libraries
 noisy_loggers = ['fontTools', 'fpdf2', 'reportlab']
