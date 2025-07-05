@@ -162,20 +162,21 @@ def process_inbox_file(
             # Conditional cleanup based on TaggerAgent results
             successfully_processed_count, failed_count = tagging_results
             
-            if successfully_processed_count > 0:
-                # Success: Remove the file from inbox
+            # CRITICAL FIX: Only delete file if ALL documents were successfully archived AND no failures occurred
+            if successfully_processed_count > 0 and failed_count == 0:
+                # Success: All documents archived successfully, safe to remove from inbox
                 try:
                     os.remove(file_path)
                     logger.info(f"Successfully processed and removed inbox file: {original_filename}")
                 except Exception as e:
                     logger.warning(f"Failed to remove processed file {file_path}: {e}")
             else:
-                # Failure: Move file to holding folder for manual inspection
+                # Failure: Move file to holding folder for manual inspection to prevent data loss
                 try:
                     holding_path = os.path.join(config_paths['holding_folder'], original_filename)
                     shutil.move(file_path, holding_path)
                     logger.error(f"FILING FAILED: Moved {original_filename} to holding folder for manual inspection")
-                    logger.error(f"TaggerAgent failed to archive document. Failed count: {failed_count}")
+                    logger.error(f"TaggerAgent failed to archive document. Success: {successfully_processed_count}, Failed: {failed_count}")
                 except Exception as e:
                     logger.error(f"CRITICAL: Failed to move {original_filename} to holding folder: {e}")
                     logger.error(f"File remains in inbox: {file_path}")

@@ -1,0 +1,1 @@
+Testing critical data loss fix - this file should be saved to holding folder if TaggerAgent fails
