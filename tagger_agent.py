@@ -876,7 +876,9 @@ class TaggerAgent:
         text_lower = text.lower()
         for issuer_name, keywords in self.KNOWN_ISSUERS.items():
             for keyword in keywords:
+                self.logger.info(f"DEBUG ISSUER: Checking for keyword '{keyword.lower()}'...")
                 if keyword.lower() in text_lower:
+                    self.logger.info(f"DEBUG ISSUER: Found keyword '{keyword.lower()}'! Returning issuer: '{issuer_name}'")
                     return issuer_name
         
         # Pass 1: Search header (first ~7 lines) for high-confidence signals
