@@ -591,50 +591,14 @@ class TaggerAgent:
                 )
                 new_filed_path = os.path.join(filing_dir, filed_filename)
                 
-                # Comprehensive file location detection for inbox workflow compatibility
-                current_file_path = None
+                # Get the confirmed current path from the database
+                current_file_path = document.get("original_watchfolder_path")
                 self.logger.info(f"TAGGER: Processing document_id: {document_id}, filename: {file_name}")
+                self.logger.info(f"TAGGER: Attempting to find file for doc {document_id} at path: {current_file_path}")
                 
-                # Try multiple potential file locations in order of likelihood
-                search_locations = []
-                
-                # 1. Original watchfolder path (if provided)
-                if original_watchfolder_path:
-                    search_locations.append(original_watchfolder_path)
-                
-                # 2. Check common inbox patterns based on original path
-                if original_watchfolder_path:
-                    original_dir = os.path.dirname(original_watchfolder_path)
-                    # Look for inbox folder in same parent directory
-                    parent_dir = os.path.dirname(original_dir)
-                    potential_inbox_locations = [
-                        os.path.join(parent_dir, "demo_inbox", file_name),
-                        os.path.join(parent_dir, "inbox", file_name),
-                        os.path.join(original_dir, "inbox", file_name),
-                        # Also check if it's still in a watch folder variant
-                        os.path.join(parent_dir, "watch", file_name),
-                        os.path.join(parent_dir, "demo_watch", file_name)
-                    ]
-                    search_locations.extend(potential_inbox_locations)
-                
-                # 3. Fallback: search in common project locations
-                project_locations = [
-                    os.path.join(".", "demo_inbox", file_name),
-                    os.path.join(".", "inbox", file_name),
-                    os.path.join(".", "demo_watch", file_name),
-                    os.path.join(".", "watch", file_name)
-                ]
-                search_locations.extend(project_locations)
-                
-                # Find the actual file location
-                for potential_path in search_locations:
-                    if potential_path and os.path.isfile(potential_path):
-                        current_file_path = potential_path
-                        self.logger.info(f"TAGGER: Found file at: {current_file_path}")
-                        break
-                
-                # Attempt file movement if we found the file
-                if current_file_path:
+                # Attempt file movement if the path exists and is a file
+                if current_file_path and os.path.isfile(current_file_path):
+                    self.logger.info(f"TAGGER: Found file at: {current_file_path}")
                     filing_successful = self._safe_file_move(current_file_path, new_filed_path)
                     if filing_successful:
                         self.logger.info(f"Successfully moved document {document_id} from {current_file_path} to {new_filed_path}")
@@ -643,12 +607,9 @@ class TaggerAgent:
                         new_filed_path = None
                         filing_successful = False
                 else:
-                    # File not found in any location - log for debugging and continue with metadata-only processing
-                    self.logger.warning(f"File '{file_name}' not found in any expected location for document {document_id}")
-                    self.logger.info(f"Searched locations: {search_locations[:3]}... (and {len(search_locations)-3} more)")
-                    self.logger.info("Continuing with metadata-only processing")
-                    filing_successful = True  # Allow metadata-only processing to succeed
-                    new_filed_path = None
+                    # This block now means the file is truly lost or the DB path is wrong
+                    self.logger.error(f"CRITICAL: File not found at the path specified in database: {current_file_path}")
+                    filing_successful = False
             
             except Exception as e:
                 self.logger.error(f"Error filing document {document_id}: {str(e)}")
