@@ -300,16 +300,22 @@ def render_search_ui():
                     search_term = st.session_state.get('search_term_input', '')
                     
                     if search_term and search_term.strip():
-                        # Use re.sub for case-insensitive replacement and to preserve original casing
+                        # Replacement style now includes 'color: black;' for dark mode visibility
+                        replacement_style = r"<span style='background-color: #FFFF00; color: black;'>\1</span>"
+                        
                         highlighted_text = re.sub(
                             f'({re.escape(search_term.strip())})', 
-                            r"<span style='background-color: #FFFF00; padding: 1px 2px;'>\1</span>", 
+                            replacement_style, 
                             full_text, 
                             flags=re.IGNORECASE
                         )
-                        # Display the highlighted text in a scrollable container
+                        
+                        # Convert newlines to HTML <br> tags for proper rendering in markdown
+                        html_text_with_breaks = highlighted_text.replace('\n', '<br>')
+                        
+                        # Use a simpler scrollable container
                         st.markdown(
-                            f"<div style='height: 250px; overflow-y: scroll; border: 1px solid #ddd; padding: 10px; background-color: #f9f9f9; border-radius: 5px; white-space: pre-wrap; font-family: monospace; font-size: 14px;'>{highlighted_text}</div>", 
+                            f"<div style='height: 250px; overflow-y: scroll; border: 1px solid #444; padding: 5px;'>{html_text_with_breaks}</div>", 
                             unsafe_allow_html=True
                         )
                     else:
