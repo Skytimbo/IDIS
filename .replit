@@ -120,8 +120,8 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "streamlit run app.py --server.port 8501 --server.address 0.0.0.0 -- --database-path production_idis.db --archive-path data/idis_archive"
-waitForPort = 8501
+args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0 -- --database-path production_idis.db --archive-path data/idis_archive"
+waitForPort = 5000
 
 [deployment]
 run = ["sh", "-c", "python -m unittest discover tests"]
