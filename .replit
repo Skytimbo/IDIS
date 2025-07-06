@@ -2,7 +2,7 @@ modules = ["python-3.11", "postgresql-16"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["cacert", "cargo", "fontconfig", "freetype", "ghostscript", "glib", "glibcLocales", "gumbo", "harfbuzz", "jbig2dec", "lcms2", "libffi", "libiconv", "libimagequant", "libjpeg", "libjpeg_turbo", "libtiff", "libwebp", "libxcrypt", "mupdf", "nano", "openjpeg", "pango", "pkg-config", "rustc", "swig", "tcl", "tesseract", "tk", "xcbuild", "xcodebuild", "zlib"]
+packages = ["bash", "cacert", "cargo", "fontconfig", "freetype", "ghostscript", "glib", "glibcLocales", "gumbo", "harfbuzz", "jbig2dec", "lcms2", "libffi", "libiconv", "libimagequant", "libjpeg", "libjpeg_turbo", "libtiff", "libwebp", "libxcrypt", "mupdf", "nano", "openjpeg", "pango", "pkg-config", "rustc", "swig", "tcl", "tesseract", "tk", "xcbuild", "xcodebuild", "zlib"]
 
 [workflows]
 runButton = "Project"

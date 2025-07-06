@@ -20,8 +20,6 @@ class IngestionTool(BaseTool):
     name = "ingest_document"
     description = "Useful for when you need to process a new document. Takes a file_path as input, extracts its text, and saves it to the database, returning the new document's ID."
     args_schema: Type[BaseModel] = IngestionInput
-    context_store: ContextStore = Field(default_factory=lambda: ContextStore(db_path=DB_PATH))
-    ingestion_agent: IngestionAgent = Field(default_factory=lambda: IngestionAgent(context_store=ContextStore(db_path=DB_PATH)))
 
     def _run(self, file_path: str) -> str:
         """Use the tool."""
@@ -29,17 +27,31 @@ class IngestionTool(BaseTool):
             return f"Error: File not found at {file_path}"
 
         try:
-            # 1. Correctly extract text by checking file type
-            file_type_category = self.ingestion_agent._get_file_type(file_path)
+            # Initialize agents locally
+            context_store = ContextStore(db_path=DB_PATH)
+            # Create temporary directories for the ingestion agent
+            import tempfile
+            temp_watch = tempfile.mkdtemp()
+            temp_holding = tempfile.mkdtemp()
+            ingestion_agent = IngestionAgent(context_store=context_store, 
+                                           watch_folder=temp_watch, 
+                                           holding_folder=temp_holding)
+            
+            # 1. Extract text based on file extension
             text = None
             confidence = 0.0
+            file_ext = os.path.splitext(file_path)[1].lower()
 
-            if file_type_category == 'pdf':
-                text, confidence = self.ingestion_agent._extract_text_from_pdf(file_path)
-            elif file_type_category == 'image':
-                text, confidence = self.ingestion_agent._extract_text_from_image(file_path)
-            elif file_type_category == 'doc':
-                text, confidence = self.ingestion_agent._extract_text_from_docx(file_path)
+            if file_ext == '.pdf':
+                text, confidence = ingestion_agent._extract_text_from_pdf(file_path)
+            elif file_ext in ['.jpg', '.jpeg', '.png', '.tiff', '.bmp']:
+                text, confidence = ingestion_agent._extract_text_from_image(file_path)
+            elif file_ext in ['.docx', '.doc']:
+                text, confidence = ingestion_agent._extract_text_from_docx(file_path)
+            elif file_ext == '.txt':
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    text = f.read()
+                    confidence = 100.0
             
             if not text:
                 return f"Error: Failed to extract text from {file_path}"
@@ -50,7 +62,7 @@ class IngestionTool(BaseTool):
                 'original_file_type': os.path.splitext(file_path)[1],
                 'ingestion_status': 'pending_ingestion', # Start as pending
             }
-            new_doc_id = self.context_store.add_document(initial_doc_data)
+            new_doc_id = context_store.add_document(initial_doc_data)
 
             if not new_doc_id:
                 return "Error: Failed to create initial document record."
@@ -61,7 +73,7 @@ class IngestionTool(BaseTool):
                 'ingestion_status': 'ingestion_successful',
                 'processing_status': 'ingested'
             }
-            update_success = self.context_store.update_document_fields(new_doc_id, update_data)
+            update_success = context_store.update_document_fields(new_doc_id, update_data)
 
             if update_success:
                 logging.info(f"Successfully ingested '{file_path}' with document ID {new_doc_id}.")
