@@ -44,6 +44,10 @@ args = "QuantaIQ UI - Production"
 task = "workflow.run"
 args = "QuantaIQ UI - Search Test"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Run Main App (Correct Paths)"
+
 [[workflows.workflow]]
 name = "Run Context Store Tests"
 author = "agent"
@@ -109,6 +113,15 @@ author = "agent"
 task = "shell.exec"
 args = "cd modules && streamlit run search_ui.py --server.port 5000 --server.address 0.0.0.0 --server.enableCORS false --server.enableWebsocketCompression false"
 waitForPort = 5000
+
+[[workflows.workflow]]
+name = "Run Main App (Correct Paths)"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "streamlit run app.py --server.port 8501 --server.address 0.0.0.0 -- --database-path production_idis.db --archive-path data/idis_archive"
+waitForPort = 8501
 
 [deployment]
 run = ["sh", "-c", "python -m unittest discover tests"]
