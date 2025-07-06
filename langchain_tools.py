@@ -1,6 +1,6 @@
 import os
 import logging
-from typing import Type
+from typing import Type, List
 from pydantic import BaseModel, Field
 
 from langchain.tools import BaseTool
@@ -10,6 +10,28 @@ from ingestion_agent import IngestionAgent
 
 # Assume a default database path for now
 DB_PATH = "production_idis.db"
+
+# --- Data Schemas for Cognitive Extraction ---
+
+class KeyDates(BaseModel):
+    primary_date: str = Field(None, description="The single most important date, in YYYY-MM-DD format.")
+    due_date: str = Field(None, description="The payment due date, if present.")
+    invoice_date: str = Field(None, description="The date the invoice was issued.")
+
+class Issuer(BaseModel):
+    name: str = Field(None, description="The name of the company or person issuing the document.")
+    contact_info: str = Field(None, description="Any contact information like a phone number or email for the issuer.")
+
+class Filing(BaseModel):
+    suggested_tags: List[str] = Field(default_factory=list, description="A list of 1-3 relevant keywords for filing.")
+
+class DocumentIntelligence(BaseModel):
+    """The main schema for structured data extracted from a document."""
+    document_type: str = Field("Unclassified", description="The classified type of the document (e.g., 'Invoice', 'Medical Record').")
+    issuer: Issuer
+    key_dates: KeyDates
+    filing: Filing
+    summary: str = Field(description="A 2-3 sentence summary of the document's content.")
 
 class IngestionInput(BaseModel):
     """Input schema for the IngestionTool."""
