@@ -41,3 +41,6 @@ pandas
 tiktoken
 langchain
 langchain-core
+langchain
+langchain-core
+langchain-openai

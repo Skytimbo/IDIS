@@ -4,6 +4,9 @@ from typing import Type, List
 from pydantic import BaseModel, Field
 
 from langchain.tools import BaseTool
+from langchain_openai import ChatOpenAI
+from langchain.prompts import ChatPromptTemplate
+from langchain.chains.openai_functions import create_structured_output_chain
 
 from context_store import ContextStore
 from ingestion_agent import IngestionAgent
@@ -14,13 +17,13 @@ DB_PATH = "production_idis.db"
 # --- Data Schemas for Cognitive Extraction ---
 
 class KeyDates(BaseModel):
-    primary_date: str = Field(None, description="The single most important date, in YYYY-MM-DD format.")
-    due_date: str = Field(None, description="The payment due date, if present.")
-    invoice_date: str = Field(None, description="The date the invoice was issued.")
+    primary_date: str | None = Field(None, description="The single most important date, in YYYY-MM-DD format.")
+    due_date: str | None = Field(None, description="The payment due date, if present.")
+    invoice_date: str | None = Field(None, description="The date the invoice was issued.")
 
 class Issuer(BaseModel):
-    name: str = Field(None, description="The name of the company or person issuing the document.")
-    contact_info: str = Field(None, description="Any contact information like a phone number or email for the issuer.")
+    name: str | None = Field(None, description="The name of the company or person issuing the document.")
+    contact_info: str | None = Field(None, description="Any contact information like a phone number or email for the issuer.")
 
 class Filing(BaseModel):
     suggested_tags: List[str] = Field(default_factory=list, description="A list of 1-3 relevant keywords for filing.")
@@ -39,8 +42,8 @@ class IngestionInput(BaseModel):
 
 class IngestionTool(BaseTool):
     """A tool to ingest a single document, extract its text, and create a database record."""
-    name = "ingest_document"
-    description = "Useful for when you need to process a new document. Takes a file_path as input, extracts its text, and saves it to the database, returning the new document's ID."
+    name: str = "ingest_document"
+    description: str = "Useful for when you need to process a new document. Takes a file_path as input, extracts its text, and saves it to the database, returning the new document's ID."
     args_schema: Type[BaseModel] = IngestionInput
 
     def _run(self, file_path: str) -> str:
@@ -110,3 +113,45 @@ class IngestionTool(BaseTool):
     def _arun(self, file_path: str):
         # This tool does not support async run yet.
         raise NotImplementedError("IngestionTool does not support async")
+
+
+class CognitiveTaggerInput(BaseModel):
+    """Input schema for the CognitiveTaggerTool."""
+    document_text: str = Field(description="The full text of the document to be analyzed.")
+
+class CognitiveTaggerTool(BaseTool):
+    """A tool to analyze document text and extract structured intelligence using an LLM."""
+    name: str = "extract_document_intelligence"
+    description: str = "Useful for when you need to understand and categorize a document. Takes the full text of a document and returns a structured JSON object with its type, issuer, key dates, and a summary."
+    args_schema: Type[BaseModel] = CognitiveTaggerInput
+
+    def _run(self, document_text: str) -> dict:
+        """Use the tool."""
+        try:
+            # For now, we'll use OpenAI. This can be swapped for a local LLM later.
+            llm = ChatOpenAI(model="gpt-4o", temperature=0)
+
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", "You are an expert at analyzing documents. Your task is to extract key information from the provided text and format it according to the specified JSON schema. Only return information found in the text."),
+                ("human", "Extract the required information from the following document text: \n\n```{text}```")
+            ])
+
+            # Create a chain that forces the LLM to output in our desired Pydantic schema
+            chain = create_structured_output_chain(output_schema=DocumentIntelligence, llm=llm, prompt=prompt)
+
+            result = chain.invoke({"text": document_text})
+
+            # Convert the result to a dictionary if it's a Pydantic model
+            if hasattr(result, 'model_dump'):
+                return result.model_dump()
+            elif hasattr(result, 'dict'):
+                return result.dict()
+            else:
+                return result
+
+        except Exception as e:
+            logging.error(f"An error occurred in CognitiveTaggerTool: {e}")
+            return {"error": str(e)}
+
+    def _arun(self, document_text: str):
+        raise NotImplementedError("CognitiveTaggerTool does not support async")
