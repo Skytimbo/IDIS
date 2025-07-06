@@ -1,28 +1,24 @@
-# 1. Start with a lightweight, official Python base image
+# Use an official lightweight Python image
 FROM python:3.11-slim
 
-# 2. Set environment variables to prevent interactive prompts during installation
-ENV PYTHONUNBUFFERED=1 \
-    DEBIAN_FRONTEND=noninteractive
+# Set the working directory in the container
+WORKDIR /app
 
-# 3. Install necessary system dependencies, including Tesseract OCR
+# Set environment variables to prevent accidental buffering of logs
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+
+# Install system dependencies required for libraries like pytesseract
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 4. Set the working directory inside the container
-WORKDIR /app
-
-# 5. Copy and install Python dependencies first (for better layer caching)
+# Copy and install Python dependencies first to leverage Docker cache
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 6. Copy the rest of the application source code into the container
+# Copy the rest of the application source code into the container
 COPY . .
 
-# 7. Make shell scripts executable
+# Make shell scripts executable
 RUN chmod +x ./start_watcher.sh ./run_ui.sh
-
-# 8. Set the default command to run when the container starts.
-# Note: The actual arguments will be overridden by docker-compose.
-CMD ["python3", "watcher_service.py"]
