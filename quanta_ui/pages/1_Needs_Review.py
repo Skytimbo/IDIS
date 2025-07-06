@@ -40,10 +40,13 @@ st.markdown("Assign a context to documents that the system could not categorize 
 def get_db_connection():
     """Create and cache the database connection."""
     try:
-        db_path = os.path.expanduser('~/IDIS_Dell_Scan_Test/idis_db_storage/idis_live_test.db')
+        # Use the environment variable for the DB path, with a fallback for local development
+        db_path = os.getenv("REVIEW_PAGE_DB_PATH", "production_idis.db")
         
-        # Ensure the directory exists
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        # Ensure the directory exists (only if there's a directory path)
+        db_dir = os.path.dirname(db_path)
+        if db_dir:
+            os.makedirs(db_dir, exist_ok=True)
         
         if not os.path.exists(db_path):
             st.error(f"Database not found at {db_path}. Please run the initialization script.")
