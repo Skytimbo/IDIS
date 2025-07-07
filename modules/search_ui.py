@@ -243,6 +243,28 @@ def render_search_ui():
     
     run_search = st.sidebar.button("🔍 Search", type="primary")
 
+    # --- File Upload Section ---
+    st.sidebar.markdown("---")
+    with st.sidebar.expander("➕ Upload New Documents"):
+        uploaded_files = st.file_uploader(
+            "Upload new files to add them to the system.",
+            accept_multiple_files=True,
+            type=['pdf', 'png', 'jpg', 'jpeg', 'txt', 'docx']
+        )
+        
+        if uploaded_files:
+            if st.button("Submit for Processing", type="primary"):
+                watch_folder = "data/scanner_output"
+                os.makedirs(watch_folder, exist_ok=True)
+                
+                with st.spinner("Submitting files..."):
+                    for uploaded_file in uploaded_files:
+                        dest_path = os.path.join(watch_folder, uploaded_file.name)
+                        with open(dest_path, "wb") as f:
+                            f.write(uploaded_file.getvalue())
+                        st.write(f"✅ Submitted {uploaded_file.name}")
+                st.success("All files submitted to the processing pipeline!")
+
     if 'results' not in st.session_state:
         st.session_state.results = None
 
