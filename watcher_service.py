@@ -15,7 +15,7 @@ import logging
 import argparse
 import shutil
 from typing import Dict, List, Optional, Any
-from watchdog.observers import Observer
+from watchdog.observers.polling import PollingObserver as Observer
 from watchdog.events import FileSystemEventHandler
 
 # Import IDIS components

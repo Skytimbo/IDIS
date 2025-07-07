@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Great Fence Restoration Campaign</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            animation: fadeInDown 1s ease;
+        }
+        
+        .title {
+            font-size: 3.5rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            background: linear-gradient(45deg, #ffd700, #ffed4a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .subtitle {
+            font-size: 1.5rem;
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+        
+        .quest-box {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 20px;
+            padding: 30px;
+            margin: 20px 0;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            animation: fadeInUp 1s ease;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .quest-box:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+        }
+        
+        .quest-title {
+            font-size: 2rem;
+            margin-bottom: 15px;
+            color: #ffd700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+        
+        .stat-card {
+            background: rgba(0,0,0,0.2);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            border: 2px solid rgba(255,215,0,0.3);
+            transition: all 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            border-color: #ffd700;
+            transform: scale(1.05);
+        }
+        
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #ffd700;
+            display: block;
+        }
+        
+        .stat-label {
+            font-size: 1.1rem;
+            opacity: 0.9;
+            margin-top: 5px;
+        }
+        
+        .xp-showcase {
+            background: linear-gradient(45deg, #2d5a27, #4a7c59);
+            border-radius: 15px;
+            padding: 25px;
+            margin: 20px 0;
+            border: 2px solid #90EE90;
+        }
+        
+        .level-progression {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .level-badge {
+            background: linear-gradient(45deg, #8B4513, #CD853F);
+            border-radius: 50px;
+            padding: 10px 20px;
+            font-weight: bold;
+            border: 2px solid #DAA520;
+            min-width: 120px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        .level-badge:hover {
+            transform: scale(1.1);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        
+        .rewards-section {
+            background: linear-gradient(45deg, #4a148c, #7b1fa2);
+            border-radius: 15px;
+            padding: 25px;
+            margin: 20px 0;
+            border: 2px solid #ba68c8;
+        }
+        
+        .reward-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .reward-item:last-child {
+            border-bottom: none;
+        }
+        
+        .cta-section {
+            text-align: center;
+            margin: 40px 0;
+            animation: pulse 2s infinite;
+        }
+        
+        .cta-button {
+            background: linear-gradient(45deg, #ff6b6b, #ff8e8e);
+            border: none;
+            border-radius: 50px;
+            padding: 15px 40px;
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 5px 20px rgba(255,107,107,0.4);
+            transition: all 0.3s ease;
+        }
+        
+        .cta-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(255,107,107,0.6);
+        }
+        
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .emoji {
+            font-size: 1.5em;
+        }
+        
+        .highlight {
+            color: #ffd700;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">THE GREAT FENCE RESTORATION CAMPAIGN</h1>
+            <p class="subtitle">A Summer Construction Adventure • Earn Real Money • Level Up Your Skills</p>
+        </div>
+
+        <div class="quest-box">
+            <h2 class="quest-title"><span class="emoji">⚔️</span> THE QUEST AWAITS</h2>
+            <p>Your grandfather's fence has weathered many Alaskan winters, but now it needs heroes to restore it to its former glory. This isn't just manual labor – it's a <span class="highlight">professional project management campaign</span> where you'll earn real money, unlock new skills, and build something that will last for years.</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <span class="stat-number">$750-1250</span>
+                <div class="stat-label">Total Earning Potential<br><em>Each Player</em></div>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number">10+</span>
+                <div class="stat-label">New Skills to Master<br><em>Real-World Abilities</em></div>
+            </div>
+            <div class="stat-card">
+                <span class="stat-number">8-10</span>
+                <div class="stat-label">Weeks of Adventure<br><em>Summer Campaign</em></div>
+            </div>
+        </div>
+
+        <div class="xp-showcase">
+            <h2 class="quest-title"><span class="emoji">⭐</span> XP & PROGRESSION SYSTEM</h2>
+            <p><strong>Every task earns Experience Points that convert to real money!</strong></p>
+            <div class="reward-item">
+                <span>Perfect measurement (within 1/8")</span>
+                <span class="highlight">25 XP = $6.25</span>
+            </div>
+            <div class="reward-item">
+                <span>Problem-solving a tricky repair</span>
+                <span class="highlight">100 XP = $25.00</span>
+            </div>
+            <div class="reward-item">
+                <span>Milestone completed on time</span>
+                <span class="highlight">200 XP = $50.00</span>
+            </div>
+            <div class="reward-item">
+                <span>Perfect safety record bonus</span>
+                <span class="highlight">300 XP = $75.00</span>
+            </div>
+        </div>
+
+        <div class="quest-box">
+            <h2 class="quest-title"><span class="emoji">🎯</span> CHARACTER CLASSES</h2>
+            <div class="level-progression">
+                <div class="level-badge">PROJECT MANAGER<br><small>Timeline & Budget Master</small></div>
+                <div class="level-badge">LEAD CARPENTER<br><small>Tool & Technique Expert</small></div>
+                <div class="level-badge">MATERIALS SPECIALIST<br><small>Resource & Planning Pro</small></div>
+                <div class="level-badge">QUALITY INSPECTOR<br><small>Standards & Safety Guardian</small></div>
+            </div>
+        </div>
+
+        <div class="rewards-section">
+            <h2 class="quest-title"><span class="emoji">🏆</span> UNLOCKABLE REWARDS</h2>
+            <div class="reward-item">
+                <span><strong>Level 3:</strong> Power Tool Access (Supervised)</span>
+                <span class="emoji">🔧</span>
+            </div>
+            <div class="reward-item">
+                <span><strong>Level 5:</strong> Independent Work Periods</span>
+                <span class="emoji">🎖️</span>
+            </div>
+            <div class="reward-item">
+                <span><strong>Level 8:</strong> Master Craftsman Status</span>
+                <span class="emoji">👑</span>
+            </div>
+            <div class="reward-item">
+                <span><strong>Campaign Complete:</strong> Professional Reference Letter</span>
+                <span class="emoji">📜</span>
+            </div>
+        </div>
+
+        <div class="quest-box">
+            <h2 class="quest-title"><span class="emoji">🛠️</span> WHAT YOU'LL MASTER</h2>
+            <p>This isn't just about fixing a fence. You'll learn:</p>
+            <ul style="margin: 15px 0; padding-left: 20px; line-height: 1.8;">
+                <li><strong>Project Management:</strong> Planning, scheduling, budget tracking, risk management</li>
+                <li><strong>Construction Skills:</strong> Power washing, wood repair, staining, post replacement</li>
+                <li><strong>Problem Solving:</strong> Engineering solutions, troubleshooting, creative thinking</li>
+                <li><strong>Business Skills:</strong> Cost analysis, quality control, time management</li>
+                <li><strong>Safety & Quality:</strong> Professional standards, tool maintenance, hazard awareness</li>
+            </ul>
+        </div>
+
+        <div class="cta-section">
+            <button class="cta-button" onclick="showAcceptMessage()">ACCEPT THE QUEST</button>
+            <p style="margin-top: 20px; opacity: 0.9;">Ready to turn summer into an epic adventure that pays?</p>
+        </div>
+    </div>
+
+    <script>
+        function showAcceptMessage() {
+            alert("🎉 QUEST ACCEPTED! 🎉\n\nPrepare for Session Zero: Character Creation & Campaign Planning!\n\nTime to roll for initiative... on fence restoration! 🎲");
+        }
+        
+        // Add some interactive sparkle effects
+        document.addEventListener('mousemove', function(e) {
+            if (Math.random() > 0.9) {
+                createSparkle(e.clientX, e.clientY);
+            }
+        });
+        
+        function createSparkle(x, y) {
+            const sparkle = document.createElement('div');
+            sparkle.style.position = 'fixed';
+            sparkle.style.left = x + 'px';
+            sparkle.style.top = y + 'px';
+            sparkle.style.width = '4px';
+            sparkle.style.height = '4px';
+            sparkle.style.backgroundColor = 'gold';
+            sparkle.style.borderRadius = '50%';
+            sparkle.style.pointerEvents = 'none';
+            sparkle.style.zIndex = '9999';
+            sparkle.style.animation = 'sparkleAnimation 1s ease-out forwards';
+            
+            document.body.appendChild(sparkle);
+            
+            setTimeout(() => {
+                sparkle.remove();
+            }, 1000);
+        }
+        
+        // Add sparkle animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes sparkleAnimation {
+                0% { opacity: 1; transform: scale(0) rotate(0deg); }
+                50% { opacity: 1; transform: scale(1) rotate(180deg); }
+                100% { opacity: 0; transform: scale(0) rotate(360deg); }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>
