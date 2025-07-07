@@ -10,4 +10,6 @@ dependencies = [
     "pytesseract>=0.3.13",
     "python-docx>=1.1.2",
     "weasyprint>=65.1",
+    "streamlit>=1.28.0",
+    "watchdog>=3.0.0",
 ]
