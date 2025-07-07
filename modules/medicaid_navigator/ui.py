@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import os
+import logging
 
 def render_navigator_ui():
     """
@@ -57,14 +58,18 @@ def render_navigator_ui():
     # --- 3. Processing ---
     st.header("3. Process and Prepare Packet")
     if st.button("✨ Analyze My Documents", type="primary", disabled=(not uploaded_files)):
+        logging.info("--- ANALYZE BUTTON CLICKED ---")
+        watch_folder = os.path.join("data", "scanner_output")
+        logging.info(f"Attempting to save to watch folder: {watch_folder}")
+
+        # Create the watch folder if it does not exist
+        os.makedirs(watch_folder, exist_ok=True)
+        
         with st.spinner("Submitting documents to the processing pipeline..."):
-            # Define the path to the main watch folder
-            watch_folder = os.path.join("data", "scanner_output")
-            os.makedirs(watch_folder, exist_ok=True)
-            
             # Save each uploaded file to the watch folder
             for uploaded_file in uploaded_files or []:
                 dest_path = os.path.join(watch_folder, uploaded_file.name)
+                logging.info(f"Saving '{uploaded_file.name}' to '{dest_path}'")
                 with open(dest_path, "wb") as f:
                     f.write(uploaded_file.getvalue())
                 st.write(f"✅ Submitted {uploaded_file.name} for processing.")
