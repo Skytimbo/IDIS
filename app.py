@@ -5,6 +5,15 @@ document intelligence modules. It uses a sidebar to switch between different too
 """
 
 import streamlit as st
+
+# --- Page Configuration (Must be first Streamlit command) ---
+st.set_page_config(
+    page_title="QuantaIQ Intelligence Platform",
+    page_icon="🧠",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 import os
 import sys
 
@@ -13,14 +22,6 @@ import sys
 from modules.search_ui import render_search_ui
 from modules.medicaid_navigator.ui import render_navigator_ui
 from quanta_ui.pages.needs_review_ui import render_needs_review_page
-
-# --- Page Configuration ---
-st.set_page_config(
-    page_title="QuantaIQ Intelligence Platform",
-    page_icon="🧠",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
 
 # --- Main Application Router ---
 def main():

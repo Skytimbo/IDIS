@@ -2,11 +2,7 @@
 
 import streamlit as st
 
-st.set_page_config(
-    page_title="QuantaIQ Home",
-    page_icon="🧠",
-    layout="wide"
-)
+# Note: set_page_config() is now handled by the main app.py router
 
 st.title("Welcome to QuantaIQ / IDIS 🧠")
 st.header("The Intelligent Document Insight System")

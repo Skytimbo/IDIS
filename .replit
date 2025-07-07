@@ -38,15 +38,15 @@ args = "Production Watcher Service"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "QuantaIQ UI - Production"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "QuantaIQ UI - Search Test"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
 args = "Run Main App (Correct Paths)"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "QuantaIQ UI - Main App"
 
 [[workflows.workflow]]
 name = "Run Context Store Tests"
@@ -97,15 +97,6 @@ task = "shell.exec"
 args = "./start_production_watcher.sh"
 
 [[workflows.workflow]]
-name = "QuantaIQ UI - Production"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd quanta_ui && echo \"\" | streamlit run app.py --server.port 5000 --server.address 0.0.0.0 --server.enableCORS false --server.enableWebsocketCompression false"
-waitForPort = 5000
-
-[[workflows.workflow]]
 name = "QuantaIQ UI - Search Test"
 author = "agent"
 
@@ -121,6 +112,15 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0 -- --database-path production_idis.db --archive-path data/idis_archive"
+waitForPort = 5000
+
+[[workflows.workflow]]
+name = "QuantaIQ UI - Main App"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0 --server.enableCORS false --server.enableWebsocketCompression false"
 waitForPort = 5000
 
 [deployment]
