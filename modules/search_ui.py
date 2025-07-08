@@ -247,7 +247,7 @@ def render_search_ui():
     st.markdown("*Intelligent Document Insight System - Cognitive Interface*")
 
     st.sidebar.header("🔧 Search Filters")
-    search_term = st.sidebar.text_input("Search Document Content", key="search_term_input")
+    search_term = st.sidebar.text_input("Search Document Content")
     selected_types = st.sidebar.multiselect("Document Type", options=get_document_types())
     issuer_filter = st.sidebar.text_input("Issuer / Source")
     tags_filter = st.sidebar.text_input("Tags (comma-separated)")
@@ -298,7 +298,7 @@ def render_search_ui():
             st.write(f"Debug: Params = {params}")  # Debug output
             st.session_state.results = pd.read_sql_query(query, conn, params=params)
             # Store search term for highlighting
-            st.session_state.search_term_input = search_term
+            st.session_state.current_search_term = search_term
         except Exception as e:
             st.error(f"Search error: {str(e)}")
             st.session_state.results = None
@@ -390,7 +390,7 @@ def render_search_ui():
                     full_text = str(row['full_text']) if pd.notna(row['full_text']) else ""
                     
                     # Get the search term for highlighting
-                    search_term = st.session_state.get('search_term_input', '')
+                    search_term = st.session_state.get('current_search_term', '')
                     
                     if search_term and search_term.strip():
                         # Replacement style now includes 'color: black;' for dark mode visibility
