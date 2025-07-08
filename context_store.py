@@ -956,9 +956,16 @@ class ContextStore:
         to test if CodeRabbit properly flags security issues in code reviews.
         
         WARNING: This function should NEVER be used in production!
+        
+        TESTING NOTE: This insecure code was intentionally added to verify
+        that CodeRabbit's "Assertive" profile mode can detect and flag
+        security vulnerabilities in automated code reviews. The function
+        demonstrates multiple security anti-patterns that should trigger
+        warnings in any competent security analysis tool.
         """
         # SECURITY VULNERABILITY: Direct string concatenation into SQL query
         # This allows SQL injection attacks through user_input parameter
+        # Example malicious input: "'; DROP TABLE documents; --"
         vulnerable_query = f"SELECT * FROM documents WHERE file_name = '{user_input}'"
         
         try:

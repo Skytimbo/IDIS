@@ -1,0 +1,8 @@
+Test: Enhanced security vulnerability function for CodeRabbit testing
+
+- Added comprehensive documentation to test_security_function() explaining testing purpose
+- Included example of malicious SQL injection input for vulnerability demonstration
+- Function intentionally bypasses parameterized queries to test CodeRabbit's assertive review mode
+- Should trigger security warnings in automated code review process
+
+This commit tests CodeRabbit's "Assertive" profile ability to detect SQL injection vulnerabilities.
