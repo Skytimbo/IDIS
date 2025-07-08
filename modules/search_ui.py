@@ -218,7 +218,10 @@ def get_enhanced_document_type(extracted_data: Optional[str], document_type: Opt
         try:
             data = json.loads(extracted_data)
             cognitive_type = data.get('document_type')
-            if cognitive_type and cognitive_type.strip():
+            # Handle both string and dict types for document_type
+            if isinstance(cognitive_type, dict):
+                cognitive_type = cognitive_type.get('predicted_type') or cognitive_type.get('name')
+            if cognitive_type and isinstance(cognitive_type, str) and cognitive_type.strip():
                 return cognitive_type
         except (json.JSONDecodeError, TypeError):
             pass
@@ -247,7 +250,12 @@ def render_search_ui():
     st.markdown("*Intelligent Document Insight System - Cognitive Interface*")
 
     st.sidebar.header("🔧 Search Filters")
-    search_term = st.sidebar.text_input("Search Document Content")
+    
+    # Initialize session state for search term if not exists
+    if 'search_input' not in st.session_state:
+        st.session_state.search_input = ""
+    
+    search_term = st.sidebar.text_input("Search Document Content", value=st.session_state.search_input, key="search_input")
     selected_types = st.sidebar.multiselect("Document Type", options=get_document_types())
     issuer_filter = st.sidebar.text_input("Issuer / Source")
     tags_filter = st.sidebar.text_input("Tags (comma-separated)")
