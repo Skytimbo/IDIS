@@ -40,14 +40,14 @@ def initialize_app_config():
     # This makes the app runnable with just `streamlit run app.py`
     if not db_path_arg:
         project_root = os.getcwd()
-        default_db_path = os.path.join(project_root, 'data', 'idis_db_storage', 'idis.db')
-        st.warning(f"Using default database path: {default_db_path}")
+        default_db_path = os.path.join(project_root, 'production_idis.db')
+        # Don't show warning at module import time - this breaks the UI
         db_path_arg = default_db_path
 
     if not archive_path_arg:
         project_root = os.getcwd()
         default_archive_path = os.path.join(project_root, 'data', 'idis_archive')
-        st.warning(f"Using default archive path: {default_archive_path}")
+        # Don't show warning at module import time - this breaks the UI
         archive_path_arg = default_archive_path
 
     return db_path_arg, archive_path_arg
