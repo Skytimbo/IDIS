@@ -81,17 +81,17 @@ def build_search_query(search_term, doc_types, issuer_filter, tags_filter, after
     params = []
 
     if search_term:
-        query_parts.append("AND full_text LIKE ?")
+        query_parts.append("AND full_text LIKE ? COLLATE NOCASE")
         params.append(f"%{search_term}%")
     if doc_types:
         placeholders = ",".join(["?" for _ in doc_types])
         query_parts.append(f"AND document_type IN ({placeholders})")
         params.extend(doc_types)
     if issuer_filter:
-        query_parts.append("AND issuer_source LIKE ?")
+        query_parts.append("AND issuer_source LIKE ? COLLATE NOCASE")
         params.append(f"%{issuer_filter}%")
     if tags_filter:
-        query_parts.append("AND tags_extracted LIKE ?")
+        query_parts.append("AND tags_extracted LIKE ? COLLATE NOCASE")
         params.append(f"%{tags_filter}%")
     if after_date:
         query_parts.append("AND date(upload_timestamp) >= ?")
@@ -322,9 +322,18 @@ def render_search_ui():
         try:
             conn = get_database_connection()
             query, params = build_search_query(search_term, selected_types, issuer_filter, tags_filter, after_date, before_date)
+            
+            # Debug information
+            st.write(f"**Debug Info:**")
+            st.write(f"Search term: '{search_term}'")
+            st.write(f"Query: {query}")
+            st.write(f"Parameters: {params}")
+            
             st.session_state.results = pd.read_sql_query(query, conn, params=params)
             # Store search term for highlighting
             st.session_state.search_term = search_term
+            
+            st.write(f"**Results found:** {len(st.session_state.results)}")
         except Exception as e:
             st.error(f"Search error: {str(e)}")
             st.session_state.results = None
