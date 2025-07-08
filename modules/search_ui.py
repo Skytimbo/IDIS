@@ -251,8 +251,8 @@ def render_search_ui():
 
     st.sidebar.header("🔧 Search Filters")
     
-    # Use a simple text input without session state conflicts
-    search_term = st.sidebar.text_input("Search Document Content", placeholder="Enter search terms...")
+    # Simple text input without session state conflicts
+    search_term = st.sidebar.text_input("Search Document Content", key="search_text")
     selected_types = st.sidebar.multiselect("Document Type", options=get_document_types())
     issuer_filter = st.sidebar.text_input("Issuer / Source")
     tags_filter = st.sidebar.text_input("Tags (comma-separated)")
@@ -267,6 +267,7 @@ def render_search_ui():
     if before_date == today:
         before_date = None
     
+    # Simple button that triggers search when clicked
     run_search = st.sidebar.button("🔍 Search", type="primary")
 
     # --- File Upload Section ---
@@ -291,20 +292,18 @@ def render_search_ui():
                         st.write(f"✅ Submitted {uploaded_file.name}")
                 st.success("All files submitted to the processing pipeline!")
 
+    # Initialize results if not present
     if 'results' not in st.session_state:
         st.session_state.results = None
-    
-    # Only show results if search was actually performed
-    if st.session_state.results is None:
-        st.info("👆 Use the filters in the sidebar and click Search to find documents.")
 
+    # Execute search when button is clicked
     if run_search:
         try:
             conn = get_database_connection()
             query, params = build_search_query(search_term, selected_types, issuer_filter, tags_filter, after_date, before_date)
             st.session_state.results = pd.read_sql_query(query, conn, params=params)
             # Store search term for highlighting
-            st.session_state.current_search_term = search_term
+            st.session_state.search_term = search_term
         except Exception as e:
             st.error(f"Search error: {str(e)}")
             st.session_state.results = None
@@ -396,7 +395,7 @@ def render_search_ui():
                     full_text = str(row['full_text']) if pd.notna(row['full_text']) else ""
                     
                     # Get the search term for highlighting
-                    search_term = st.session_state.get('current_search_term', '')
+                    search_term = st.session_state.get('search_term', '')
                     
                     if search_term and search_term.strip():
                         # Replacement style now includes 'color: black;' for dark mode visibility
