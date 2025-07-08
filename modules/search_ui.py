@@ -282,11 +282,18 @@ def render_search_ui():
         st.session_state.results = None
 
     if run_search:
-        conn = get_database_connection()
-        query, params = build_search_query(search_term, selected_types, issuer_filter, tags_filter, after_date, before_date)
-        st.session_state.results = pd.read_sql_query(query, conn, params=params)
-        # Store search term for highlighting
-        st.session_state.search_term_input = search_term
+        try:
+            conn = get_database_connection()
+            query, params = build_search_query(search_term, selected_types, issuer_filter, tags_filter, after_date, before_date)
+            st.write(f"Debug: Search term = '{search_term}'")  # Debug output
+            st.write(f"Debug: Query = {query}")  # Debug output
+            st.write(f"Debug: Params = {params}")  # Debug output
+            st.session_state.results = pd.read_sql_query(query, conn, params=params)
+            # Store search term for highlighting
+            st.session_state.search_term_input = search_term
+        except Exception as e:
+            st.error(f"Search error: {str(e)}")
+            st.session_state.results = None
 
     if st.session_state.results is not None:
         results_df = st.session_state.results
