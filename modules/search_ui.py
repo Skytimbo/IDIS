@@ -251,11 +251,8 @@ def render_search_ui():
 
     st.sidebar.header("🔧 Search Filters")
     
-    # Initialize session state for search term if not exists
-    if 'search_input' not in st.session_state:
-        st.session_state.search_input = ""
-    
-    search_term = st.sidebar.text_input("Search Document Content", value=st.session_state.search_input, key="search_input")
+    # Use a simple text input without session state conflicts
+    search_term = st.sidebar.text_input("Search Document Content", placeholder="Enter search terms...")
     selected_types = st.sidebar.multiselect("Document Type", options=get_document_types())
     issuer_filter = st.sidebar.text_input("Issuer / Source")
     tags_filter = st.sidebar.text_input("Tags (comma-separated)")
@@ -298,7 +295,7 @@ def render_search_ui():
         st.session_state.results = None
     
     # Only show results if search was actually performed
-    if not run_search and st.session_state.results is None:
+    if st.session_state.results is None:
         st.info("👆 Use the filters in the sidebar and click Search to find documents.")
 
     if run_search:
