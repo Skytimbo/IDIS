@@ -77,36 +77,40 @@ def get_document_types() -> List[str]:
 
 def parse_boolean_search(search_term: str) -> Tuple[str, List[str]]:
     """Parse boolean search terms and convert to SQL WHERE clause."""
-    if not search_term:
+    if not search_term or not search_term.strip():
         return "", []
     
-    # Handle boolean operators
-    if " AND " in search_term.upper():
-        terms = [term.strip() for term in search_term.split(" AND ")]
-        conditions = []
-        params = []
-        for term in terms:
-            conditions.append("full_text LIKE ? COLLATE NOCASE")
-            params.append(f"%{term}%")
-        return f"({' AND '.join(conditions)})", params
+    search_term = search_term.strip()
     
-    elif " OR " in search_term.upper():
-        terms = [term.strip() for term in search_term.split(" OR ")]
-        conditions = []
-        params = []
-        for term in terms:
-            conditions.append("full_text LIKE ? COLLATE NOCASE")
-            params.append(f"%{term}%")
-        return f"({' OR '.join(conditions)})", params
+    # Handle boolean operators - check for exact matches with spaces
+    if " AND " in search_term:
+        terms = [term.strip() for term in search_term.split(" AND ") if term.strip()]
+        if len(terms) > 1:
+            conditions = []
+            params = []
+            for term in terms:
+                conditions.append("full_text LIKE ? COLLATE NOCASE")
+                params.append(f"%{term}%")
+            return f"({' AND '.join(conditions)})", params
     
-    elif " NOT " in search_term.upper():
-        parts = search_term.split(" NOT ")
+    elif " OR " in search_term:
+        terms = [term.strip() for term in search_term.split(" OR ") if term.strip()]
+        if len(terms) > 1:
+            conditions = []
+            params = []
+            for term in terms:
+                conditions.append("full_text LIKE ? COLLATE NOCASE")
+                params.append(f"%{term}%")
+            return f"({' OR '.join(conditions)})", params
+    
+    elif " NOT " in search_term:
+        parts = [part.strip() for part in search_term.split(" NOT ") if part.strip()]
         if len(parts) == 2:
-            include_term = parts[0].strip()
-            exclude_term = parts[1].strip()
+            include_term = parts[0]
+            exclude_term = parts[1]
             return "(full_text LIKE ? COLLATE NOCASE AND full_text NOT LIKE ? COLLATE NOCASE)", [f"%{include_term}%", f"%{exclude_term}%"]
     
-    # Default single term search
+    # Default single term search - this should always work for simple terms
     return "full_text LIKE ? COLLATE NOCASE", [f"%{search_term}%"]
 
 def build_search_query(search_term, doc_types, issuer_filter, tags_filter, after_date, before_date) -> Tuple[str, List[Any]]:
@@ -369,9 +373,18 @@ def render_search_ui():
         try:
             conn = get_database_connection()
             query, params = build_search_query(search_term, selected_types, issuer_filter, tags_filter, after_date, before_date)
+            
+            # Debug information
+            st.write(f"**Debug Info:**")
+            st.write(f"Raw search term: '{search_term}'")
+            st.write(f"Query: {query}")
+            st.write(f"Parameters: {params}")
+            
             st.session_state.results = pd.read_sql_query(query, conn, params=params)
             # Store search term for highlighting
             st.session_state.search_term = search_term
+            
+            st.write(f"**Results found:** {len(st.session_state.results)}")
         except Exception as e:
             st.error(f"Search error: {str(e)}")
             st.session_state.results = None
