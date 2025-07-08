@@ -322,18 +322,9 @@ def render_search_ui():
         try:
             conn = get_database_connection()
             query, params = build_search_query(search_term, selected_types, issuer_filter, tags_filter, after_date, before_date)
-            
-            # Debug information
-            st.write(f"**Debug Info:**")
-            st.write(f"Search term: '{search_term}'")
-            st.write(f"Query: {query}")
-            st.write(f"Parameters: {params}")
-            
             st.session_state.results = pd.read_sql_query(query, conn, params=params)
             # Store search term for highlighting
             st.session_state.search_term = search_term
-            
-            st.write(f"**Results found:** {len(st.session_state.results)}")
         except Exception as e:
             st.error(f"Search error: {str(e)}")
             st.session_state.results = None
