@@ -250,9 +250,11 @@ def render_search_ui():
     st.markdown("*Intelligent Document Insight System - Cognitive Interface*")
 
     # Clear session state button for debugging
-    if st.button("🔄 Reset Session State"):
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
+    if st.button("🔄 Clear Search Results"):
+        if 'results' in st.session_state:
+            del st.session_state['results']
+        if 'search_term' in st.session_state:
+            del st.session_state['search_term']
         st.rerun()
 
     # Alternative approach - move everything to main area and use columns
@@ -264,8 +266,8 @@ def render_search_ui():
         # Use working text area method
         search_term = st.text_area("Search Document Content", height=100, placeholder="Enter search terms here (e.g., payslip, utility bill)...")
         
-        # Additional filters in expandable section
-        with st.expander("Advanced Filters"):
+        # Additional filters - expanded by default for better accessibility
+        with st.expander("Advanced Filters", expanded=True):
             selected_types = st.multiselect("Document Type", options=get_document_types())
             issuer_filter = st.text_area("Issuer / Source", height=60, placeholder="Enter issuer or source organization...")
             tags_filter = st.text_area("Tags (comma-separated)", height=60, placeholder="Enter tags separated by commas...")
