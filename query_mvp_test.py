@@ -30,7 +30,7 @@ def query_mvp_payslip():
             upload_timestamp,
             last_modified_timestamp
         FROM documents 
-        WHERE file_name = 'mvp_payslip.txt'
+        WHERE file_name LIKE 'mvp_payslip%'
         ORDER BY id DESC 
         LIMIT 1
         """

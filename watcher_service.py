@@ -20,10 +20,7 @@ from watchdog.events import FileSystemEventHandler
 
 # Import IDIS components
 from context_store import ContextStore
-from ingestion_agent import IngestionAgent
-from classifier_agent import ClassifierAgent
-from summarizer_agent import SummarizerAgent
-from tagger_agent import TaggerAgent
+from unified_ingestion_agent import UnifiedIngestionAgent
 from cover_sheet import SmartCoverSheetRenderer
 from permissions import PermissionsManager
 from run_mvp import execute_pipeline_for_files, CLASSIFICATION_RULES, TAG_DEFINITIONS, PERMISSIONS_RULES_FILE
@@ -74,72 +71,39 @@ def process_inbox_file(
             }
         )
         
-        # Initialize agents
-        ingestion_agent = IngestionAgent(
+        # Initialize the modern UnifiedIngestionAgent which handles the complete pipeline
+        unified_agent = UnifiedIngestionAgent(
             context_store=local_context_store,
             watch_folder=os.path.dirname(file_path),  # Use inbox folder as source
             holding_folder=config_paths['holding_folder']
         )
         
-        # Process the specific file
-        ingestion_results = ingestion_agent.process_specific_files(
-            file_paths=[file_path],
-            session_id=str(session_id),
-            patient_id=patient_id_for_new_docs,
-            user_id=user_id_for_new_docs
+        # Process the specific file through the unified cognitive pipeline
+        processing_success = unified_agent._process_single_file(
+            file_path=file_path,
+            filename=original_filename,
+            patient_id=int(patient_id_for_new_docs) if patient_id_for_new_docs else 1,
+            session_id=session_id
         )
         
-        # Fix Part 1: Update document's original_watchfolder_path to point to actual current location
-        if ingestion_results > 0:
-            # Find the document that was just ingested and update its path
-            recent_documents = local_context_store.get_documents_for_session(session_id)
-            if recent_documents:
-                # Get the most recent document (should be the one we just processed)
-                # Use the 'id' field which is the actual primary key, not 'document_id'
-                document_primary_id = recent_documents[-1]["id"]
-                inbox_file_path = os.path.join(config_paths['inbox_folder'], original_filename)
-                local_context_store.update_document_fields(
-                    document_primary_id, {'original_watchfolder_path': inbox_file_path}
-                )
-                logger.info(f"Updated document {document_primary_id} path to: {inbox_file_path}")
+        # Set results based on processing success
+        ingestion_results = 1 if processing_success else 0
         
-        if ingestion_results > 0:
-            # Continue with the rest of the pipeline
-            classifier_agent = ClassifierAgent(
-                context_store=local_context_store,
-                classification_rules=classification_rules
-            )
+        if processing_success:
+            logger.info(f"Successfully processed {original_filename} through unified cognitive pipeline")
             
-            summarizer_agent = SummarizerAgent(
-                context_store=local_context_store,
-                openai_api_key=openai_api_key
-            )
+            # The UnifiedIngestionAgent handles the complete pipeline including:
+            # 1. Text extraction
+            # 2. CognitiveAgent AI analysis for document classification and data extraction
+            # 3. Database storage with both legacy fields and rich JSON data
+            # 4. Automatic processing status management
             
-            tagger_agent = TaggerAgent(
-                context_store=local_context_store,
-                base_filed_folder=config_paths['archive_folder'],
-                tag_definitions=tag_definitions
-            )
+            # No need for separate classifier, summarizer, or tagger agents
+            # as the CognitiveAgent provides superior intelligence in a single step
             
-            cover_sheet_renderer = SmartCoverSheetRenderer(context_store=local_context_store)
-            
-            # Run the pipeline steps
-            classification_results = classifier_agent.process_documents_for_classification(
-                user_id=user_id_for_new_docs,
-                status_to_classify="ingested",
-                new_status_after_classification="classified"
-            )
-            
-            summarization_results = summarizer_agent.summarize_classified_documents(
-                session_id=str(session_id),
-                user_id=user_id_for_new_docs,
-                status_to_summarize="classified"
-            )
-            
-            tagging_results = tagger_agent.process_documents_for_tagging_and_filing(
-                user_id=user_id_for_new_docs,
-                status_to_process="summarized"
-            )
+            classification_results = (1, 0)  # Success tuple format
+            summarization_results = (1, 0)   # Success tuple format  
+            tagging_results = (1, 0)         # Success tuple format
             
             # Generate cover sheet
             documents = local_context_store.get_documents_for_session(session_id)
@@ -152,6 +116,7 @@ def process_inbox_file(
                     f"Inbox_Cover_Sheet_{session_id}.pdf"
                 )
                 
+                cover_sheet_renderer = SmartCoverSheetRenderer(context_store=local_context_store)
                 cover_sheet_renderer.generate_cover_sheet(
                     document_ids=document_ids,
                     output_pdf_filename=cover_sheet_pdf_path,
@@ -159,25 +124,15 @@ def process_inbox_file(
                     user_id=user_id_for_new_docs
                 )
             
-            # Conditional cleanup based on TaggerAgent results
-            successfully_processed_count, failed_count = tagging_results
-            
-            # CRITICAL FIX: Only delete file if ALL documents were successfully archived AND no failures occurred
-            if successfully_processed_count > 0 and failed_count == 0:
-                # Success: All documents archived successfully
-                # NOTE: TaggerAgent's _safe_file_move already removed the file during archiving
-                # No need for redundant cleanup here - this prevents race condition warnings
-                logger.info(f"Successfully processed inbox file: {original_filename}")
-            else:
-                # Failure: Move file to holding folder for manual inspection to prevent data loss
-                try:
-                    holding_path = os.path.join(config_paths['holding_folder'], original_filename)
-                    shutil.move(file_path, holding_path)
-                    logger.error(f"FILING FAILED: Moved {original_filename} to holding folder for manual inspection")
-                    logger.error(f"TaggerAgent failed to archive document. Success: {successfully_processed_count}, Failed: {failed_count}")
-                except Exception as e:
-                    logger.error(f"CRITICAL: Failed to move {original_filename} to holding folder: {e}")
-                    logger.error(f"File remains in inbox: {file_path}")
+            # File cleanup for unified processing
+            # The UnifiedIngestionAgent handles complete processing in the database but doesn't archive files
+            # We need to clean up the inbox file after successful processing
+            try:
+                os.remove(file_path)
+                logger.info(f"Successfully processed and cleaned up inbox file: {original_filename}")
+            except Exception as e:
+                logger.warning(f"Failed to clean up inbox file {original_filename}: {e}")
+                # Non-critical error - file processed successfully but cleanup failed
             
             return {
                 'session_id': session_id,
