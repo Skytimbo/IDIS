@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  idis_watcher:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: idis_watcher
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LOGGING_LEVEL=INFO
+    volumes:
+      - ./data:/app/data
+      - ./demo_watch:/app/demo_watch
+      - ./demo_inbox:/app/demo_inbox
+      - ./demo_holding:/app/demo_holding
+      - ./demo_archive:/app/demo_archive
+      - ./demo_coversheets:/app/demo_coversheets
+      - ./production_idis.db:/app/production_idis.db
+    command: >
+      python watcher_service.py
+      --watch-folder /app/data/scanner_output
+      --inbox-folder /app/data/inbox
+      --holding-folder /app/data/holding
+      --archive-folder /app/data/archive
+      --cover-sheets-folder /app/data/coversheets
+      --db-path /app/production_idis.db
+      --openai
+    restart: unless-stopped
+    depends_on:
+      - idis_ui
+
+  idis_ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: idis_ui
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./data:/app/data
+      - ./production_idis.db:/app/production_idis.db
+    ports:
+      - "8501:8501"
+    command: >
+      /usr/local/bin/streamlit run app.py
+      --server.port 8501
+      --server.address 0.0.0.0
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  data:
+    driver: local
+  database:
+    driver: local

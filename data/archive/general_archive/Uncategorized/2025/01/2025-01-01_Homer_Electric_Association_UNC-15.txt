@@ -1,0 +1,24 @@
+ALASKA MEDICAID PAYSLIP
+Employee Name: John Smith
+Employee ID: 12345
+Pay Period: 01/01/2025 - 01/15/2025
+Issue Date: 01/16/2025
+
+EARNINGS:
+Regular Hours: 80.00 @ $18.50 = $1,480.00
+Overtime Hours: 5.00 @ $27.75 = $138.75
+Total Gross Pay: $1,618.75
+
+DEDUCTIONS:
+Federal Tax: $194.25
+State Tax: $81.17
+Social Security: $100.36
+Medicare: $23.47
+Alaska Medicaid Premium: $45.00
+Total Deductions: $444.25
+
+NET PAY: $1,174.50
+
+Employer: Alaska Department of Health & Social Services
+Address: 350 Main Street, Anchorage, AK 99501
+Phone: (907) 465-3030

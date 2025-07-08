@@ -2,7 +2,7 @@ modules = ["python-3.11", "postgresql-16"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["bash", "cacert", "cargo", "fontconfig", "freetype", "ghostscript", "glib", "glibcLocales", "gumbo", "harfbuzz", "jbig2dec", "lcms2", "libffi", "libiconv", "libimagequant", "libjpeg", "libjpeg_turbo", "libtiff", "libwebp", "libxcrypt", "mupdf", "nano", "openjpeg", "pango", "pkg-config", "rustc", "swig", "tcl", "tesseract", "tk", "xcbuild", "xcodebuild", "zlib"]
+packages = ["bash", "cacert", "cargo", "fontconfig", "freetype", "ghostscript", "glib", "glibcLocales", "gumbo", "harfbuzz", "jbig2dec", "lcms2", "libffi", "libiconv", "libimagequant", "libjpeg", "libjpeg_turbo", "libtiff", "libwebp", "libxcrypt", "mupdf", "nano", "openjpeg", "pango", "pkg-config", "rustc", "swig", "tcl", "tesseract", "tk", "xcbuild", "xcodebuild", "zlib", "docker-compose_1", "docker", "docker-compose"]
 
 [workflows]
 runButton = "Project"
@@ -34,19 +34,15 @@ args = "Run Watcher Service Demo"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Production Watcher Service"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "QuantaIQ UI - Search Test"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "Run Main App (Correct Paths)"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "QuantaIQ UI - Main App"
+args = "Production Watcher Service"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Test Search Input Fixed"
 
 [[workflows.workflow]]
 name = "Run Context Store Tests"
@@ -89,23 +85,6 @@ task = "shell.exec"
 args = "python watcher_service.py --watch-folder ./demo_watch --inbox-folder ./demo_inbox --holding-folder ./demo_holding --archive-folder ./demo_archive --cover-sheets-folder ./demo_coversheets --db-path ./watcher_demo.db --openai"
 
 [[workflows.workflow]]
-name = "Production Watcher Service"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "./start_production_watcher.sh"
-
-[[workflows.workflow]]
-name = "QuantaIQ UI - Search Test"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd modules && streamlit run search_ui.py --server.port 5000 --server.address 0.0.0.0 --server.enableCORS false --server.enableWebsocketCompression false"
-waitForPort = 5000
-
-[[workflows.workflow]]
 name = "Run Main App (Correct Paths)"
 author = "agent"
 
@@ -115,13 +94,21 @@ args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0 -- --da
 waitForPort = 5000
 
 [[workflows.workflow]]
-name = "QuantaIQ UI - Main App"
+name = "Production Watcher Service"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0 --server.enableCORS false --server.enableWebsocketCompression false"
-waitForPort = 5000
+args = "./start_production_watcher.sh"
+
+[[workflows.workflow]]
+name = "Test Search Input Fixed"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "streamlit run test_search_input.py --server.port 5001 --server.address 0.0.0.0"
+waitForPort = 5001
 
 [deployment]
 run = ["sh", "-c", "python -m unittest discover tests"]
@@ -130,6 +117,10 @@ deploymentTarget = "cloudrun"
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 5001
+externalPort = 3001
 
 [[ports]]
 localPort = 8501

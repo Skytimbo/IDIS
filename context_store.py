@@ -682,12 +682,20 @@ class ContextStore:
                 # Add document_id field for backward compatibility
                 doc['document_id'] = doc['id']
                 
-                # Parse JSON fields
+                # Parse JSON fields with error handling
                 if doc.get('document_dates'):
-                    doc['document_dates'] = json.loads(doc['document_dates'])
+                    try:
+                        doc['document_dates'] = json.loads(doc['document_dates'])
+                    except (json.JSONDecodeError, TypeError):
+                        # If JSON parsing fails, treat as plain text
+                        doc['document_dates'] = doc['document_dates']
                 
                 if doc.get('tags_extracted'):
-                    doc['tags_extracted'] = json.loads(doc['tags_extracted'])
+                    try:
+                        doc['tags_extracted'] = json.loads(doc['tags_extracted'])
+                    except (json.JSONDecodeError, TypeError):
+                        # If JSON parsing fails, treat as plain text
+                        doc['tags_extracted'] = doc['tags_extracted']
                 
                 result.append(doc)
             

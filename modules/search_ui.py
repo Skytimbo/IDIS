@@ -40,14 +40,14 @@ def initialize_app_config():
     # This makes the app runnable with just `streamlit run app.py`
     if not db_path_arg:
         project_root = os.getcwd()
-        default_db_path = os.path.join(project_root, 'data', 'idis_db_storage', 'idis.db')
-        st.warning(f"Using default database path: {default_db_path}")
+        default_db_path = os.path.join(project_root, 'production_idis.db')
+        # Don't show warning at module import time - this breaks the UI
         db_path_arg = default_db_path
 
     if not archive_path_arg:
         project_root = os.getcwd()
         default_archive_path = os.path.join(project_root, 'data', 'idis_archive')
-        st.warning(f"Using default archive path: {default_archive_path}")
+        # Don't show warning at module import time - this breaks the UI
         archive_path_arg = default_archive_path
 
     return db_path_arg, archive_path_arg
@@ -75,23 +75,65 @@ def get_document_types() -> List[str]:
         st.error(f"Error fetching document types: {str(e)}")
         return []
 
+def parse_boolean_search(search_term: str) -> Tuple[str, List[str]]:
+    """Parse boolean search terms and convert to SQL WHERE clause."""
+    if not search_term or not search_term.strip():
+        return "", []
+    
+    search_term = search_term.strip()
+    import re
+    
+    # Handle OR operator (case-insensitive)
+    if re.search(r'\s+or\s+', search_term, re.IGNORECASE):
+        terms = [term.strip() for term in re.split(r'\s+or\s+', search_term, flags=re.IGNORECASE) if term.strip()]
+        if len(terms) > 1:
+            conditions = []
+            params = []
+            for term in terms:
+                conditions.append("full_text LIKE ? COLLATE NOCASE")
+                params.append(f"%{term}%")
+            return f"({' OR '.join(conditions)})", params
+    
+    # Handle AND operator (case-insensitive)
+    elif re.search(r'\s+and\s+', search_term, re.IGNORECASE):
+        terms = [term.strip() for term in re.split(r'\s+and\s+', search_term, flags=re.IGNORECASE) if term.strip()]
+        if len(terms) > 1:
+            conditions = []
+            params = []
+            for term in terms:
+                conditions.append("full_text LIKE ? COLLATE NOCASE")
+                params.append(f"%{term}%")
+            return f"({' AND '.join(conditions)})", params
+    
+    # Handle NOT operator (case-insensitive)
+    elif re.search(r'\s+not\s+', search_term, re.IGNORECASE):
+        parts = [part.strip() for part in re.split(r'\s+not\s+', search_term, flags=re.IGNORECASE) if part.strip()]
+        if len(parts) == 2:
+            include_term = parts[0]
+            exclude_term = parts[1]
+            return "(full_text LIKE ? COLLATE NOCASE AND full_text NOT LIKE ? COLLATE NOCASE)", [f"%{include_term}%", f"%{exclude_term}%"]
+    
+    # Default single term search - this should always work for simple terms
+    return "full_text LIKE ? COLLATE NOCASE", [f"%{search_term}%"]
+
 def build_search_query(search_term, doc_types, issuer_filter, tags_filter, after_date, before_date) -> Tuple[str, List[Any]]:
     """Build the SQL query and parameters for searching documents."""
     query_parts = ["SELECT document_id, file_name, document_type, upload_timestamp, issuer_source, filed_path, full_text, document_dates, tags_extracted, extracted_data FROM documents WHERE 1=1"]
     params = []
 
     if search_term:
-        query_parts.append("AND full_text LIKE ?")
-        params.append(f"%{search_term}%")
+        search_condition, search_params = parse_boolean_search(search_term)
+        query_parts.append(f"AND {search_condition}")
+        params.extend(search_params)
     if doc_types:
         placeholders = ",".join(["?" for _ in doc_types])
         query_parts.append(f"AND document_type IN ({placeholders})")
         params.extend(doc_types)
     if issuer_filter:
-        query_parts.append("AND issuer_source LIKE ?")
+        query_parts.append("AND issuer_source LIKE ? COLLATE NOCASE")
         params.append(f"%{issuer_filter}%")
     if tags_filter:
-        query_parts.append("AND tags_extracted LIKE ?")
+        query_parts.append("AND tags_extracted LIKE ? COLLATE NOCASE")
         params.append(f"%{tags_filter}%")
     if after_date:
         query_parts.append("AND date(upload_timestamp) >= ?")
@@ -212,6 +254,22 @@ def get_enhanced_tags(extracted_data: Optional[str], tags_extracted: Optional[st
     
     return format_json_display(tags_extracted, 'None')
 
+def get_enhanced_document_type(extracted_data: Optional[str], document_type: Optional[str]) -> str:
+    """Get document type from CognitiveAgent data or fallback to legacy column."""
+    if extracted_data:
+        try:
+            data = json.loads(extracted_data)
+            cognitive_type = data.get('document_type')
+            # Handle both string and dict types for document_type
+            if isinstance(cognitive_type, dict):
+                cognitive_type = cognitive_type.get('predicted_type') or cognitive_type.get('name')
+            if cognitive_type and isinstance(cognitive_type, str) and cognitive_type.strip():
+                return cognitive_type
+        except (json.JSONDecodeError, TypeError):
+            pass
+    
+    return document_type or "N/A"
+
 # --- UI Helper Functions ---
 def format_json_display(json_string: Optional[str], default_text="Not available") -> str:
     if not json_string: return default_text
@@ -233,19 +291,62 @@ def render_search_ui():
     st.title("🔍 QuantaIQ Document Search")
     st.markdown("*Intelligent Document Insight System - Cognitive Interface*")
 
-    st.sidebar.header("🔧 Search Filters")
-    search_term = st.sidebar.text_input("Search Document Content")
-    selected_types = st.sidebar.multiselect("Document Type", options=get_document_types())
-    issuer_filter = st.sidebar.text_input("Issuer / Source")
-    tags_filter = st.sidebar.text_input("Tags (comma-separated)")
-    after_date = st.sidebar.date_input("Uploaded After", value=None)
-    before_date = st.sidebar.date_input("Uploaded Before", value=None)
+    # Clear session state button for debugging
+    if st.button("🔄 Clear Search Results"):
+        if 'results' in st.session_state:
+            del st.session_state['results']
+        if 'search_term' in st.session_state:
+            del st.session_state['search_term']
+        st.rerun()
+
+    # Alternative approach - move everything to main area and use columns
+    col1, col2 = st.columns([2, 1])
     
-    run_search = st.sidebar.button("🔍 Search", type="primary")
+    with col1:
+        st.subheader("Search Parameters")
+        
+        # Use working text area method
+        search_term = st.text_area("Search Document Content", height=100, placeholder="Enter search terms here (e.g., payslip, utility bill)...")
+        
+        # Boolean search help
+        with st.expander("💡 Boolean Search Tips"):
+            st.markdown("""
+            **Boolean operators supported (case-insensitive):**
+            - `payslip OR invoice` or `payslip or invoice` - Find documents with either term
+            - `payslip AND medicaid` or `payslip and medicaid` - Find documents with both terms
+            - `invoice NOT utility` or `invoice not utility` - Find documents with 'invoice' but not 'utility'
+            - `payslip` - Simple single term search
+            
+            **Note:** Operators work in both uppercase and lowercase
+            """)
+        
+        # Additional filters - expanded by default for better accessibility
+        with st.expander("Advanced Filters", expanded=True):
+            selected_types = st.multiselect("Document Type", options=get_document_types())
+            issuer_filter = st.text_area("Issuer / Source", height=60, placeholder="Enter issuer or source organization...")
+            tags_filter = st.text_area("Tags (comma-separated)", height=60, placeholder="Enter tags separated by commas...")
+            
+            col_date1, col_date2 = st.columns(2)
+            with col_date1:
+                after_date = st.date_input("Uploaded After", value=None)
+            with col_date2:
+                before_date = st.date_input("Uploaded Before", value=None)
+            
+            # Reset dates if they are equal to today (user likely didn't set them)
+            from datetime import date
+            today = date.today()
+            if after_date == today:
+                after_date = None
+            if before_date == today:
+                before_date = None
+    
+    with col2:
+        st.subheader("Actions")
+        run_search = st.button("🔍 Search Documents", type="primary")
 
     # --- File Upload Section ---
-    st.sidebar.markdown("---")
-    with st.sidebar.expander("➕ Upload New Documents"):
+    st.markdown("---")
+    with st.expander("➕ Upload New Documents"):
         uploaded_files = st.file_uploader(
             "Upload new files to add them to the system.",
             accept_multiple_files=True,
@@ -265,15 +366,30 @@ def render_search_ui():
                         st.write(f"✅ Submitted {uploaded_file.name}")
                 st.success("All files submitted to the processing pipeline!")
 
+    # Initialize results if not present
     if 'results' not in st.session_state:
         st.session_state.results = None
 
+    # Execute search when button is clicked
     if run_search:
-        conn = get_database_connection()
-        query, params = build_search_query(search_term, selected_types, issuer_filter, tags_filter, after_date, before_date)
-        st.session_state.results = pd.read_sql_query(query, conn, params=params)
-        # Store search term for highlighting
-        st.session_state.search_term_input = search_term
+        try:
+            conn = get_database_connection()
+            query, params = build_search_query(search_term, selected_types, issuer_filter, tags_filter, after_date, before_date)
+            
+            st.session_state.results = pd.read_sql_query(query, conn, params=params)
+            # Store search term for highlighting
+            st.session_state.search_term = search_term
+            
+            # Debug information (collapsed by default)
+            with st.expander("Debug Information"):
+                st.write(f"**Debug Info:**")
+                st.write(f"Raw search term: '{search_term}'")
+                st.write(f"Query: {query}")
+                st.write(f"Parameters: {params}")
+                st.write(f"**Results found:** {len(st.session_state.results)}")
+        except Exception as e:
+            st.error(f"Search error: {str(e)}")
+            st.session_state.results = None
 
     if st.session_state.results is not None:
         results_df = st.session_state.results
@@ -283,9 +399,11 @@ def render_search_ui():
             # Convert Series values to strings for proper handling
             filed_path = row['filed_path'] if pd.notna(row['filed_path']) else None
             file_name = str(row['file_name'])
-            document_type = str(row['document_type']) if pd.notna(row['document_type']) else 'N/A'
-            extracted_data = str(row['extracted_data']) if pd.notna(row['extracted_data']) else None
+            extracted_data = str(row['extracted_data']) if pd.notna(row['extracted_data']) and row['extracted_data'] != 'None' else None
             document_id = str(row['document_id'])
+            
+            # Get enhanced document type from CognitiveAgent data or fallback to legacy
+            enhanced_document_type = get_enhanced_document_type(extracted_data, str(row['document_type']) if pd.notna(row['document_type']) else 'N/A')
             
             display_filename = get_display_filename(filed_path, file_name)
             with st.container():
@@ -293,7 +411,7 @@ def render_search_ui():
                 
                 col1, col2 = st.columns(2)
                 with col1:
-                    st.markdown(f"**Type:** `{document_type}`")
+                    st.markdown(f"**Type:** `{enhanced_document_type}`")
                     enhanced_issuer = get_enhanced_issuer(extracted_data, str(row['issuer_source']) if pd.notna(row['issuer_source']) else None)
                     st.markdown(f"**Source:** `{enhanced_issuer}`")
                 with col2:
@@ -311,6 +429,47 @@ def render_search_ui():
                     summary = get_document_summary(document_id, extracted_data)
                     st.info(summary)
                     
+                    # Display CognitiveAgent structured data if available
+                    if extracted_data:
+                        try:
+                            data = json.loads(extracted_data)
+                            
+                            # Show confidence score if available
+                            confidence = data.get('confidence_score')
+                            if confidence is not None:
+                                st.subheader("🎯 Classification Confidence")
+                                st.progress(confidence, text=f"{confidence:.1%}")
+                            
+                            # Show financial information if available
+                            financials = data.get('financials', {})
+                            if financials and any(v for v in financials.values() if v):
+                                st.subheader("💰 Financial Details")
+                                fin_col1, fin_col2 = st.columns(2)
+                                with fin_col1:
+                                    if financials.get('gross_amount'):
+                                        st.metric("Gross Amount", f"${financials['gross_amount']}")
+                                    if financials.get('net_amount'):
+                                        st.metric("Net Amount", f"${financials['net_amount']}")
+                                with fin_col2:
+                                    if financials.get('total_deductions'):
+                                        st.metric("Total Deductions", f"${financials['total_deductions']}")
+                                    if financials.get('total_amount'):
+                                        st.metric("Total Amount", f"${financials['total_amount']}")
+                            
+                            # Show entity information if available
+                            entity = data.get('entity', {})
+                            if entity and any(v for v in entity.values() if v):
+                                st.subheader("👤 Entity Information")
+                                if entity.get('name'):
+                                    st.text(f"Name: {entity['name']}")
+                                if entity.get('role'):
+                                    st.text(f"Role: {entity['role']}")
+                                if entity.get('id'):
+                                    st.text(f"ID: {entity['id']}")
+                                    
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+                    
                     st.subheader("📅 Extracted Dates")
                     formatted_dates = format_extracted_dates(extracted_data, str(row['document_dates']) if pd.notna(row['document_dates']) else None)
                     st.code(formatted_dates)
@@ -319,7 +478,7 @@ def render_search_ui():
                     full_text = str(row['full_text']) if pd.notna(row['full_text']) else ""
                     
                     # Get the search term for highlighting
-                    search_term = st.session_state.get('search_term_input', '')
+                    search_term = st.session_state.get('search_term', '')
                     
                     if search_term and search_term.strip():
                         # Replacement style now includes 'color: black;' for dark mode visibility
