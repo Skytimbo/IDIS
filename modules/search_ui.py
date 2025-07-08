@@ -212,6 +212,19 @@ def get_enhanced_tags(extracted_data: Optional[str], tags_extracted: Optional[st
     
     return format_json_display(tags_extracted, 'None')
 
+def get_enhanced_document_type(extracted_data: Optional[str], document_type: Optional[str]) -> str:
+    """Get document type from CognitiveAgent data or fallback to legacy column."""
+    if extracted_data:
+        try:
+            data = json.loads(extracted_data)
+            cognitive_type = data.get('document_type')
+            if cognitive_type and cognitive_type.strip():
+                return cognitive_type
+        except (json.JSONDecodeError, TypeError):
+            pass
+    
+    return document_type or "N/A"
+
 # --- UI Helper Functions ---
 def format_json_display(json_string: Optional[str], default_text="Not available") -> str:
     if not json_string: return default_text
@@ -283,9 +296,11 @@ def render_search_ui():
             # Convert Series values to strings for proper handling
             filed_path = row['filed_path'] if pd.notna(row['filed_path']) else None
             file_name = str(row['file_name'])
-            document_type = str(row['document_type']) if pd.notna(row['document_type']) else 'N/A'
-            extracted_data = str(row['extracted_data']) if pd.notna(row['extracted_data']) else None
+            extracted_data = str(row['extracted_data']) if pd.notna(row['extracted_data']) and row['extracted_data'] != 'None' else None
             document_id = str(row['document_id'])
+            
+            # Get enhanced document type from CognitiveAgent data or fallback to legacy
+            enhanced_document_type = get_enhanced_document_type(extracted_data, str(row['document_type']) if pd.notna(row['document_type']) else 'N/A')
             
             display_filename = get_display_filename(filed_path, file_name)
             with st.container():
@@ -293,7 +308,7 @@ def render_search_ui():
                 
                 col1, col2 = st.columns(2)
                 with col1:
-                    st.markdown(f"**Type:** `{document_type}`")
+                    st.markdown(f"**Type:** `{enhanced_document_type}`")
                     enhanced_issuer = get_enhanced_issuer(extracted_data, str(row['issuer_source']) if pd.notna(row['issuer_source']) else None)
                     st.markdown(f"**Source:** `{enhanced_issuer}`")
                 with col2:
@@ -310,6 +325,47 @@ def render_search_ui():
                     st.subheader("📋 AI Summary")
                     summary = get_document_summary(document_id, extracted_data)
                     st.info(summary)
+                    
+                    # Display CognitiveAgent structured data if available
+                    if extracted_data:
+                        try:
+                            data = json.loads(extracted_data)
+                            
+                            # Show confidence score if available
+                            confidence = data.get('confidence_score')
+                            if confidence is not None:
+                                st.subheader("🎯 Classification Confidence")
+                                st.progress(confidence, text=f"{confidence:.1%}")
+                            
+                            # Show financial information if available
+                            financials = data.get('financials', {})
+                            if financials and any(v for v in financials.values() if v):
+                                st.subheader("💰 Financial Details")
+                                fin_col1, fin_col2 = st.columns(2)
+                                with fin_col1:
+                                    if financials.get('gross_amount'):
+                                        st.metric("Gross Amount", f"${financials['gross_amount']}")
+                                    if financials.get('net_amount'):
+                                        st.metric("Net Amount", f"${financials['net_amount']}")
+                                with fin_col2:
+                                    if financials.get('total_deductions'):
+                                        st.metric("Total Deductions", f"${financials['total_deductions']}")
+                                    if financials.get('total_amount'):
+                                        st.metric("Total Amount", f"${financials['total_amount']}")
+                            
+                            # Show entity information if available
+                            entity = data.get('entity', {})
+                            if entity and any(v for v in entity.values() if v):
+                                st.subheader("👤 Entity Information")
+                                if entity.get('name'):
+                                    st.text(f"Name: {entity['name']}")
+                                if entity.get('role'):
+                                    st.text(f"Role: {entity['role']}")
+                                if entity.get('id'):
+                                    st.text(f"ID: {entity['id']}")
+                                    
+                        except (json.JSONDecodeError, TypeError):
+                            pass
                     
                     st.subheader("📅 Extracted Dates")
                     formatted_dates = format_extracted_dates(extracted_data, str(row['document_dates']) if pd.notna(row['document_dates']) else None)
