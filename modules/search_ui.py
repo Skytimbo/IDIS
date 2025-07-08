@@ -81,20 +81,11 @@ def parse_boolean_search(search_term: str) -> Tuple[str, List[str]]:
         return "", []
     
     search_term = search_term.strip()
+    import re
     
-    # Handle boolean operators - check for exact matches with spaces
-    if " AND " in search_term:
-        terms = [term.strip() for term in search_term.split(" AND ") if term.strip()]
-        if len(terms) > 1:
-            conditions = []
-            params = []
-            for term in terms:
-                conditions.append("full_text LIKE ? COLLATE NOCASE")
-                params.append(f"%{term}%")
-            return f"({' AND '.join(conditions)})", params
-    
-    elif " OR " in search_term:
-        terms = [term.strip() for term in search_term.split(" OR ") if term.strip()]
+    # Handle OR operator (case-insensitive)
+    if re.search(r'\s+or\s+', search_term, re.IGNORECASE):
+        terms = [term.strip() for term in re.split(r'\s+or\s+', search_term, flags=re.IGNORECASE) if term.strip()]
         if len(terms) > 1:
             conditions = []
             params = []
@@ -103,8 +94,20 @@ def parse_boolean_search(search_term: str) -> Tuple[str, List[str]]:
                 params.append(f"%{term}%")
             return f"({' OR '.join(conditions)})", params
     
-    elif " NOT " in search_term:
-        parts = [part.strip() for part in search_term.split(" NOT ") if part.strip()]
+    # Handle AND operator (case-insensitive)
+    elif re.search(r'\s+and\s+', search_term, re.IGNORECASE):
+        terms = [term.strip() for term in re.split(r'\s+and\s+', search_term, flags=re.IGNORECASE) if term.strip()]
+        if len(terms) > 1:
+            conditions = []
+            params = []
+            for term in terms:
+                conditions.append("full_text LIKE ? COLLATE NOCASE")
+                params.append(f"%{term}%")
+            return f"({' AND '.join(conditions)})", params
+    
+    # Handle NOT operator (case-insensitive)
+    elif re.search(r'\s+not\s+', search_term, re.IGNORECASE):
+        parts = [part.strip() for part in re.split(r'\s+not\s+', search_term, flags=re.IGNORECASE) if part.strip()]
         if len(parts) == 2:
             include_term = parts[0]
             exclude_term = parts[1]
@@ -308,13 +311,13 @@ def render_search_ui():
         # Boolean search help
         with st.expander("💡 Boolean Search Tips"):
             st.markdown("""
-            **Boolean operators supported:**
-            - `payslip OR invoice` - Find documents with either term
-            - `payslip AND medicaid` - Find documents with both terms
-            - `invoice NOT utility` - Find documents with 'invoice' but not 'utility'
+            **Boolean operators supported (case-insensitive):**
+            - `payslip OR invoice` or `payslip or invoice` - Find documents with either term
+            - `payslip AND medicaid` or `payslip and medicaid` - Find documents with both terms
+            - `invoice NOT utility` or `invoice not utility` - Find documents with 'invoice' but not 'utility'
             - `payslip` - Simple single term search
             
-            **Note:** Use uppercase for operators (AND, OR, NOT)
+            **Note:** Operators work in both uppercase and lowercase
             """)
         
         # Additional filters - expanded by default for better accessibility
