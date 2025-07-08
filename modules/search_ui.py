@@ -249,30 +249,41 @@ def render_search_ui():
     st.title("🔍 QuantaIQ Document Search")
     st.markdown("*Intelligent Document Insight System - Cognitive Interface*")
 
-    st.sidebar.header("🔧 Search Filters")
+    # Alternative approach - move everything to main area and use columns
+    col1, col2 = st.columns([2, 1])
     
-    # Simple, clean approach without complex session state
-    search_term = st.sidebar.text_input("Search Document Content", key="main_search_input")
-    selected_types = st.sidebar.multiselect("Document Type", options=get_document_types())
-    issuer_filter = st.sidebar.text_input("Issuer / Source")
-    tags_filter = st.sidebar.text_input("Tags (comma-separated)")
-    after_date = st.sidebar.date_input("Uploaded After", value=None)
-    before_date = st.sidebar.date_input("Uploaded Before", value=None)
+    with col1:
+        st.subheader("Search Parameters")
+        search_term = st.text_input("Search Document Content", placeholder="Enter search terms here...")
+        
+        # Additional filters in expandable section
+        with st.expander("Advanced Filters"):
+            selected_types = st.multiselect("Document Type", options=get_document_types())
+            issuer_filter = st.text_input("Issuer / Source")
+            tags_filter = st.text_input("Tags (comma-separated)")
+            
+            col_date1, col_date2 = st.columns(2)
+            with col_date1:
+                after_date = st.date_input("Uploaded After", value=None)
+            with col_date2:
+                before_date = st.date_input("Uploaded Before", value=None)
+            
+            # Reset dates if they are equal to today (user likely didn't set them)
+            from datetime import date
+            today = date.today()
+            if after_date == today:
+                after_date = None
+            if before_date == today:
+                before_date = None
     
-    # Reset dates if they are equal to today (user likely didn't set them)
-    from datetime import date
-    today = date.today()
-    if after_date == today:
-        after_date = None
-    if before_date == today:
-        before_date = None
-    
-    # Simple button approach
-    run_search = st.sidebar.button("🔍 Search", type="primary")
+    with col2:
+        st.subheader("Actions")
+        run_search = st.button("🔍 Search Documents", type="primary")
+        st.button("🔄 Clear Results")
 
     # --- File Upload Section ---
-    st.sidebar.markdown("---")
-    with st.sidebar.expander("➕ Upload New Documents"):
+    st.markdown("---")
+    with st.expander("➕ Upload New Documents"):
         uploaded_files = st.file_uploader(
             "Upload new files to add them to the system.",
             accept_multiple_files=True,
