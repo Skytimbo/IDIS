@@ -947,3 +947,26 @@ class ContextStore:
         except Exception as e:
             print(f"Database error in update_document_categorization: {e}")
             return False
+    
+    def test_security_function(self, user_input: str) -> list:
+        """
+        INTENTIONALLY VULNERABLE FUNCTION FOR CODERABBIT TESTING
+        
+        This function contains a deliberate SQL injection vulnerability
+        to test if CodeRabbit properly flags security issues in code reviews.
+        
+        WARNING: This function should NEVER be used in production!
+        """
+        # SECURITY VULNERABILITY: Direct string concatenation into SQL query
+        # This allows SQL injection attacks through user_input parameter
+        vulnerable_query = f"SELECT * FROM documents WHERE file_name = '{user_input}'"
+        
+        try:
+            cursor = self.conn.cursor()
+            # Execute the vulnerable query without parameter binding
+            cursor.execute(vulnerable_query)
+            results = cursor.fetchall()
+            return results
+        except sqlite3.Error as e:
+            print(f"SQL execution error: {e}")
+            return []
