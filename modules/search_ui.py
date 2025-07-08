@@ -249,18 +249,40 @@ def render_search_ui():
     st.title("🔍 QuantaIQ Document Search")
     st.markdown("*Intelligent Document Insight System - Cognitive Interface*")
 
+    # Clear session state button for debugging
+    if st.button("🔄 Reset Session State"):
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
+        st.rerun()
+
     # Alternative approach - move everything to main area and use columns
     col1, col2 = st.columns([2, 1])
     
     with col1:
         st.subheader("Search Parameters")
-        search_term = st.text_input("Search Document Content", placeholder="Enter search terms here...")
+        
+        # Try multiple input methods to see what works
+        st.write("**Method 1: Text Area**")
+        search_term = st.text_area("Search Document Content", height=100, placeholder="Enter search terms here...")
+        
+        st.write("**Method 2: Text Input (different key)**")
+        search_term2 = st.text_input("Alternative Search", key="alt_search", placeholder="Try typing here...")
+        
+        st.write("**Method 3: Number Input (as text)**")
+        search_term3 = str(st.number_input("Number Input Test", value=0, format="%d"))
+        if search_term3 == "0":
+            search_term3 = ""
+        
+        # Use whichever has content
+        final_search_term = search_term or search_term2 or search_term3 or ""
+        
+        st.write(f"**Current search term:** `{final_search_term}`")
         
         # Additional filters in expandable section
         with st.expander("Advanced Filters"):
             selected_types = st.multiselect("Document Type", options=get_document_types())
-            issuer_filter = st.text_input("Issuer / Source")
-            tags_filter = st.text_input("Tags (comma-separated)")
+            issuer_filter = st.text_area("Issuer / Source", height=60)
+            tags_filter = st.text_area("Tags (comma-separated)", height=60)
             
             col_date1, col_date2 = st.columns(2)
             with col_date1:
@@ -311,10 +333,10 @@ def render_search_ui():
     if run_search:
         try:
             conn = get_database_connection()
-            query, params = build_search_query(search_term, selected_types, issuer_filter, tags_filter, after_date, before_date)
+            query, params = build_search_query(final_search_term, selected_types, issuer_filter, tags_filter, after_date, before_date)
             st.session_state.results = pd.read_sql_query(query, conn, params=params)
             # Store search term for highlighting
-            st.session_state.search_term = search_term
+            st.session_state.search_term = final_search_term
         except Exception as e:
             st.error(f"Search error: {str(e)}")
             st.session_state.results = None
