@@ -251,29 +251,24 @@ def render_search_ui():
 
     st.sidebar.header("🔧 Search Filters")
     
-    # Initialize session state for input persistence
-    if 'search_input_value' not in st.session_state:
-        st.session_state.search_input_value = ""
+    # Simple, clean approach without complex session state
+    search_term = st.sidebar.text_input("Search Document Content", key="main_search_input")
+    selected_types = st.sidebar.multiselect("Document Type", options=get_document_types())
+    issuer_filter = st.sidebar.text_input("Issuer / Source")
+    tags_filter = st.sidebar.text_input("Tags (comma-separated)")
+    after_date = st.sidebar.date_input("Uploaded After", value=None)
+    before_date = st.sidebar.date_input("Uploaded Before", value=None)
     
-    # Use form to handle input properly
-    with st.sidebar.form("search_form"):
-        search_term = st.text_input("Search Document Content", value=st.session_state.search_input_value)
-        selected_types = st.multiselect("Document Type", options=get_document_types())
-        issuer_filter = st.text_input("Issuer / Source")
-        tags_filter = st.text_input("Tags (comma-separated)")
-        after_date = st.date_input("Uploaded After", value=None)
-        before_date = st.date_input("Uploaded Before", value=None)
-        
-        # Reset dates if they are equal to today (user likely didn't set them)
-        from datetime import date
-        today = date.today()
-        if after_date == today:
-            after_date = None
-        if before_date == today:
-            before_date = None
-        
-        # Form submit button
-        run_search = st.form_submit_button("🔍 Search", type="primary")
+    # Reset dates if they are equal to today (user likely didn't set them)
+    from datetime import date
+    today = date.today()
+    if after_date == today:
+        after_date = None
+    if before_date == today:
+        before_date = None
+    
+    # Simple button approach
+    run_search = st.sidebar.button("🔍 Search", type="primary")
 
     # --- File Upload Section ---
     st.sidebar.markdown("---")
@@ -301,10 +296,8 @@ def render_search_ui():
     if 'results' not in st.session_state:
         st.session_state.results = None
 
-    # Execute search when form is submitted
+    # Execute search when button is clicked
     if run_search:
-        # Update session state with the search term
-        st.session_state.search_input_value = search_term
         try:
             conn = get_database_connection()
             query, params = build_search_query(search_term, selected_types, issuer_filter, tags_filter, after_date, before_date)

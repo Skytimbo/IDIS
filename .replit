@@ -42,7 +42,7 @@ args = "Production Watcher Service"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Test Search Input"
+args = "Test Search Input Fixed"
 
 [[workflows.workflow]]
 name = "Run Context Store Tests"
@@ -102,13 +102,13 @@ task = "shell.exec"
 args = "./start_production_watcher.sh"
 
 [[workflows.workflow]]
-name = "Test Search Input"
+name = "Test Search Input Fixed"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "streamlit run test_search_input.py --server.port 8501 --server.address 0.0.0.0"
-waitForPort = 8501
+args = "streamlit run test_search_input.py --server.port 5001 --server.address 0.0.0.0"
+waitForPort = 5001
 
 [deployment]
 run = ["sh", "-c", "python -m unittest discover tests"]
@@ -117,6 +117,10 @@ deploymentTarget = "cloudrun"
 [[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 5001
+externalPort = 3001
 
 [[ports]]
 localPort = 8501
