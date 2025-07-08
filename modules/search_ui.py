@@ -75,14 +75,49 @@ def get_document_types() -> List[str]:
         st.error(f"Error fetching document types: {str(e)}")
         return []
 
+def parse_boolean_search(search_term: str) -> Tuple[str, List[str]]:
+    """Parse boolean search terms and convert to SQL WHERE clause."""
+    if not search_term:
+        return "", []
+    
+    # Handle boolean operators
+    if " AND " in search_term.upper():
+        terms = [term.strip() for term in search_term.split(" AND ")]
+        conditions = []
+        params = []
+        for term in terms:
+            conditions.append("full_text LIKE ? COLLATE NOCASE")
+            params.append(f"%{term}%")
+        return f"({' AND '.join(conditions)})", params
+    
+    elif " OR " in search_term.upper():
+        terms = [term.strip() for term in search_term.split(" OR ")]
+        conditions = []
+        params = []
+        for term in terms:
+            conditions.append("full_text LIKE ? COLLATE NOCASE")
+            params.append(f"%{term}%")
+        return f"({' OR '.join(conditions)})", params
+    
+    elif " NOT " in search_term.upper():
+        parts = search_term.split(" NOT ")
+        if len(parts) == 2:
+            include_term = parts[0].strip()
+            exclude_term = parts[1].strip()
+            return "(full_text LIKE ? COLLATE NOCASE AND full_text NOT LIKE ? COLLATE NOCASE)", [f"%{include_term}%", f"%{exclude_term}%"]
+    
+    # Default single term search
+    return "full_text LIKE ? COLLATE NOCASE", [f"%{search_term}%"]
+
 def build_search_query(search_term, doc_types, issuer_filter, tags_filter, after_date, before_date) -> Tuple[str, List[Any]]:
     """Build the SQL query and parameters for searching documents."""
     query_parts = ["SELECT document_id, file_name, document_type, upload_timestamp, issuer_source, filed_path, full_text, document_dates, tags_extracted, extracted_data FROM documents WHERE 1=1"]
     params = []
 
     if search_term:
-        query_parts.append("AND full_text LIKE ? COLLATE NOCASE")
-        params.append(f"%{search_term}%")
+        search_condition, search_params = parse_boolean_search(search_term)
+        query_parts.append(f"AND {search_condition}")
+        params.extend(search_params)
     if doc_types:
         placeholders = ",".join(["?" for _ in doc_types])
         query_parts.append(f"AND document_type IN ({placeholders})")
@@ -265,6 +300,18 @@ def render_search_ui():
         
         # Use working text area method
         search_term = st.text_area("Search Document Content", height=100, placeholder="Enter search terms here (e.g., payslip, utility bill)...")
+        
+        # Boolean search help
+        with st.expander("💡 Boolean Search Tips"):
+            st.markdown("""
+            **Boolean operators supported:**
+            - `payslip OR invoice` - Find documents with either term
+            - `payslip AND medicaid` - Find documents with both terms
+            - `invoice NOT utility` - Find documents with 'invoice' but not 'utility'
+            - `payslip` - Simple single term search
+            
+            **Note:** Use uppercase for operators (AND, OR, NOT)
+            """)
         
         # Additional filters - expanded by default for better accessibility
         with st.expander("Advanced Filters", expanded=True):
