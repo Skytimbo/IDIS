@@ -1,8 +1,22 @@
 """
 Context Store Module for Intelligent Document Insight System (IDIS)
 
-This module manages the SQLite database containing all persistent data for IDIS,
-including documents, patients, sessions, agent outputs, and audit trails.
+This module serves as the central data persistence layer for the IDIS platform,
+managing all SQLite database operations for document intelligence workflows.
+
+Key Responsibilities:
+- Document lifecycle management (ingestion, processing, archiving)
+- Patient and session data management with privacy controls
+- Agent output storage for AI-powered document analysis results
+- Comprehensive audit logging for compliance and debugging
+- Hybrid V1.3 schema supporting both legacy UI and modern JSON structures
+
+The ContextStore class provides thread-safe CRUD operations and maintains
+data integrity across the entire document processing pipeline, from initial
+file upload through AI analysis to final archiving and retrieval.
+
+CodeRabbit Integration Test: This comment was added to verify automated 
+code review functionality is working correctly with GitHub integration.
 """
 
 import sqlite3
