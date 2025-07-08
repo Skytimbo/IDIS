@@ -296,14 +296,15 @@ def render_search_ui():
 
     if 'results' not in st.session_state:
         st.session_state.results = None
+    
+    # Only show results if search was actually performed
+    if not run_search and st.session_state.results is None:
+        st.info("👆 Use the filters in the sidebar and click Search to find documents.")
 
     if run_search:
         try:
             conn = get_database_connection()
             query, params = build_search_query(search_term, selected_types, issuer_filter, tags_filter, after_date, before_date)
-            st.write(f"Debug: Search term = '{search_term}'")  # Debug output
-            st.write(f"Debug: Query = {query}")  # Debug output
-            st.write(f"Debug: Params = {params}")  # Debug output
             st.session_state.results = pd.read_sql_query(query, conn, params=params)
             # Store search term for highlighting
             st.session_state.current_search_term = search_term
