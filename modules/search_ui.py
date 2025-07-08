@@ -247,12 +247,20 @@ def render_search_ui():
     st.markdown("*Intelligent Document Insight System - Cognitive Interface*")
 
     st.sidebar.header("🔧 Search Filters")
-    search_term = st.sidebar.text_input("Search Document Content")
+    search_term = st.sidebar.text_input("Search Document Content", key="search_term_input")
     selected_types = st.sidebar.multiselect("Document Type", options=get_document_types())
     issuer_filter = st.sidebar.text_input("Issuer / Source")
     tags_filter = st.sidebar.text_input("Tags (comma-separated)")
     after_date = st.sidebar.date_input("Uploaded After", value=None)
     before_date = st.sidebar.date_input("Uploaded Before", value=None)
+    
+    # Reset dates if they are equal to today (user likely didn't set them)
+    from datetime import date
+    today = date.today()
+    if after_date == today:
+        after_date = None
+    if before_date == today:
+        before_date = None
     
     run_search = st.sidebar.button("🔍 Search", type="primary")
 
