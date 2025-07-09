@@ -93,7 +93,57 @@ def load_application_checklist():
         return pd.DataFrame()
 
 
-def assign_document_to_requirement(document_id: int, requirement_id: int, patient_id: int = 1):
+def validate_document_assignment(ai_detected_type: str, selected_requirement: str) -> dict:
+    """
+    Validate if a document assignment is appropriate based on AI classification.
+    
+    Args:
+        ai_detected_type: The document type detected by AI
+        selected_requirement: The requirement selected by the user
+        
+    Returns:
+        dict: {'is_valid': bool, 'warning_message': str}
+    """
+    # Define valid document types for each requirement
+    valid_mappings = {
+        'Proof of Identity': [
+            'Driver License', 'State ID', 'Passport', 'Birth Certificate',
+            'Business License', 'Identity Document'
+        ],
+        'Proof of Citizenship': [
+            'Birth Certificate', 'Passport', 'Citizenship Document',
+            'Naturalization Certificate'
+        ],
+        'Proof of Residency': [
+            'Utility Bill', 'Bank Statement', 'Lease Agreement',
+            'Mortgage Statement', 'Rent Receipt'
+        ],
+        'Proof of Income': [
+            'Paystub', 'Employment Letter', 'Social Security Award',
+            'Tax Return', 'Bank Statement', 'Payslip'
+        ],
+        'Proof of Resources/Assets': [
+            'Bank Statement', 'Investment Statement', 'Asset Valuation',
+            'Property Deed', 'Vehicle Title'
+        ]
+    }
+    
+    # Check if the assignment is valid
+    valid_types = valid_mappings.get(selected_requirement, [])
+    
+    if ai_detected_type in valid_types:
+        return {
+            'is_valid': True,
+            'warning_message': ''
+        }
+    else:
+        return {
+            'is_valid': False,
+            'warning_message': f"A '{ai_detected_type}' document may not be appropriate for '{selected_requirement}'. Expected types: {', '.join(valid_types)}"
+        }
+
+
+def assign_document_to_requirement(document_id: int, requirement_id: int, patient_id: int = 1, override: bool = False, override_reason: str = ""):
     """
     Assign a document to a specific checklist requirement.
     
@@ -193,18 +243,53 @@ def render_document_assignment_interface():
                 if st.button("✅ Assign Document", key=f"assign_btn_{i}", type="primary"):
                     if selected_requirement:
                         requirement_id = requirement_options[selected_requirement]
-                        success = assign_document_to_requirement(
-                            doc_info['document_id'], 
-                            requirement_id
+                        
+                        # Validate the assignment
+                        validation_result = validate_document_assignment(
+                            doc_info.get('document_type', 'Unknown'), 
+                            selected_requirement
                         )
                         
-                        if success:
-                            st.success(f"✅ Document assigned to '{selected_requirement}'")
-                            # Remove from processed documents list
-                            st.session_state.processed_documents.pop(i)
-                            st.experimental_rerun()
+                        if validation_result['is_valid']:
+                            # Valid assignment - proceed normally
+                            success = assign_document_to_requirement(
+                                doc_info['document_id'], 
+                                requirement_id
+                            )
+                            
+                            if success:
+                                st.success(f"✅ Document assigned to '{selected_requirement}'")
+                                # Remove from processed documents list
+                                st.session_state.processed_documents.pop(i)
+                                st.experimental_rerun()
+                            else:
+                                st.error("❌ Failed to assign document")
                         else:
-                            st.error("❌ Failed to assign document")
+                            # Invalid assignment - show warning
+                            st.warning(f"⚠️ {validation_result['warning_message']}")
+                            
+                            # Create override option in expandable section
+                            with st.expander("Override Assignment (Use with Caution)", expanded=False):
+                                st.write(f"**AI detected:** {doc_info.get('document_type', 'Unknown')}")
+                                st.write(f"**You're assigning to:** {selected_requirement}")
+                                st.write("**Risk:** This may not meet Medicaid application requirements.")
+                                
+                                if st.button("⚠️ Override and Assign Anyway", key=f"override_{i}", type="secondary"):
+                                    # Proceed with override assignment
+                                    success = assign_document_to_requirement(
+                                        doc_info['document_id'], 
+                                        requirement_id,
+                                        override=True,
+                                        override_reason=f"User override: {doc_info.get('document_type', 'Unknown')} → {selected_requirement}"
+                                    )
+                                    
+                                    if success:
+                                        st.success(f"✅ Document assigned to '{selected_requirement}' (Override)")
+                                        # Remove from processed documents list
+                                        st.session_state.processed_documents.pop(i)
+                                        st.experimental_rerun()
+                                    else:
+                                        st.error("❌ Failed to assign document")
                     else:
                         st.warning("Please select a requirement first")
 
