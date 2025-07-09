@@ -1,0 +1,14 @@
+Medicaid Navigator Upload Test
+
+This is a test document for the Medicaid Navigator uploader functionality.
+The document contains sample medicaid-related information to verify that
+the unified uploader correctly processes files with 'medicaid' context.
+
+Document Type: Medicaid Test Document
+Source: Medicaid Navigator Module
+Date: July 9, 2025
+Content: This document should be processed through the unified uploader
+with context='medicaid' parameter.
+
+Medicaid Keywords: medicaid, navigator, healthcare, alaska, benefits, eligibility
+Patient Information: Test patient for medicaid application
