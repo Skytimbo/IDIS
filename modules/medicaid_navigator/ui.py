@@ -202,7 +202,7 @@ def render_document_assignment_interface():
                             st.success(f"✅ Document assigned to '{selected_requirement}'")
                             # Remove from processed documents list
                             st.session_state.processed_documents.pop(i)
-                            st.rerun()
+                            st.experimental_rerun()
                         else:
                             st.error("❌ Failed to assign document")
                     else:
