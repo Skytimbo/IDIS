@@ -113,6 +113,7 @@ Future phases may include:
 - Optional cloud integration with privacy controls
 
 ## Recent Changes  
+- **July 2025**: **CUSTOM THEME IMPLEMENTATION COMPLETE** - Applied custom Streamlit theme with professional blue color scheme: primary color #5c85ad, light gray background #f0f2f6, secondary background #e1e5f2, dark blue text #1f2041, sans serif font, configured headless mode for smooth deployment
 - **July 2025**: **GIT CONFIGURATION FIX COMPLETE** - Fixed repository synchronization issue by removing docker-compose.yml from .gitignore file, enabling proper tracking of critical Docker configuration changes between environments
 - **July 2025**: **APPLICATION HARDENING COMPLETE** - Addressed critical CodeRabbit review issues: (1) Fixed potential startup crash by creating missing data/idis_archive directory, (2) Removed non-functional "Clear Results" button from search UI to prevent user confusion, (3) Moved SQL debug information into collapsed expander for cleaner interface, (4) Implemented case-insensitive boolean search with regex parsing supporting both "OR/or", "AND/and", "NOT/not" operators
 - **July 2025**: **SEARCH FUNCTIONALITY FULLY OPERATIONAL** - Resolved critical search interface issues: (1) Fixed non-responsive st.text_input widgets by replacing with working st.text_area widgets, (2) Implemented case-insensitive search with COLLATE NOCASE for all text filters, (3) Expanded advanced filters interface for better accessibility, enabling complete search functionality across all document content, types, dates, issuers, and tags

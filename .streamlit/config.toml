@@ -1,4 +1,14 @@
+[theme]
+primaryColor="#5c85ad"
+backgroundColor="#f0f2f6"
+secondaryBackgroundColor="#e1e5f2"
+textColor="#1f2041"
+font="sans serif"
+
+[browser]
+gatherUsageStats = false
+
 [server]
+enableCORS = false
+enableXsrfProtection = false
 headless = true
-address = "0.0.0.0"
-port = 5000

@@ -90,7 +90,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "streamlit run app.py --server.port 5000 --server.address 0.0.0.0 -- --database-path production_idis.db --archive-path data/idis_archive"
+args = "STREAMLIT_SERVER_HEADLESS=true streamlit run app.py --server.port 5000 --server.address 0.0.0.0 -- --database-path production_idis.db --archive-path data/idis_archive"
 waitForPort = 5000
 
 [[workflows.workflow]]
