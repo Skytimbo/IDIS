@@ -137,6 +137,7 @@ The project is configured for production deployment using Docker Compose with a 
 ## Recent Changes  
 ## Recent Changes
 
+- **July 2025**: **STREAMLIT COMPATIBILITY FIX** - Fixed AttributeError with st.rerun() function by replacing with st.experimental_rerun() for compatibility with current Streamlit version, resolving search interface crashes
 - **July 2025**: **CRITICAL CODERABBIT BUGS FIXED** - Fixed two critical bugs identified in CodeRabbit review: (1) Added proper audit trail logging in assign_document_to_requirement function with logging.info() statements for override actions, ensuring compliance and auditability, (2) Fixed deployment script to properly initialize database using ContextStore instead of empty touch command, ensuring production database has correct schema and tables from deployment start
 - **July 2025**: **CASE MANAGEMENT UI COMPLETE** - Implemented a dynamic, database-driven checklist in the Medicaid Navigator. Added UI for users to assign uploaded documents to specific requirements. Integrated a "Trust, but Verify" system to validate user assignments against AI classification.
 - **July 2025**: **DEPLOYMENT CONFIGURATION COMPLETE** - Created `deploy.sh` script to manage production startup with environment checks. Added `DEPLOYMENT.md` documentation. Verified `docker-compose.yml` is configured for a multi-service production environment.

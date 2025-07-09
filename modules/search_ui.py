@@ -297,7 +297,7 @@ def render_search_ui():
             del st.session_state['results']
         if 'search_term' in st.session_state:
             del st.session_state['search_term']
-        st.rerun()
+        st.experimental_rerun()
 
     # Alternative approach - move everything to main area and use columns
     col1, col2 = st.columns([2, 1])
