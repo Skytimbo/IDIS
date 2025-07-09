@@ -204,7 +204,8 @@ def render_needs_review_page():
             # --- Document Text Preview ---
             st.subheader("📖 Document Content")
             if full_text:
-                with st.expander("View Full Document Text", expanded=False):
+                # Use details/summary instead of nested expander to avoid Streamlit limitation
+                if st.checkbox("Show Full Document Text", key=f"show_text_{doc_id}"):
                     st.text_area("Document Text", full_text, height=300, disabled=True, key=f"text_{doc_id}")
             else:
                 st.warning("No text content available for this document.")
