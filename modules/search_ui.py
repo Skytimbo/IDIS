@@ -345,26 +345,16 @@ def render_search_ui():
         run_search = st.button("🔍 Search Documents", type="primary")
 
     # --- File Upload Section ---
-    st.markdown("---")
-    with st.expander("➕ Upload New Documents"):
-        uploaded_files = st.file_uploader(
-            "Upload new files to add them to the system.",
-            accept_multiple_files=True,
-            type=['pdf', 'png', 'jpg', 'jpeg', 'txt', 'docx']
-        )
-        
-        if uploaded_files:
-            if st.button("Submit for Processing", type="primary"):
-                watch_folder = "data/scanner_output"
-                os.makedirs(watch_folder, exist_ok=True)
-                
-                with st.spinner("Submitting files..."):
-                    for uploaded_file in uploaded_files:
-                        dest_path = os.path.join(watch_folder, uploaded_file.name)
-                        with open(dest_path, "wb") as f:
-                            f.write(uploaded_file.getvalue())
-                        st.write(f"✅ Submitted {uploaded_file.name}")
-                st.success("All files submitted to the processing pipeline!")
+    from modules.shared.unified_uploader import render_unified_uploader
+    
+    render_unified_uploader(
+        context="general",
+        title="Upload New Documents",
+        description="Upload new files to add them to the system.",
+        button_text="Process Documents",
+        file_types=['pdf', 'png', 'jpg', 'jpeg', 'txt', 'docx'],
+        accept_multiple=True
+    )
 
     # Initialize results if not present
     if 'results' not in st.session_state:
