@@ -177,13 +177,17 @@ def render_document_assignment_interface():
                 st.write(f"**AI-detected type:** {doc_info.get('document_type', 'Unknown')}")
                 
                 # Dropdown for assignment
+                options_with_placeholder = ["Select a requirement..."] + list(requirement_options.keys())
                 selected_requirement = st.selectbox(
                     "Assign to requirement:",
-                    options=list(requirement_options.keys()),
+                    options=options_with_placeholder,
                     key=f"req_select_{i}",
-                    index=None,
-                    placeholder="Select a requirement..."
+                    index=0
                 )
+                
+                # Handle the placeholder selection
+                if selected_requirement == "Select a requirement...":
+                    selected_requirement = None
             
             with col2:
                 if st.button("✅ Assign Document", key=f"assign_btn_{i}", type="primary"):
