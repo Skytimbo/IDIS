@@ -205,7 +205,7 @@ The project is configured for production deployment using Docker Compose with a 
 **Active Services**:
 - Main App: Streamlit interface on port 5000 (development) / 8501 (production)
 - Production Watcher Service: Monitoring `data/scanner_output` folder
-- Database: `production_idis.db` with test documents
+- Database: `production_idis.db` with 3 test documents (grocery receipt, Home Depot receipt, restaurant invoice)
 
 **Next Development Areas**:
 - Performance optimization for large document collections
