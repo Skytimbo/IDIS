@@ -405,106 +405,114 @@ def render_search_ui():
             # Get enhanced document type from CognitiveAgent data or fallback to legacy
             enhanced_document_type = get_enhanced_document_type(extracted_data, str(row['document_type']) if pd.notna(row['document_type']) else 'N/A')
             
+            # Get processed date for display
+            processed_date_str = "N/A"
+            if pd.notna(row['upload_timestamp']):
+                upload_dt = pd.to_datetime(row['upload_timestamp'])
+                processed_date_str = upload_dt.strftime('%Y-%m-%d')
+            
+            # Get enhanced issuer
+            enhanced_issuer = get_enhanced_issuer(extracted_data, str(row['issuer_source']) if pd.notna(row['issuer_source']) else None)
+            
+            # Create concise one-line summary for expander label
             display_filename = get_display_filename(filed_path, file_name)
-            with st.container():
-                st.subheader(f"📄 {display_filename}")
-                
-                col1, col2 = st.columns(2)
-                with col1:
+            
+            # Create a clean, scannable expander label with key information
+            expander_label = f"📄 {display_filename} | {enhanced_document_type} | {enhanced_issuer} | {processed_date_str}"
+            
+            # Use expander for each document with the concise summary as label
+            with st.expander(expander_label, expanded=False):
+                # Show basic document details in header
+                detail_col1, detail_col2 = st.columns(2)
+                with detail_col1:
                     st.markdown(f"**Type:** `{enhanced_document_type}`")
-                    enhanced_issuer = get_enhanced_issuer(extracted_data, str(row['issuer_source']) if pd.notna(row['issuer_source']) else None)
                     st.markdown(f"**Source:** `{enhanced_issuer}`")
-                with col2:
-                    processed_date_str = "N/A"
-                    if pd.notna(row['upload_timestamp']):
-                        upload_dt = pd.to_datetime(row['upload_timestamp'])
-                        processed_date_str = upload_dt.strftime('%Y-%m-%d %H:%M')
+                with detail_col2:
                     st.markdown(f"**Processed:** `{processed_date_str}`")
                     enhanced_tags = get_enhanced_tags(extracted_data, str(row['tags_extracted']) if pd.notna(row['tags_extracted']) else None)
                     st.markdown(f"**Tags:** `{enhanced_tags}`")
                 
-                with st.expander("View Details"):
-                    st.markdown("---")
-                    st.subheader("📋 AI Summary")
-                    summary = get_document_summary(document_id, extracted_data)
-                    st.info(summary)
-                    
-                    # Display CognitiveAgent structured data if available
-                    if extracted_data:
-                        try:
-                            data = json.loads(extracted_data)
-                            
-                            # Show confidence score if available
-                            confidence = data.get('confidence_score')
-                            if confidence is not None:
-                                st.subheader("🎯 Classification Confidence")
-                                st.progress(confidence, text=f"{confidence:.1%}")
-                            
-                            # Show financial information if available
-                            financials = data.get('financials', {})
-                            if financials and any(v for v in financials.values() if v):
-                                st.subheader("💰 Financial Details")
-                                fin_col1, fin_col2 = st.columns(2)
-                                with fin_col1:
-                                    if financials.get('gross_amount'):
-                                        st.metric("Gross Amount", f"${financials['gross_amount']}")
-                                    if financials.get('net_amount'):
-                                        st.metric("Net Amount", f"${financials['net_amount']}")
-                                with fin_col2:
-                                    if financials.get('total_deductions'):
-                                        st.metric("Total Deductions", f"${financials['total_deductions']}")
-                                    if financials.get('total_amount'):
-                                        st.metric("Total Amount", f"${financials['total_amount']}")
-                            
-                            # Show entity information if available
-                            entity = data.get('entity', {})
-                            if entity and any(v for v in entity.values() if v):
-                                st.subheader("👤 Entity Information")
-                                if entity.get('name'):
-                                    st.text(f"Name: {entity['name']}")
-                                if entity.get('role'):
-                                    st.text(f"Role: {entity['role']}")
-                                if entity.get('id'):
-                                    st.text(f"ID: {entity['id']}")
-                                    
-                        except (json.JSONDecodeError, TypeError):
-                            pass
-                    
-                    st.subheader("📅 Extracted Dates")
-                    formatted_dates = format_extracted_dates(extracted_data, str(row['document_dates']) if pd.notna(row['document_dates']) else None)
-                    st.code(formatted_dates)
-                    
-                    st.subheader("📝 Extracted Text")
-                    full_text = str(row['full_text']) if pd.notna(row['full_text']) else ""
-                    
-                    # Get the search term for highlighting
-                    search_term = st.session_state.get('search_term', '')
-                    
-                    if search_term and search_term.strip():
-                        # Replacement style now includes 'color: black;' for dark mode visibility
-                        replacement_style = r"<span style='background-color: #FFFF00; color: black;'>\1</span>"
+                st.markdown("---")
+                st.subheader("📋 AI Summary")
+                summary = get_document_summary(document_id, extracted_data)
+                st.info(summary)
+                
+                # Display CognitiveAgent structured data if available
+                if extracted_data:
+                    try:
+                        data = json.loads(extracted_data)
                         
-                        highlighted_text = re.sub(
-                            f'({re.escape(search_term.strip())})', 
-                            replacement_style, 
-                            full_text, 
-                            flags=re.IGNORECASE
-                        )
+                        # Show confidence score if available
+                        confidence = data.get('confidence_score')
+                        if confidence is not None:
+                            st.subheader("🎯 Classification Confidence")
+                            st.progress(confidence, text=f"{confidence:.1%}")
                         
-                        # Convert newlines to HTML <br> tags for proper rendering in markdown
-                        html_text_with_breaks = highlighted_text.replace('\n', '<br>')
+                        # Show financial information if available
+                        financials = data.get('financials', {})
+                        if financials and any(v for v in financials.values() if v):
+                            st.subheader("💰 Financial Details")
+                            fin_col1, fin_col2 = st.columns(2)
+                            with fin_col1:
+                                if financials.get('gross_amount'):
+                                    st.metric("Gross Amount", f"${financials['gross_amount']}")
+                                if financials.get('net_amount'):
+                                    st.metric("Net Amount", f"${financials['net_amount']}")
+                            with fin_col2:
+                                if financials.get('total_deductions'):
+                                    st.metric("Total Deductions", f"${financials['total_deductions']}")
+                                if financials.get('total_amount'):
+                                    st.metric("Total Amount", f"${financials['total_amount']}")
                         
-                        # Use a simpler scrollable container
-                        st.markdown(
-                            f"<div style='height: 250px; overflow-y: scroll; border: 1px solid #444; padding: 5px; color: black; background-color: #f9f9f9;'>{html_text_with_breaks}</div>", 
-                            unsafe_allow_html=True
-                        )
-                    else:
-                        # Fallback to a normal text area if no search term
-                        st.text_area("Full Text", value=full_text, height=250, key=f"text_{document_id}_{index}")
+                        # Show entity information if available
+                        entity = data.get('entity', {})
+                        if entity and any(v for v in entity.values() if v):
+                            st.subheader("👤 Entity Information")
+                            if entity.get('name'):
+                                st.text(f"Name: {entity['name']}")
+                            if entity.get('role'):
+                                st.text(f"Role: {entity['role']}")
+                            if entity.get('id'):
+                                st.text(f"ID: {entity['id']}")
+                                
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                
+                st.subheader("📅 Extracted Dates")
+                formatted_dates = format_extracted_dates(extracted_data, str(row['document_dates']) if pd.notna(row['document_dates']) else None)
+                st.code(formatted_dates)
+                
+                st.subheader("📝 Extracted Text")
+                full_text = str(row['full_text']) if pd.notna(row['full_text']) else ""
+                
+                # Get the search term for highlighting
+                search_term = st.session_state.get('search_term', '')
+                
+                if search_term and search_term.strip():
+                    # Replacement style now includes 'color: black;' for dark mode visibility
+                    replacement_style = r"<span style='background-color: #FFFF00; color: black;'>\1</span>"
+                    
+                    highlighted_text = re.sub(
+                        f'({re.escape(search_term.strip())})', 
+                        replacement_style, 
+                        full_text, 
+                        flags=re.IGNORECASE
+                    )
+                    
+                    # Convert newlines to HTML <br> tags for proper rendering in markdown
+                    html_text_with_breaks = highlighted_text.replace('\n', '<br>')
+                    
+                    # Use a simpler scrollable container
+                    st.markdown(
+                        f"<div style='height: 250px; overflow-y: scroll; border: 1px solid #444; padding: 5px; color: black; background-color: #f9f9f9;'>{html_text_with_breaks}</div>", 
+                        unsafe_allow_html=True
+                    )
+                else:
+                    # Fallback to a normal text area if no search term
+                    st.text_area("Full Text", value=full_text, height=250, key=f"text_{document_id}_{index}")
 
-                    if filed_path:
-                        st.subheader("📁 File Location")
-                        st.code(filed_path, language=None)
+                if filed_path:
+                    st.subheader("📁 File Location")
+                    st.code(filed_path, language=None)
     else:
         st.info("👆 Use the filters in the sidebar and click Search to find documents.")

@@ -113,6 +113,7 @@ Future phases may include:
 - Optional cloud integration with privacy controls
 
 ## Recent Changes  
+- **July 2025**: **SEARCH RESULTS ACCORDION REDESIGN COMPLETE** - Redesigned search results page with accordion/expander layout for improved scannability: replaced full document display with collapsed one-line summaries showing filename, document type, issuer, and date; full document details expand on demand without affecting other results; maintains all existing functionality including search highlighting, AI summaries, and structured data display
 - **July 2025**: **CUSTOM THEME IMPLEMENTATION COMPLETE** - Applied custom Streamlit theme with professional blue color scheme: primary color #5c85ad, light gray background #f0f2f6, secondary background #e1e5f2, dark blue text #1f2041, sans serif font, configured headless mode for smooth deployment
 - **July 2025**: **GIT CONFIGURATION FIX COMPLETE** - Fixed repository synchronization issue by removing docker-compose.yml from .gitignore file, enabling proper tracking of critical Docker configuration changes between environments
 - **July 2025**: **APPLICATION HARDENING COMPLETE** - Addressed critical CodeRabbit review issues: (1) Fixed potential startup crash by creating missing data/idis_archive directory, (2) Removed non-functional "Clear Results" button from search UI to prevent user confusion, (3) Moved SQL debug information into collapsed expander for cleaner interface, (4) Implemented case-insensitive boolean search with regex parsing supporting both "OR/or", "AND/and", "NOT/not" operators
