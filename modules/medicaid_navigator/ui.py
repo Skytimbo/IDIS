@@ -80,8 +80,15 @@ def render_navigator_ui():
         accept_multiple=True
     )
     
-    # --- 3. Processing ---
-    st.header("3. Process and Prepare Packet")
-    if False:  # This block is now handled by the unified uploader
-        # This processing logic is now handled by the unified uploader
-        pass
+    # --- 3. Next Steps ---
+    st.header("3. Next Steps")
+    st.info("""
+    **After uploading your documents:**
+    1. Review the updated checklist above to see which documents have been processed
+    2. Upload any remaining required documents
+    3. Use the General Document Search to verify all documents are properly categorized
+    4. Contact your caseworker when all requirements are complete
+    """)
+    
+    st.markdown("---")
+    st.markdown("**Need help?** Contact Alaska Medicaid Support at 1-800-XXX-XXXX")
