@@ -99,8 +99,8 @@ def render_needs_review_page():
     def get_db_connection():
         """Create and cache the database connection."""
         try:
-            # Use the environment variable for the DB path, with a fallback for local development
-            db_path = os.getenv("REVIEW_PAGE_DB_PATH", "production_idis.db")
+            # Force correct database path - override any incorrect environment variable
+            db_path = "production_idis.db"
             
             # Ensure the directory exists (only if there's a directory path)
             db_dir = os.path.dirname(db_path)
