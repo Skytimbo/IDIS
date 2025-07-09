@@ -95,9 +95,8 @@ def render_needs_review_page():
     st.markdown("Review and categorize documents that the AI system has flagged for human attention.")
 
     # --- Database Connection ---
-    @st.cache_resource
     def get_db_connection():
-        """Create and cache the database connection."""
+        """Create a fresh database connection to avoid threading issues."""
         try:
             # Force correct database path - override any incorrect environment variable
             db_path = "production_idis.db"
@@ -118,7 +117,6 @@ def render_needs_review_page():
     context_store = get_db_connection()
 
     # --- Data Fetching ---
-    @st.cache_data(ttl=10) # Cache data for 10 seconds to allow for quick refreshes
     def get_docs_to_review():
         """Fetch documents with 'pending_categorization' status."""
         if not context_store:
@@ -277,8 +275,6 @@ def categorize_document(context_store, doc_id, category_name, category_data):
         success = context_store.update_document_categorization(doc_id, entity_json)
         
         if success:
-            # Clear the cache to force a re-fetch of the document list
-            st.cache_data.clear()
             return True
         else:
             return False
@@ -298,8 +294,6 @@ def skip_document(context_store, doc_id):
         })
         
         if success:
-            # Clear the cache to force a re-fetch of the document list
-            st.cache_data.clear()
             return True
         else:
             return False
