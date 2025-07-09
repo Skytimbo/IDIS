@@ -131,7 +131,14 @@ def validate_document_assignment(ai_detected_type: str, selected_requirement: st
     # Check if the assignment is valid
     valid_types = valid_mappings.get(selected_requirement, [])
     
-    if ai_detected_type in valid_types:
+    # Handle special cases
+    if ai_detected_type in ['None', 'Unknown', '']:
+        # If AI couldn't determine type, show warning but allow assignment
+        return {
+            'is_valid': False,
+            'warning_message': f"The AI could not determine the document type. Please verify this document is appropriate for '{selected_requirement}'. Expected types: {', '.join(valid_types)}"
+        }
+    elif ai_detected_type in valid_types:
         return {
             'is_valid': True,
             'warning_message': ''
@@ -268,28 +275,28 @@ def render_document_assignment_interface():
                             # Invalid assignment - show warning
                             st.warning(f"⚠️ {validation_result['warning_message']}")
                             
-                            # Create override option in expandable section
-                            with st.expander("Override Assignment (Use with Caution)", expanded=False):
-                                st.write(f"**AI detected:** {doc_info.get('document_type', 'Unknown')}")
-                                st.write(f"**You're assigning to:** {selected_requirement}")
-                                st.write("**Risk:** This may not meet Medicaid application requirements.")
+                            # Create override option outside of expander to avoid nesting issues
+                            st.write("**Override Options:**")
+                            st.write(f"• AI detected: {doc_info.get('document_type', 'Unknown')}")
+                            st.write(f"• You're assigning to: {selected_requirement}")
+                            st.write("• Risk: This may not meet Medicaid application requirements.")
+                            
+                            if st.button("⚠️ Override and Assign Anyway", key=f"override_{i}", type="secondary"):
+                                # Proceed with override assignment
+                                success = assign_document_to_requirement(
+                                    doc_info['document_id'], 
+                                    requirement_id,
+                                    override=True,
+                                    override_reason=f"User override: {doc_info.get('document_type', 'Unknown')} → {selected_requirement}"
+                                )
                                 
-                                if st.button("⚠️ Override and Assign Anyway", key=f"override_{i}", type="secondary"):
-                                    # Proceed with override assignment
-                                    success = assign_document_to_requirement(
-                                        doc_info['document_id'], 
-                                        requirement_id,
-                                        override=True,
-                                        override_reason=f"User override: {doc_info.get('document_type', 'Unknown')} → {selected_requirement}"
-                                    )
-                                    
-                                    if success:
-                                        st.success(f"✅ Document assigned to '{selected_requirement}' (Override)")
-                                        # Remove from processed documents list
-                                        st.session_state.processed_documents.pop(i)
-                                        st.experimental_rerun()
-                                    else:
-                                        st.error("❌ Failed to assign document")
+                                if success:
+                                    st.success(f"✅ Document assigned to '{selected_requirement}' (Override)")
+                                    # Remove from processed documents list
+                                    st.session_state.processed_documents.pop(i)
+                                    st.experimental_rerun()
+                                else:
+                                    st.error("❌ Failed to assign document")
                     else:
                         st.warning("Please select a requirement first")
 
