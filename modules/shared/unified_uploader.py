@@ -1,0 +1,211 @@
+"""
+Unified Document Uploader Component
+
+This module provides a consistent file upload interface that can be used
+across different modules in the IDIS application. It supports context-aware
+processing while maintaining consistent behavior and user experience.
+"""
+
+import streamlit as st
+import os
+import logging
+from typing import List, Optional
+from context_store import ContextStore
+from unified_ingestion_agent import UnifiedIngestionAgent
+
+
+def render_unified_uploader(
+    context: str = "general",
+    title: str = "Upload Documents",
+    description: str = "Upload new files to add them to the system.",
+    button_text: str = "Process Documents",
+    file_types: List[str] = None,
+    accept_multiple: bool = True
+) -> None:
+    """
+    Renders a unified file uploader component with consistent behavior.
+    
+    Args:
+        context: Processing context ('medicaid', 'general', etc.)
+        title: Display title for the upload section
+        description: Help text for the uploader
+        button_text: Text for the process button
+        file_types: Allowed file extensions (defaults to all supported types)
+        accept_multiple: Whether to accept multiple files
+    """
+    
+    # Set default file types if not provided
+    if file_types is None:
+        file_types = ['pdf', 'png', 'jpg', 'jpeg', 'txt', 'docx']
+    
+    # Render the upload interface
+    st.markdown("---")
+    with st.expander(f"➕ {title}"):
+        uploaded_files = st.file_uploader(
+            description,
+            accept_multiple_files=accept_multiple,
+            type=file_types
+        )
+        
+        if uploaded_files:
+            # Show uploaded files
+            if accept_multiple:
+                st.success(f"{len(uploaded_files)} file(s) uploaded successfully. Ready for processing.")
+                for uploaded_file in uploaded_files:
+                    st.write(f"- {uploaded_file.name}")
+            else:
+                st.success(f"File '{uploaded_files.name}' uploaded successfully. Ready for processing.")
+            
+            # Process button
+            if st.button(f"✨ {button_text}", type="primary"):
+                _process_uploaded_files(uploaded_files, context, accept_multiple)
+
+
+def _process_uploaded_files(uploaded_files, context: str, accept_multiple: bool) -> None:
+    """
+    Internal function to process uploaded files through the unified pipeline.
+    
+    Args:
+        uploaded_files: Streamlit uploaded file objects
+        context: Processing context for business logic
+        accept_multiple: Whether multiple files were uploaded
+    """
+    
+    logging.info(f"--- UNIFIED UPLOADER PROCESSING: {context.upper()} CONTEXT ---")
+    
+    # Initialize components
+    context_store = ContextStore("production_idis.db")
+    temp_folder = os.path.join("data", f"temp_{context}_upload")
+    holding_folder = os.path.join("data", "holding")
+    
+    # Create necessary directories
+    os.makedirs(temp_folder, exist_ok=True)
+    os.makedirs(holding_folder, exist_ok=True)
+    
+    # Initialize the unified ingestion agent
+    ingestion_agent = UnifiedIngestionAgent(
+        context_store=context_store,
+        watch_folder=temp_folder,
+        holding_folder=holding_folder
+    )
+    
+    with st.spinner("Processing documents through AI pipeline..."):
+        processed_count = 0
+        failed_count = 0
+        
+        # Handle single file vs multiple files
+        files_to_process = uploaded_files if accept_multiple else [uploaded_files]
+        
+        # Process each uploaded file directly through the AI pipeline
+        for uploaded_file in files_to_process:
+            try:
+                # Save file temporarily
+                temp_path = os.path.join(temp_folder, uploaded_file.name)
+                logging.info(f"Processing '{uploaded_file.name}' through AI pipeline (context: {context})")
+                
+                with open(temp_path, "wb") as f:
+                    f.write(uploaded_file.getvalue())
+                
+                # Context-aware processing parameters
+                patient_id, session_id = _get_context_parameters(context)
+                
+                # Process directly through UnifiedIngestionAgent
+                success = ingestion_agent._process_single_file(
+                    temp_path, 
+                    uploaded_file.name, 
+                    patient_id=patient_id, 
+                    session_id=session_id
+                )
+                
+                if success:
+                    st.write(f"✅ Successfully processed {uploaded_file.name}")
+                    processed_count += 1
+                    
+                    # Context-specific success actions
+                    _handle_success_context(context, uploaded_file.name)
+                else:
+                    st.write(f"❌ Failed to process {uploaded_file.name}")
+                    failed_count += 1
+                
+                # Clean up temporary file
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+                    
+            except Exception as e:
+                st.write(f"❌ Error processing {uploaded_file.name}: {str(e)}")
+                failed_count += 1
+                logging.error(f"Error processing {uploaded_file.name}: {e}")
+        
+        # Show final results
+        _display_processing_results(processed_count, failed_count, context)
+    
+    # Clean up temp directory
+    try:
+        if os.path.exists(temp_folder):
+            os.rmdir(temp_folder)
+    except OSError:
+        pass  # Directory not empty, leave it for manual cleanup
+
+
+def _get_context_parameters(context: str) -> tuple:
+    """
+    Get context-specific patient_id and session_id parameters.
+    
+    Args:
+        context: Processing context ('medicaid', 'general', etc.)
+    
+    Returns:
+        Tuple of (patient_id, session_id)
+    """
+    
+    if context == "medicaid":
+        # Medicaid Navigator uses specific IDs for tracking
+        return (1, 1)
+    elif context == "general":
+        # General document search uses default IDs
+        return (1, 1)
+    else:
+        # Default fallback
+        return (1, 1)
+
+
+def _handle_success_context(context: str, filename: str) -> None:
+    """
+    Handle context-specific actions after successful processing.
+    
+    Args:
+        context: Processing context
+        filename: Name of the processed file
+    """
+    
+    if context == "medicaid":
+        # Future: Update Medicaid checklist, trigger compliance checks
+        logging.info(f"Medicaid document processed: {filename}")
+    elif context == "general":
+        # Future: Update general document index, trigger search indexing
+        logging.info(f"General document processed: {filename}")
+
+
+def _display_processing_results(processed_count: int, failed_count: int, context: str) -> None:
+    """
+    Display context-appropriate processing results.
+    
+    Args:
+        processed_count: Number of successfully processed files
+        failed_count: Number of failed files
+        context: Processing context
+    """
+    
+    if processed_count > 0:
+        if context == "medicaid":
+            st.success(f"Successfully processed {processed_count} Medicaid documents! Your documents are now searchable and ready for compliance checking.")
+        else:
+            st.success(f"Successfully processed {processed_count} documents! Your documents are now searchable by content.")
+            
+        if failed_count > 0:
+            st.warning(f"Failed to process {failed_count} documents. Please check the logs.")
+        
+        # Show celebration for successful processing
+        st.balloons()
+    else:
+        st.error("No documents were processed successfully. Please try again or check the file formats.")

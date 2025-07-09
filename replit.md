@@ -94,25 +94,42 @@ For future phases, additional dependencies may include:
 - External APIs for specialized analysis
 
 ## Deployment Strategy
-The current deployment is configured in .replit to run unit tests:
-```
-[deployment]
-run = ["sh", "-c", "python -m unittest discover tests"]
-```
 
-For the Phase 1 MVP:
-1. The system is designed to run locally for privacy and performance
-2. A simple CLI interface will allow basic operations
-3. The watchfolder approach simplifies document ingestion without requiring a complex UI
-4. All data is stored in a local SQLite database for easy deployment
+### Production Deployment on Replit
+The project is configured for production deployment using Docker Compose with a comprehensive multi-service architecture:
 
-Future phases may include:
-- Web-based UI
-- Multi-user support
-- Enhanced security features
-- Optional cloud integration with privacy controls
+**Primary Deployment Command**: `docker compose up`
+
+**Key Deployment Components**:
+1. **docker-compose.yml**: Multi-service orchestration for both UI and watcher services
+2. **deploy.sh**: Production deployment script with environment checks and service validation
+3. **Dockerfile**: Production-ready container with Python 3.11 and Tesseract OCR
+4. **Environment Configuration**: OpenAI API key integration for AI-powered features
+
+**Services Architecture**:
+- **idis_ui**: Streamlit web interface on port 8501 with health checks
+- **idis_watcher**: Background document processing service with file system monitoring
+- **Persistent Storage**: Volume mounts for data, database, and document archives
+- **Automatic Restart**: Services configured with `unless-stopped` restart policy
+
+**Deployment Process**:
+1. Set `OPENAI_API_KEY` environment variable
+2. Run `./deploy.sh` or `docker compose up --build`
+3. Application accessible at designated port with full AI processing capabilities
+
+**Production Features**:
+- Multi-container architecture for scalability
+- Persistent data storage with proper volume mounting
+- Health monitoring and automatic service recovery
+- Complete Docker containerization for consistent deployment
+- Integrated watcher service for automated document processing
 
 ## Recent Changes  
+- **July 2025**: **REPLIT DEPLOYMENT CONFIGURATION COMPLETE** - Configured comprehensive production deployment for Replit platform: created deploy.sh script with environment validation and service monitoring, developed DEPLOYMENT.md documentation with complete deployment guide, updated replit.md with Docker Compose deployment strategy, verified docker-compose.yml configuration with multi-service architecture (idis_ui on port 8501, idis_watcher background service), established production-ready deployment using `docker compose up` command with persistent storage, health checks, and automatic restart policies
+- **July 2025**: **UNIFIED UPLOADER COMPONENT COMPLETE** - Created comprehensive unified uploader component at modules/shared/unified_uploader.py with context parameter support ('general' vs 'medicaid'): successfully integrated into both General Document Search and Medicaid Navigator modules, achieving identical processing behavior while preserving business logic differences, validated through comprehensive testing with AI-powered document classification correctly identifying different module contexts (General Search Module vs Medicaid Navigator Module) with consistent V1.3 JSON schema output
+- **July 2025**: **MEDICAID NAVIGATOR DIRECT PROCESSING FIX COMPLETE** - Fixed Medicaid Navigator file uploader to directly call UnifiedIngestionAgent._process_single_file method ensuring proper full_text population: replaced indirect watch folder approach with direct AI processing pipeline, documents now immediately undergo complete cognitive processing with structured data extraction, guaranteeing full searchability by content for all uploads
+- **July 2025**: **SEARCH RESULTS ACCORDION REDESIGN COMPLETE** - Redesigned search results page with accordion/expander layout for improved scannability: replaced full document display with collapsed one-line summaries showing filename, document type, issuer, and date; full document details expand on demand without affecting other results; maintains all existing functionality including search highlighting, AI summaries, and structured data display
+- **July 2025**: **CUSTOM THEME IMPLEMENTATION COMPLETE** - Applied custom Streamlit theme with professional blue color scheme: primary color #5c85ad, light gray background #f0f2f6, secondary background #e1e5f2, dark blue text #1f2041, sans serif font, configured headless mode for smooth deployment
 - **July 2025**: **GIT CONFIGURATION FIX COMPLETE** - Fixed repository synchronization issue by removing docker-compose.yml from .gitignore file, enabling proper tracking of critical Docker configuration changes between environments
 - **July 2025**: **APPLICATION HARDENING COMPLETE** - Addressed critical CodeRabbit review issues: (1) Fixed potential startup crash by creating missing data/idis_archive directory, (2) Removed non-functional "Clear Results" button from search UI to prevent user confusion, (3) Moved SQL debug information into collapsed expander for cleaner interface, (4) Implemented case-insensitive boolean search with regex parsing supporting both "OR/or", "AND/and", "NOT/not" operators
 - **July 2025**: **SEARCH FUNCTIONALITY FULLY OPERATIONAL** - Resolved critical search interface issues: (1) Fixed non-responsive st.text_input widgets by replacing with working st.text_area widgets, (2) Implemented case-insensitive search with COLLATE NOCASE for all text filters, (3) Expanded advanced filters interface for better accessibility, enabling complete search functionality across all document content, types, dates, issuers, and tags

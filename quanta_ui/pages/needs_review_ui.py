@@ -25,18 +25,81 @@ if project_root not in sys.path:
 
 from context_store import ContextStore
 
+# --- Helper Functions ---
+def parse_extracted_data(extracted_data_str):
+    """Parse extracted data JSON string and return structured information."""
+    try:
+        if not extracted_data_str:
+            return {}
+        data = json.loads(extracted_data_str)
+        return data
+    except json.JSONDecodeError:
+        return {}
+
+def format_ai_document_type(doc_type_data):
+    """Format AI document type for display."""
+    if isinstance(doc_type_data, dict):
+        predicted_class = doc_type_data.get('predicted_class', 'Unknown')
+        confidence = doc_type_data.get('confidence_score', 0)
+        return f"{predicted_class} ({confidence:.1%} confidence)"
+    return str(doc_type_data) if doc_type_data else 'Unknown'
+
+def format_ai_issuer(issuer_data):
+    """Format AI issuer for display."""
+    if isinstance(issuer_data, dict):
+        name = issuer_data.get('name', 'Unknown')
+        address = issuer_data.get('address', '')
+        if address:
+            return f"{name} ({address})"
+        return name
+    return str(issuer_data) if issuer_data else 'Unknown'
+
+def get_categorization_options():
+    """Get available categorization options for documents."""
+    return {
+        "General Document": {
+            "entity_type": "general",
+            "description": "General purpose document for search and reference",
+            "color": "#5c85ad"
+        },
+        "Medicaid/Healthcare": {
+            "entity_type": "medicaid",
+            "description": "Healthcare or Medicaid-related document",
+            "color": "#28a745"
+        },
+        "Financial": {
+            "entity_type": "financial",
+            "description": "Financial document (invoice, receipt, statement)",
+            "color": "#ffc107"
+        },
+        "Legal": {
+            "entity_type": "legal",
+            "description": "Legal document (contract, agreement, notice)",
+            "color": "#dc3545"
+        },
+        "Administrative": {
+            "entity_type": "administrative",
+            "description": "Administrative or operational document",
+            "color": "#6c757d"
+        },
+        "Personal": {
+            "entity_type": "personal",
+            "description": "Personal document or correspondence",
+            "color": "#17a2b8"
+        }
+    }
+
 def render_needs_review_page():
     """Main render function for the Needs Review page."""
-    st.title("Documents Awaiting Review (HITL) 🧐")
-    st.markdown("Assign a context to documents that the system could not categorize automatically.")
+    st.title("📋 Documents Awaiting Review (HITL)")
+    st.markdown("Review and categorize documents that the AI system has flagged for human attention.")
 
     # --- Database Connection ---
-    @st.cache_resource
     def get_db_connection():
-        """Create and cache the database connection."""
+        """Create a fresh database connection to avoid threading issues."""
         try:
-            # Use the environment variable for the DB path, with a fallback for local development
-            db_path = os.getenv("REVIEW_PAGE_DB_PATH", "production_idis.db")
+            # Force correct database path - override any incorrect environment variable
+            db_path = "production_idis.db"
             
             # Ensure the directory exists (only if there's a directory path)
             db_dir = os.path.dirname(db_path)
@@ -54,7 +117,6 @@ def render_needs_review_page():
     context_store = get_db_connection()
 
     # --- Data Fetching ---
-    @st.cache_data(ttl=10) # Cache data for 10 seconds to allow for quick refreshes
     def get_docs_to_review():
         """Fetch documents with 'pending_categorization' status."""
         if not context_store:
@@ -74,71 +136,168 @@ def render_needs_review_page():
     docs_in_queue = get_docs_to_review()
     queue_count = len(docs_in_queue)
 
-    st.info(f"You have **{queue_count}** document(s) awaiting your review.", icon="ℹ️")
-
-    if not docs_in_queue:
-        st.success("The review queue is empty! Great job.", icon="✅")
+    # --- Queue Status ---
+    if queue_count == 0:
+        st.success("🎉 The review queue is empty! All documents have been categorized.", icon="✅")
+        st.info("Documents will appear here when the AI system flags them for human review.")
         st.stop()
 
-    # Get the current document to display (always the first in the list)
-    current_doc = docs_in_queue[0]
-    doc_id = current_doc['document_id']
-    extracted_data = json.loads(current_doc.get('extracted_data', '{}'))
+    # Show queue status
+    st.info(f"📊 **{queue_count}** document(s) awaiting your review")
 
-    # --- UI Layout ---
-    st.divider()
-    st.header(f"Reviewing: `{current_doc.get('file_name', 'Unknown File')}`")
-
-    col1, col2 = st.columns([1, 2])
-
-    with col1:
-        # Display key information from the extracted JSON
-        st.subheader("Extracted Details")
-        st.text(f"Document ID: {doc_id}")
-        st.info(f"**Issuer:** {extracted_data.get('issuer', {}).get('name', 'N/A')}")
-        st.text(f"**Primary Date:** {extracted_data.get('key_dates', {}).get('primary_date', 'N/A')}")
-        st.text(f"**Total Amount:** {extracted_data.get('financials', {}).get('total_amount', 'N/A')}")
+    # --- Process Each Document ---
+    for doc_index, doc in enumerate(docs_in_queue):
+        doc_id = doc.get('document_id')
+        file_name = doc.get('file_name', 'Unknown File')
+        extracted_data = parse_extracted_data(doc.get('extracted_data', ''))
+        full_text = doc.get('full_text', '')
         
-        summary = extracted_data.get('content', {}).get('summary', 'No summary available.')
-        st.text_area("AI Summary", summary, height=200, disabled=True)
-
-    with col2:
-        st.subheader("Document Preview")
-        st.warning("Document image preview is not yet implemented.", icon="🖼️")
-        st.image("https://i.imgur.com/n4s4z4V.png", caption="Placeholder for Scanned Document Image")
-
-    st.divider()
-
-    # --- Action Panel ---
-    st.subheader("Which entity should this be associated with?")
-
-    # MOCK ENTITIES - In a real app, this would be fetched from the user's settings
-    MOCK_ENTITIES = {
-        "Primary Residence": {"entity_id": "prop-uuid-001", "entity_type": "Property"},
-        "Rental on Pioneer Ave": {"entity_id": "prop-uuid-002", "entity_type": "Property"},
-        "General Business Expense": {"entity_id": "biz-uuid-001", "entity_type": "Business"}
-    }
-
-    def categorize_document(document_id_to_update, entity_data):
-        """Callback function to update the database when a button is clicked."""
-        if context_store:
-            entity_json = json.dumps(entity_data)
-            success = context_store.update_document_categorization(document_id_to_update, entity_json)
-            if success:
-                # Clear the cache to force a re-fetch of the document list on the next run
-                st.cache_data.clear()
+        # Create expandable section for each document
+        with st.expander(f"📄 **{file_name}** (Document {doc_index + 1} of {queue_count})", expanded=(doc_index == 0)):
+            
+            # --- Document Overview ---
+            col1, col2 = st.columns([2, 1])
+            
+            with col1:
+                st.subheader("📋 Document Information")
+                
+                # AI Analysis Results
+                if extracted_data:
+                    ai_doc_type = format_ai_document_type(extracted_data.get('document_type', {}))
+                    ai_issuer = format_ai_issuer(extracted_data.get('issuer', {}))
+                    ai_summary = extracted_data.get('content', {}).get('summary', 'No summary available')
+                    ai_tags = extracted_data.get('filing', {}).get('suggested_tags', [])
+                    
+                    st.markdown(f"**AI Classification:** {ai_doc_type}")
+                    st.markdown(f"**AI Detected Issuer:** {ai_issuer}")
+                    
+                    # Tags
+                    if ai_tags:
+                        tags_str = " • ".join([f"`{tag}`" for tag in ai_tags])
+                        st.markdown(f"**AI Suggested Tags:** {tags_str}")
+                    
+                    # Summary
+                    st.markdown("**AI Summary:**")
+                    st.info(ai_summary)
+                    
+                    # Financial information if available
+                    financials = extracted_data.get('financials', {})
+                    if financials and financials.get('total_amount'):
+                        st.markdown(f"**Total Amount:** ${financials.get('total_amount', 'N/A')}")
+                    
+                    # Key dates
+                    key_dates = extracted_data.get('key_dates', {})
+                    if key_dates and key_dates.get('primary_date'):
+                        st.markdown(f"**Primary Date:** {key_dates.get('primary_date', 'N/A')}")
+                
+                else:
+                    st.warning("No AI analysis data available for this document.")
+            
+            with col2:
+                st.subheader("📊 Document Stats")
+                st.metric("Document ID", doc_id or "N/A")
+                st.metric("Text Length", f"{len(full_text)} chars")
+                st.metric("Status", "Pending Review")
+            
+            # --- Document Text Preview ---
+            st.subheader("📖 Document Content")
+            if full_text:
+                # Use details/summary instead of nested expander to avoid Streamlit limitation
+                if st.checkbox("Show Full Document Text", key=f"show_text_{doc_id}"):
+                    st.text_area("Document Text", full_text, height=300, disabled=True, key=f"text_{doc_id}")
             else:
-                st.error("Failed to update document categorization in the database.")
+                st.warning("No text content available for this document.")
+            
+            # --- Categorization Section ---
+            st.subheader("🎯 Categorize This Document")
+            st.markdown("Select the appropriate category for this document:")
+            
+            # Get categorization options
+            categories = get_categorization_options()
+            
+            # Create categorization buttons
+            col_count = 3
+            button_cols = st.columns(col_count)
+            
+            category_items = list(categories.items())
+            for i, (category_name, category_data) in enumerate(category_items):
+                col_idx = i % col_count
+                with button_cols[col_idx]:
+                    if st.button(
+                        f"📂 {category_name}",
+                        key=f"cat_{doc_id}_{category_name.replace(' ', '_')}",
+                        help=category_data["description"],
+                        use_container_width=True
+                    ):
+                        # Process the categorization
+                        success = categorize_document(context_store, doc_id, category_name, category_data)
+                        if success:
+                            st.success(f"✅ Document categorized as: {category_name}")
+                            st.rerun()
+                        else:
+                            st.error("❌ Failed to categorize document. Please try again.")
+            
+            # --- Additional Actions ---
+            st.subheader("🔧 Additional Actions")
+            action_col1, action_col2 = st.columns(2)
+            
+            with action_col1:
+                if st.button(f"🗑️ Skip This Document", key=f"skip_{doc_id}", help="Skip this document for now"):
+                    # Move to a different status to remove from queue
+                    skip_success = skip_document(context_store, doc_id)
+                    if skip_success:
+                        st.info("Document skipped and moved to later review.")
+                        st.rerun()
+                    else:
+                        st.error("Failed to skip document.")
+            
+            with action_col2:
+                if st.button(f"🔄 Re-analyze", key=f"reanalyze_{doc_id}", help="Re-run AI analysis on this document"):
+                    st.info("Re-analysis feature not yet implemented.")
+            
+            st.divider()
 
-    # Create a button for each entity
-    button_cols = st.columns(len(MOCK_ENTITIES))
-    for i, (entity_name, entity_data) in enumerate(MOCK_ENTITIES.items()):
-        with button_cols[i]:
-            st.button(
-                entity_name, 
-                key=f"entity_{entity_name}", 
-                on_click=categorize_document,
-                args=(doc_id, entity_data),
-                use_container_width=True,
-                type="primary" if i == 0 else "secondary"
-            )
+def categorize_document(context_store, doc_id, category_name, category_data):
+    """Categorize a document and update its status in the database."""
+    try:
+        # Create entity data for the categorization
+        entity_data = {
+            "entity_name": category_name,
+            "entity_type": category_data["entity_type"],
+            "entity_id": f"{category_data['entity_type']}_{doc_id}",
+            "categorization_timestamp": datetime.now().isoformat(),
+            "categorized_by": "human_reviewer",
+            "category_description": category_data["description"]
+        }
+        
+        # Update the document categorization
+        entity_json = json.dumps(entity_data)
+        success = context_store.update_document_categorization(doc_id, entity_json)
+        
+        if success:
+            return True
+        else:
+            return False
+            
+    except Exception as e:
+        st.error(f"Error categorizing document: {e}")
+        return False
+
+def skip_document(context_store, doc_id):
+    """Skip a document by changing its status."""
+    try:
+        # Update the document status to 'skipped_review'
+        success = context_store.update_document_fields(doc_id, {
+            'processing_status': 'skipped_review',
+            'review_timestamp': datetime.now().isoformat(),
+            'reviewed_by': 'human_reviewer'
+        })
+        
+        if success:
+            return True
+        else:
+            return False
+            
+    except Exception as e:
+        st.error(f"Error skipping document: {e}")
+        return False

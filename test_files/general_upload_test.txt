@@ -1,0 +1,13 @@
+General Document Upload Test
+
+This is a test document for the General Search uploader functionality.
+The document contains sample information to verify that the unified uploader
+correctly processes files with 'general' context.
+
+Document Type: Test Document
+Source: General Search Module
+Date: July 9, 2025
+Content: This document should be processed through the unified uploader
+with context='general' parameter.
+
+Test Keywords: general, upload, document, search, test

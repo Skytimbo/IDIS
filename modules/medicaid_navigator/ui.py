@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import os
 import logging
+from context_store import ContextStore
+from unified_ingestion_agent import UnifiedIngestionAgent
 
 def render_navigator_ui():
     """
@@ -44,35 +46,21 @@ def render_navigator_ui():
 
     # --- 2. Document Upload ---
     st.header("2. Upload Your Documents")
-    uploaded_files = st.file_uploader(
-        "Drag and drop your PDFs or images here.",
-        type=['pdf', 'png', 'jpg', 'jpeg'],
-        accept_multiple_files=True
+    
+    # Use the unified uploader component
+    from modules.shared.unified_uploader import render_unified_uploader
+    
+    render_unified_uploader(
+        context="medicaid",
+        title="Upload Medicaid Documents",
+        description="Drag and drop your PDFs or images here.",
+        button_text="Analyze My Documents",
+        file_types=['pdf', 'png', 'jpg', 'jpeg', 'txt', 'docx'],
+        accept_multiple=True
     )
-
-    if uploaded_files:
-        st.success(f"{len(uploaded_files)} file(s) uploaded successfully. They are ready for processing.")
-        for uploaded_file in uploaded_files:
-            st.write(f"- {uploaded_file.name}")
-
+    
     # --- 3. Processing ---
     st.header("3. Process and Prepare Packet")
-    if st.button("✨ Analyze My Documents", type="primary", disabled=(not uploaded_files)):
-        logging.info("--- ANALYZE BUTTON CLICKED ---")
-        watch_folder = os.path.join("data", "scanner_output")
-        logging.info(f"Attempting to save to watch folder: {watch_folder}")
-
-        # Create the watch folder if it does not exist
-        os.makedirs(watch_folder, exist_ok=True)
-        
-        with st.spinner("Submitting documents to the processing pipeline..."):
-            # Save each uploaded file to the watch folder
-            for uploaded_file in uploaded_files or []:
-                dest_path = os.path.join(watch_folder, uploaded_file.name)
-                logging.info(f"Saving '{uploaded_file.name}' to '{dest_path}'")
-                with open(dest_path, "wb") as f:
-                    f.write(uploaded_file.getvalue())
-                st.write(f"✅ Submitted {uploaded_file.name} for processing.")
-                
-            st.success("All documents submitted! The checklist will update as each document is analyzed.")
-            st.balloons()
+    if False:  # This block is now handled by the unified uploader
+        # This processing logic is now handled by the unified uploader
+        pass
