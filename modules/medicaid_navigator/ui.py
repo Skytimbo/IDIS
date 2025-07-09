@@ -158,11 +158,17 @@ def assign_document_to_requirement(document_id: int, requirement_id: int, patien
         document_id: ID of the document to assign
         requirement_id: ID of the checklist requirement
         patient_id: Patient ID (default: 1)
+        override: Whether this assignment is an override of validation warnings
+        override_reason: Reason for the override (logged for audit trail)
     
     Returns:
         bool: True if assignment was successful
     """
     try:
+        # Log override actions for audit trail
+        if override and override_reason:
+            logging.info(f"AUDIT: Document assignment override - {override_reason}")
+        
         db_path = st.session_state.get('database_path', 'production_idis.db')
         context_store = ContextStore(db_path)
         cursor = context_store.conn.cursor()
