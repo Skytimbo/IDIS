@@ -121,10 +121,12 @@ def _process_uploaded_files(uploaded_files, context: str, accept_multiple: bool)
                     st.write(f"✅ Successfully processed {uploaded_file.name}")
                     processed_count += 1
                     
+
                     # Store processed document info in session state for assignment
                     if context == "medicaid":
                         _store_processed_document(uploaded_file.name, context_store)
                     
+
                     # Context-specific success actions
                     _handle_success_context(context, uploaded_file.name)
                 else:
@@ -189,7 +191,6 @@ def _handle_success_context(context: str, filename: str) -> None:
         # Future: Update general document index, trigger search indexing
         logging.info(f"General document processed: {filename}")
 
-
 def _store_processed_document(filename: str, context_store: ContextStore) -> None:
     """
     Store processed document information in session state for assignment.
@@ -231,7 +232,6 @@ def _store_processed_document(filename: str, context_store: ContextStore) -> Non
         
     except Exception as e:
         logging.error(f"Error storing processed document {filename}: {e}")
-
 
 def _display_processing_results(processed_count: int, failed_count: int, context: str) -> None:
     """

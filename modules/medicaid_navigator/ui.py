@@ -335,7 +335,8 @@ def render_navigator_ui():
         file_types=['pdf', 'png', 'jpg', 'jpeg', 'txt', 'docx'],
         accept_multiple=True
     )
-    
+
+
     # --- 2.5. Document Assignment Interface ---
     render_document_assignment_interface()
     
