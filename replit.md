@@ -6,6 +6,16 @@ The Intelligent Document Insight System (IDIS) is designed to transform unstruct
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
+## Master Prompt Context
+This document serves as the master prompt and continuity record for the IDIS project. It contains:
+- Complete architectural overview with rationale for design decisions
+- Comprehensive development history with technical details
+- User preferences and communication style
+- Current project state and next steps
+- Known issues and their resolution status
+
+**For New AI Systems**: This file provides all necessary context to understand the project's evolution, current state, and continue development seamlessly. Pay special attention to the Recent Changes section which chronicles the complete development journey with technical specifics.
+
 ## System Architecture
 IDIS follows a modular architecture with the following core components:
 
@@ -171,12 +181,38 @@ The project is configured for production deployment using Docker Compose with a 
 - **June 2025**: Restored local Dell development machine database paths for final deployment readiness
 - **June 2025**: Comprehensive security analysis confirmed SQL injection vulnerability reports were false positives due to proper whitelisting and parameterized queries
 
+## Current State (July 2025)
+**Project Status**: Production-ready with comprehensive deployment infrastructure
+**Latest Version**: Multi-module platform with AI-powered cognitive processing
+**Key Achievements**:
+- ✅ Complete modular architecture with General Document Search and Medicaid Navigator
+- ✅ AI-powered processing using OpenAI GPT-4o with V1.3 JSON schema
+- ✅ Production Docker deployment with multi-service architecture
+- ✅ Unified uploader component with context-aware processing
+- ✅ Search interface with highlighting, filtering, and accordion display
+- ✅ Human-in-the-loop workflow for document review
+- ✅ Comprehensive logging and error handling
+- ✅ SQLite database with hybrid schema supporting legacy and modern data
+
+**Active Services**:
+- Main App: Streamlit interface on port 5000 (development) / 8501 (production)
+- Production Watcher Service: Monitoring `data/scanner_output` folder
+- Database: `production_idis.db` with test documents
+
+**Next Development Areas**:
+- Performance optimization for large document collections
+- Enhanced AI prompts for specialized document types
+- Advanced search operators and filters
+- Integration with external document sources
+- Mobile-responsive interface improvements
+
 ## Development Guidelines
 1. Maintain the modular structure to enable independent agent development
 2. Ensure comprehensive unit testing for all components
 3. Follow privacy-by-design principles
 4. Document all API interfaces between components
 5. Prioritize features based on the Phase 1 MVP roadmap
+6. Update this replit.md file with all architectural changes and user preferences
 
 ## Docker Deployment
 The system now includes complete containerization support:
@@ -184,3 +220,41 @@ The system now includes complete containerization support:
 - **docker-compose.yml**: Multi-service orchestration for watcher and UI services
 - **Volume mounts**: Persistent data storage for documents and database
 - **Environment variables**: OpenAI API key configuration support
+
+## Known Issues & Environment Notes
+**Resolved Issues**:
+- ✅ SQLite threading conflicts (removed @st.cache_resource decorators)
+- ✅ Docker file detection in containers (switched to PollingObserver)
+- ✅ Race conditions in document processing (triage architecture)
+- ✅ Data loss in failed processing (holding folder implementation)
+- ✅ Search interface responsiveness (replaced text_input with text_area)
+
+**Environment Requirements**:
+- Python 3.11 (specified in .replit)
+- OpenAI API key (required for cognitive processing)
+- SQLite database (production_idis.db)
+- Required directories: data/scanner_output, data/inbox, data/holding, data/archive
+- Docker support for containerized deployment
+
+**Development Notes**:
+- Cannot edit .replit file directly (permission restrictions)
+- Use deploy.sh script for production deployment
+- Logging configured via LOGGING_LEVEL environment variable
+- Test documents available in database (IDs 19, 20)
+
+## File Structure Overview
+```
+.
+├── app.py                      # Main Streamlit application router
+├── modules/                    # Modular UI components
+│   ├── search_ui.py           # General document search interface
+│   ├── medicaid_navigator/    # Specialized Medicaid module
+│   └── shared/                # Shared components (unified uploader)
+├── context_store.py           # SQLite database management
+├── unified_ingestion_agent.py # AI-powered document processing
+├── watcher_service.py         # File monitoring and processing
+├── docker-compose.yml         # Production deployment configuration
+├── deploy.sh                  # Deployment script
+├── production_idis.db         # Production database
+└── replit.md                  # Master prompt and project documentation
+```
