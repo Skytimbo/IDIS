@@ -471,7 +471,30 @@ def render_navigator_ui():
     )
 
     # --- 2.5. Document Assignment Interface ---
-    render_document_assignment_interface()
+    # render_document_assignment_interface()  # Commented out for debugging
+    
+    # DEBUGGING: Simple override test
+    st.header("🪲 Debugging Override")
+    # Hardcode IDs for a direct test. Let's try to assign Document 4 to Requirement 1.
+    test_doc_id = 4  # test_payslip.txt
+    test_req_id = 1  # Proof of Identity
+    
+    st.write(f"Clicking this button will attempt to assign Document ID {test_doc_id} to Requirement ID {test_req_id} with an override.")
+    
+    if st.button("!! Force Override Test !!", type="primary"):
+        st.info("DEBUG: Force Override Button Clicked.")
+        success = assign_document_to_requirement(
+            document_id=test_doc_id,
+            requirement_id=test_req_id,
+            override=True,
+            override_reason="Forced debug override"
+        )
+        
+        if success:
+            st.success("DEBUG: Assignment function returned True. Rerunning page.")
+            st.experimental_rerun()
+        else:
+            st.error("DEBUG: Assignment function returned False.")
     
     # --- 3. Next Steps ---
     st.header("3. Next Steps")
