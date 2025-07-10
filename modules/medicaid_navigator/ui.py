@@ -335,7 +335,7 @@ def get_all_patients():
         context_store = ContextStore(db_path)
         cursor = context_store.conn.cursor()
         cursor.execute("""
-            SELECT patient_id, patient_name 
+            SELECT id, patient_name 
             FROM patients 
             ORDER BY patient_name
         """)
