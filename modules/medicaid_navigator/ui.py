@@ -127,6 +127,10 @@ def validate_document_assignment(ai_detected_type: str, selected_requirement: st
             'Utility Bill', 'Bank Statement', 'Lease Agreement',
             'Mortgage Statement', 'Rent Receipt'
         ],
+        'Proof of Alaska Residency': [
+            'Utility Bill', 'Bank Statement', 'Lease Agreement',
+            'Mortgage Statement', 'Rent Receipt'
+        ],
         'Proof of Income': [
             'Paystub', 'Employment Letter', 'Social Security Award',
             'Tax Return', 'Bank Statement', 'Payslip'
