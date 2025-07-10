@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script to verify the assignment fix is working correctly.
+Direct database test for override functionality - no Streamlit dependencies.
 """
 
 import sqlite3
@@ -9,8 +9,8 @@ import logging
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
-def test_assignment_fix():
-    """Test that the assignment function now works with the 'id' column."""
+def test_direct_database_override():
+    """Test assignment directly via database operations."""
     
     db_path = 'production_idis.db'
     
@@ -19,11 +19,11 @@ def test_assignment_fix():
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         
-        # Find a test document using the 'id' column
+        # Find a test document
         cursor.execute("""
-            SELECT id, file_name, document_type 
+            SELECT document_id, file_name, document_type 
             FROM documents 
-            WHERE file_name LIKE '%test%' OR file_name LIKE '%payslip%'
+            WHERE document_type = 'Correspondence' OR document_type LIKE '%payslip%' OR file_name LIKE '%test%'
             ORDER BY upload_timestamp DESC 
             LIMIT 1
         """)
@@ -52,24 +52,37 @@ def test_assignment_fix():
         requirement_id, req_name = req_result
         print(f"Found requirement: ID={requirement_id}, name={req_name}")
         
-        # Test assignment using the 'id' column
-        print("\n=== TESTING ASSIGNMENT WITH ID COLUMN ===")
+        # Test direct database assignment
+        print("\n=== TESTING DIRECT DATABASE ASSIGNMENT ===")
         
-        # Check if a record already exists and delete it for clean test
+        # Check if a record already exists
         cursor.execute("""
-            DELETE FROM case_documents 
+            SELECT id FROM case_documents 
             WHERE checklist_item_id = ? AND entity_id = ? AND case_id = ?
         """, (requirement_id, 1, 'CASE-1-DEFAULT'))
         
-        # Insert new record using the 'id' column
-        cursor.execute("""
-            INSERT INTO case_documents (case_id, entity_id, checklist_item_id, document_id, status, created_at, updated_at)
-            VALUES (?, ?, ?, ?, 'Submitted', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        """, ('CASE-1-DEFAULT', 1, requirement_id, document_id))
+        existing_record = cursor.fetchone()
+        
+        if existing_record:
+            print(f"Found existing record: {existing_record[0]}")
+            # Update existing record
+            cursor.execute("""
+                UPDATE case_documents 
+                SET document_id = ?, status = 'Submitted', updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (document_id, existing_record[0]))
+            print("Updated existing record")
+        else:
+            # Insert new record
+            cursor.execute("""
+                INSERT INTO case_documents (case_id, entity_id, checklist_item_id, document_id, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, 'Submitted', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, ('CASE-1-DEFAULT', 1, requirement_id, document_id))
+            print("Inserted new record")
         
         # Commit the transaction
         conn.commit()
-        print("✅ Assignment record created successfully")
+        print("✅ Database transaction committed successfully")
         
         # Verify the assignment
         cursor.execute("""
@@ -81,24 +94,10 @@ def test_assignment_fix():
         
         result = cursor.fetchone()
         if result:
-            print(f"✅ Assignment verified: Status '{result[5]}' for document {document_id}")
-            print(f"✅ Document properly linked to requirement '{result[7]}'")
-            
-            # Test if the UI will now see the status indicator
-            cursor.execute("""
-                SELECT COUNT(*) FROM case_documents cd 
-                WHERE cd.checklist_item_id = ? AND cd.entity_id = ? AND cd.case_id = ?
-            """, (requirement_id, 1, 'CASE-1-DEFAULT'))
-            
-            count = cursor.fetchone()[0]
-            if count > 0:
-                print("✅ Status indicator should now work correctly (count > 0)")
-                return True
-            else:
-                print("❌ Status indicator will still be broken (count = 0)")
-                return False
+            print(f"✅ Verification successful: Assignment found with status '{result[5]}'")
+            return True
         else:
-            print("❌ Assignment verification failed")
+            print("❌ Verification failed: Assignment not found")
             return False
         
     except Exception as e:
@@ -110,12 +109,12 @@ def test_assignment_fix():
             conn.close()
 
 if __name__ == "__main__":
-    print("Testing assignment fix...")
-    success = test_assignment_fix()
+    print("Testing direct database override functionality...")
+    success = test_direct_database_override()
     
     if success:
-        print("\n🎉 Assignment fix is working correctly!")
-        print("The override workflow should now work with the 'id' column.")
+        print("\n🎉 Direct database assignment is working correctly!")
+        print("This suggests the issue is with the Streamlit UI interaction, not the database logic.")
     else:
-        print("\n💥 Assignment fix still has issues.")
-        print("Additional debugging may be needed.")
+        print("\n💥 Direct database assignment failed!")
+        print("The issue is at the database level.")

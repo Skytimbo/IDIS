@@ -203,7 +203,7 @@ def _store_processed_document(filename: str, context_store: ContextStore) -> Non
         # Query for the most recently added document with this filename
         cursor = context_store.conn.cursor()
         cursor.execute("""
-            SELECT document_id, file_name, document_type, extracted_data
+            SELECT id, file_name, document_type, extracted_data
             FROM documents 
             WHERE file_name = ? 
             ORDER BY upload_timestamp DESC 
@@ -221,7 +221,7 @@ def _store_processed_document(filename: str, context_store: ContextStore) -> Non
             
             # Add to processed documents list
             document_info = {
-                'document_id': document_id,
+                'document_id': document_id,  # Using the 'id' column instead of 'document_id'
                 'filename': file_name,
                 'document_type': document_type,
                 'extracted_data': extracted_data
