@@ -192,7 +192,7 @@ def assign_document_to_requirement(document_id: int, requirement_id: int, patien
         # Check if a record already exists for this requirement
         cursor.execute("""
             SELECT id FROM case_documents 
-            WHERE checklist_item_id = ? AND patient_id = ? AND case_id = ?
+            WHERE checklist_item_id = ? AND entity_id = ? AND case_id = ?
         """, (requirement_id, patient_id, case_id))
         
         existing_record = cursor.fetchone()
@@ -207,7 +207,7 @@ def assign_document_to_requirement(document_id: int, requirement_id: int, patien
         else:
             # Insert new record
             cursor.execute("""
-                INSERT INTO case_documents (case_id, patient_id, checklist_item_id, document_id, status, created_at, updated_at)
+                INSERT INTO case_documents (case_id, entity_id, checklist_item_id, document_id, status, created_at, updated_at)
                 VALUES (?, ?, ?, ?, 'Submitted', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             """, (case_id, patient_id, requirement_id, document_id))
         

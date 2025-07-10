@@ -1,6 +1,0 @@
-Paystub - Period: 06/15/2025 to 06/30/2025
-Employee: Jane Doe
-Employer: Alaska General Hospital
-Gross Pay: $2,100.00
-Net Pay: $1,650.00
-This document serves as proof of income.
