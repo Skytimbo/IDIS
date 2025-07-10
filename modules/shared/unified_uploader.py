@@ -121,6 +121,12 @@ def _process_uploaded_files(uploaded_files, context: str, accept_multiple: bool)
                     st.write(f"✅ Successfully processed {uploaded_file.name}")
                     processed_count += 1
                     
+
+                    # Store processed document info in session state for assignment
+                    if context == "medicaid":
+                        _store_processed_document(uploaded_file.name, context_store)
+                    
+
                     # Context-specific success actions
                     _handle_success_context(context, uploaded_file.name)
                 else:
@@ -185,6 +191,47 @@ def _handle_success_context(context: str, filename: str) -> None:
         # Future: Update general document index, trigger search indexing
         logging.info(f"General document processed: {filename}")
 
+def _store_processed_document(filename: str, context_store: ContextStore) -> None:
+    """
+    Store processed document information in session state for assignment.
+    
+    Args:
+        filename: Name of the processed file
+        context_store: Database connection to query document information
+    """
+    try:
+        # Query for the most recently added document with this filename
+        cursor = context_store.conn.cursor()
+        cursor.execute("""
+            SELECT document_id, file_name, document_type, extracted_data
+            FROM documents 
+            WHERE file_name = ? 
+            ORDER BY upload_timestamp DESC 
+            LIMIT 1
+        """, (filename,))
+        
+        result = cursor.fetchone()
+        
+        if result:
+            document_id, file_name, document_type, extracted_data = result
+            
+            # Initialize session state for processed documents if it doesn't exist
+            if 'processed_documents' not in st.session_state:
+                st.session_state.processed_documents = []
+            
+            # Add to processed documents list
+            document_info = {
+                'document_id': document_id,
+                'filename': file_name,
+                'document_type': document_type,
+                'extracted_data': extracted_data
+            }
+            
+            st.session_state.processed_documents.append(document_info)
+            logging.info(f"Stored processed document: {filename} (ID: {document_id})")
+        
+    except Exception as e:
+        logging.error(f"Error storing processed document {filename}: {e}")
 
 def _display_processing_results(processed_count: int, failed_count: int, context: str) -> None:
     """

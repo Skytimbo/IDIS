@@ -33,8 +33,16 @@ mkdir -p data/coversheets
 
 # Ensure the production database file exists
 if [ ! -f "production_idis.db" ]; then
-    echo "Warning: production_idis.db not found. Creating empty database..."
-    touch production_idis.db
+    echo "Warning: production_idis.db not found. Initializing database with proper schema..."
+    python3 -c "
+from context_store import ContextStore
+import sys
+print('Creating database with proper schema...')
+cs = ContextStore('production_idis.db')
+print('Database initialized successfully')
+"
+    # Also add case management tables
+    python3 init_case_management_db.py production_idis.db
 fi
 
 # Start the application using Docker Compose
