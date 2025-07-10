@@ -189,10 +189,10 @@ def assign_document_to_requirement(document_id: int, requirement_id: int, patien
                 WHERE id = ?
             """, (document_id, existing_record[0]))
         else:
-            # Insert new record
+            # Insert new record - case_id should be TEXT, so use string
             cursor.execute("""
                 INSERT INTO case_documents (case_id, patient_id, checklist_item_id, document_id, status, created_at, updated_at)
-                VALUES (1, ?, ?, ?, 'Submitted', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                VALUES ('1', ?, ?, ?, 'Submitted', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             """, (patient_id, requirement_id, document_id))
         
         context_store.conn.commit()
