@@ -284,29 +284,19 @@ def render_document_assignment_interface():
                     if selected_requirement:
                         requirement_id = requirement_options[selected_requirement]
                         
-                        # Validate the assignment
-                        validation_result = validate_document_assignment(
-                            doc_info.get('document_type', 'Unknown'), 
-                            selected_requirement
+                        # Direct assignment without validation
+                        success = assign_document_to_requirement(
+                            doc_info['document_id'], 
+                            requirement_id
                         )
                         
-                        if validation_result['is_valid']:
-                            # Valid assignment - proceed normally
-                            success = assign_document_to_requirement(
-                                doc_info['document_id'], 
-                                requirement_id
-                            )
-                            
-                            if success:
-                                st.success(f"✅ Document assigned to '{selected_requirement}'")
-                                # Mark document for removal
-                                documents_to_remove.append(doc_info)
-                                rerun_needed = True
-                            else:
-                                st.error("❌ Failed to assign document")
+                        if success:
+                            st.success(f"✅ Document assigned to '{selected_requirement}'")
+                            # Mark document for removal
+                            documents_to_remove.append(doc_info)
+                            rerun_needed = True
                         else:
-                            # Invalid assignment - show warning only
-                            st.warning(f"⚠️ {validation_result['warning_message']}")
+                            st.error("❌ Failed to assign document")
                     else:
                         st.warning("Please select a requirement first")
     

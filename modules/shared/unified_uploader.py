@@ -219,15 +219,18 @@ def _store_processed_document(filename: str, context_store: ContextStore) -> Non
             if 'processed_documents' not in st.session_state:
                 st.session_state.processed_documents = []
             
-            # Add to processed documents list
-            document_info = {
-                'document_id': document_id,  # Using the 'id' column instead of 'document_id'
-                'filename': file_name,
-                'document_type': document_type,
-                'extracted_data': extracted_data
-            }
-            
-            st.session_state.processed_documents.append(document_info)
+            # Check for duplicate entries before adding
+            existing_filenames = [doc['filename'] for doc in st.session_state.processed_documents]
+            if file_name not in existing_filenames:
+                # Add to processed documents list
+                document_info = {
+                    'document_id': document_id,  # Using the 'id' column instead of 'document_id'
+                    'filename': file_name,
+                    'document_type': document_type,
+                    'extracted_data': extracted_data
+                }
+                
+                st.session_state.processed_documents.append(document_info)
             logging.info(f"Stored processed document: {filename} (ID: {document_id})")
         
     except Exception as e:
