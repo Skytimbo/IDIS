@@ -507,7 +507,11 @@ def render_search_ui():
                     
                     # Document Viewer Component
                     st.subheader("📄 Original Document")
-                    if os.path.exists(filed_path):
+                    
+                    # Check if this is a test document placeholder
+                    if filed_path.startswith("TEST_DOCUMENT_NO_ARCHIVE/"):
+                        st.info("ℹ️ This is a test document added directly to the database. No archived file is available for display.")
+                    elif os.path.exists(filed_path):
                         file_extension = os.path.splitext(filed_path)[1].lower()
                         
                         if file_extension == '.pdf':
