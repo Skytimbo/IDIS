@@ -83,6 +83,11 @@ def parse_boolean_search(search_term: str) -> Tuple[str, List[str]]:
     search_term = search_term.strip()
     import re
     
+    # Handle quoted strings first - strip quotes and treat as exact phrase
+    if search_term.startswith('"') and search_term.endswith('"'):
+        cleaned_term = search_term[1:-1].strip()
+        return "full_text LIKE ? COLLATE NOCASE", [f"%{cleaned_term}%"]
+    
     # Handle OR operator (case-insensitive)
     if re.search(r'\s+or\s+', search_term, re.IGNORECASE):
         terms = [term.strip() for term in re.split(r'\s+or\s+', search_term, flags=re.IGNORECASE) if term.strip()]
@@ -90,6 +95,9 @@ def parse_boolean_search(search_term: str) -> Tuple[str, List[str]]:
             conditions = []
             params = []
             for term in terms:
+                # Handle quoted terms within OR
+                if term.startswith('"') and term.endswith('"'):
+                    term = term[1:-1].strip()
                 conditions.append("full_text LIKE ? COLLATE NOCASE")
                 params.append(f"%{term}%")
             return f"({' OR '.join(conditions)})", params
@@ -101,6 +109,9 @@ def parse_boolean_search(search_term: str) -> Tuple[str, List[str]]:
             conditions = []
             params = []
             for term in terms:
+                # Handle quoted terms within AND
+                if term.startswith('"') and term.endswith('"'):
+                    term = term[1:-1].strip()
                 conditions.append("full_text LIKE ? COLLATE NOCASE")
                 params.append(f"%{term}%")
             return f"({' AND '.join(conditions)})", params
@@ -111,6 +122,11 @@ def parse_boolean_search(search_term: str) -> Tuple[str, List[str]]:
         if len(parts) == 2:
             include_term = parts[0]
             exclude_term = parts[1]
+            # Handle quoted terms in NOT
+            if include_term.startswith('"') and include_term.endswith('"'):
+                include_term = include_term[1:-1].strip()
+            if exclude_term.startswith('"') and exclude_term.endswith('"'):
+                exclude_term = exclude_term[1:-1].strip()
             return "(full_text LIKE ? COLLATE NOCASE AND full_text NOT LIKE ? COLLATE NOCASE)", [f"%{include_term}%", f"%{exclude_term}%"]
     
     # Default single term search - this should always work for simple terms
@@ -291,13 +307,13 @@ def render_search_ui():
     st.title("🔍 QuantaIQ Document Search")
     st.markdown("*Intelligent Document Insight System - Cognitive Interface*")
 
-    # Clear session state button for debugging
-    if st.button("🔄 Clear Search Results"):
+    # Clear search results button with better explanation
+    if st.button("🔄 Clear Search Results", help="Clear all previous search results and start fresh"):
         if 'results' in st.session_state:
             del st.session_state['results']
         if 'search_term' in st.session_state:
             del st.session_state['search_term']
-        st.rerun()
+        st.experimental_rerun()
 
     # Alternative approach - move everything to main area and use columns
     col1, col2 = st.columns([2, 1])
@@ -306,7 +322,7 @@ def render_search_ui():
         st.subheader("Search Parameters")
         
         # Use working text area method
-        search_term = st.text_area("Search Document Content", height=100, placeholder="Enter search terms here (e.g., payslip, utility bill)...")
+        search_term = st.text_area("Search Document Content", height=100, placeholder="Enter search terms here (e.g., payslip, utility bill)...", help="Type your search terms and press Enter to search (the 'cmd+enter' popup is optional - regular Enter works fine)")
         
         # Boolean search help
         with st.expander("💡 Boolean Search Tips"):
@@ -479,15 +495,35 @@ def render_search_ui():
                 search_term = st.session_state.get('search_term', '')
                 
                 if search_term and search_term.strip():
-                    # Replacement style now includes 'color: black;' for dark mode visibility
-                    replacement_style = r"<span style='background-color: #FFFF00; color: black;'>\1</span>"
+                    # Extract the actual search term for highlighting (handle quoted strings)
+                    highlight_term = search_term.strip()
+                    if highlight_term.startswith('"') and highlight_term.endswith('"'):
+                        highlight_term = highlight_term[1:-1].strip()
                     
-                    highlighted_text = re.sub(
-                        f'({re.escape(search_term.strip())})', 
-                        replacement_style, 
-                        full_text, 
-                        flags=re.IGNORECASE
-                    )
+                    # For OR searches, highlight all terms
+                    if re.search(r'\s+or\s+', highlight_term, re.IGNORECASE):
+                        terms = [term.strip() for term in re.split(r'\s+or\s+', highlight_term, flags=re.IGNORECASE) if term.strip()]
+                        highlighted_text = full_text
+                        for term in terms:
+                            # Handle quoted terms within OR
+                            if term.startswith('"') and term.endswith('"'):
+                                term = term[1:-1].strip()
+                            replacement_style = r"<span style='background-color: #FFFF00; color: black;'>\1</span>"
+                            highlighted_text = re.sub(
+                                f'({re.escape(term)})', 
+                                replacement_style, 
+                                highlighted_text, 
+                                flags=re.IGNORECASE
+                            )
+                    else:
+                        # Single term highlighting
+                        replacement_style = r"<span style='background-color: #FFFF00; color: black;'>\1</span>"
+                        highlighted_text = re.sub(
+                            f'({re.escape(highlight_term)})', 
+                            replacement_style, 
+                            full_text, 
+                            flags=re.IGNORECASE
+                        )
                     
                     # Convert newlines to HTML <br> tags for proper rendering in markdown
                     html_text_with_breaks = highlighted_text.replace('\n', '<br>')
@@ -504,5 +540,48 @@ def render_search_ui():
                 if filed_path:
                     st.subheader("📁 File Location")
                     st.code(filed_path, language=None)
+                    
+                    # Document Viewer Component
+                    st.subheader("📄 Original Document")
+                    
+                    # Check if this is a test document placeholder
+                    if filed_path.startswith("TEST_DOCUMENT_NO_ARCHIVE/"):
+                        st.info("ℹ️ This is a test document added directly to the database. No archived file is available for display.")
+                    elif os.path.exists(filed_path):
+                        file_extension = os.path.splitext(filed_path)[1].lower()
+                        
+                        if file_extension == '.pdf':
+                            # For PDF files, show a download button
+                            with open(filed_path, 'rb') as file:
+                                pdf_bytes = file.read()
+                            st.download_button(
+                                label="📥 Download PDF",
+                                data=pdf_bytes,
+                                file_name=os.path.basename(filed_path),
+                                mime="application/pdf"
+                            )
+                            
+                        elif file_extension in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:
+                            # For image files, display directly
+                            st.image(filed_path, caption=f"Original Document: {os.path.basename(filed_path)}")
+                            
+                        elif file_extension in ['.txt', '.md']:
+                            # For text files, show content
+                            with open(filed_path, 'r', encoding='utf-8', errors='ignore') as file:
+                                text_content = file.read()
+                            st.text_area("File Content", value=text_content, height=200, disabled=True)
+                            
+                        else:
+                            # For other file types, provide download option
+                            with open(filed_path, 'rb') as file:
+                                file_bytes = file.read()
+                            st.download_button(
+                                label=f"📥 Download {file_extension.upper()} File",
+                                data=file_bytes,
+                                file_name=os.path.basename(filed_path),
+                                mime="application/octet-stream"
+                            )
+                    else:
+                        st.error("⚠️ Original document file not found at the specified location.")
     else:
         st.info("👆 Use the filters in the sidebar and click Search to find documents.")

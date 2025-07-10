@@ -1,8 +1,8 @@
-modules = ["python-3.11", "postgresql-16"]
+modules = ["python-3.11", "postgresql-16", "python3"]
 
 [nix]
 channel = "stable-24_05"
-packages = ["bash", "cacert", "cargo", "fontconfig", "freetype", "ghostscript", "glib", "glibcLocales", "gumbo", "harfbuzz", "jbig2dec", "lcms2", "libffi", "libiconv", "libimagequant", "libjpeg", "libjpeg_turbo", "libtiff", "libwebp", "libxcrypt", "mupdf", "nano", "openjpeg", "pango", "pkg-config", "rustc", "swig", "tcl", "tesseract", "tk", "xcbuild", "xcodebuild", "zlib", "docker-compose_1", "docker", "docker-compose"]
+packages = ["arrow-cpp", "bash", "cacert", "cargo", "docker", "docker-compose", "docker-compose_1", "fontconfig", "freetype", "ghostscript", "glib", "glibcLocales", "gumbo", "harfbuzz", "jbig2dec", "lcms2", "libffi", "libiconv", "libimagequant", "libjpeg", "libjpeg_turbo", "libtiff", "libwebp", "libxcrypt", "mupdf", "nano", "openjpeg", "pango", "pkg-config", "rustc", "swig", "tcl", "tesseract", "tk", "xcbuild", "xcodebuild", "zlib"]
 
 [workflows]
 runButton = "Project"
