@@ -256,6 +256,7 @@ def render_document_assignment_interface():
     # Process each unassigned document - use a copy to avoid modification during iteration
     documents_to_process = list(st.session_state.processed_documents)
     documents_to_remove = []
+    rerun_needed = False
     
     for i, doc_info in enumerate(documents_to_process):
         with st.expander(f"📄 New document '{doc_info['filename']}' processed", expanded=True):
@@ -300,7 +301,7 @@ def render_document_assignment_interface():
                                 st.success(f"✅ Document assigned to '{selected_requirement}'")
                                 # Mark document for removal
                                 documents_to_remove.append(doc_info)
-                                st.experimental_rerun()
+                                rerun_needed = True
                             else:
                                 st.error("❌ Failed to assign document")
                         else:
@@ -329,7 +330,7 @@ def render_document_assignment_interface():
                                     st.success(f"✅ Document assigned to '{selected_requirement}' (Override)")
                                     # Mark document for removal
                                     documents_to_remove.append(doc_info)
-                                    st.experimental_rerun()
+                                    rerun_needed = True
                                 else:
                                     st.error("❌ Failed to assign document")
                     else:
@@ -339,6 +340,10 @@ def render_document_assignment_interface():
     for doc_to_remove in documents_to_remove:
         if doc_to_remove in st.session_state.processed_documents:
             st.session_state.processed_documents.remove(doc_to_remove)
+    
+    # Rerun the app after all processing is complete
+    if rerun_needed:
+        st.experimental_rerun()
 
 
 def get_all_patients():
