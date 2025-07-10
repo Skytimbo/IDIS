@@ -107,13 +107,13 @@ def _process_uploaded_files(uploaded_files, context: str, accept_multiple: bool)
                     f.write(uploaded_file.getvalue())
                 
                 # Context-aware processing parameters
-                patient_id, session_id = _get_context_parameters(context)
+                entity_id, session_id = _get_context_parameters(context)
                 
                 # Process directly through UnifiedIngestionAgent
                 success = ingestion_agent._process_single_file(
                     temp_path, 
                     uploaded_file.name, 
-                    patient_id=patient_id, 
+                    entity_id=entity_id, 
                     session_id=session_id
                 )
                 
@@ -155,13 +155,13 @@ def _process_uploaded_files(uploaded_files, context: str, accept_multiple: bool)
 
 def _get_context_parameters(context: str) -> tuple:
     """
-    Get context-specific patient_id and session_id parameters.
+    Get context-specific entity_id and session_id parameters.
     
     Args:
         context: Processing context ('medicaid', 'general', etc.)
     
     Returns:
-        Tuple of (patient_id, session_id)
+        Tuple of (entity_id, session_id)
     """
     
     if context == "medicaid":
