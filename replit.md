@@ -137,6 +137,8 @@ The project is configured for production deployment using Docker Compose with a 
 ## Recent Changes  
 ## Recent Changes
 
+- **July 2025**: **SEARCH UI IMPROVEMENTS** - Enhanced search interface user experience: added helpful tooltips explaining that the "cmd+enter" popup is optional (regular Enter works fine), clarified that "Clear Search Results" button removes previous search results and starts fresh, improved overall search interface usability
+- **July 2025**: **CRITICAL ASSIGNMENT BUG FIXED** - Fixed database assignment bug in Medicaid Navigator where case_id schema mismatch (TEXT vs INTEGER) prevented status indicators from updating, corrected assign_document_to_requirement function to use string case_id values, verified fix with test script showing successful "🔵 Submitted" status updates
 - **July 2025**: **SEARCH FUNCTION DATABASE POPULATION** - Resolved search function returning 0 documents by adding test documents to production database (grocery receipt, home depot receipt, restaurant invoice with full text and structured data)
 - **July 2025**: **STREAMLIT COMPATIBILITY FIX** - Fixed AttributeError with st.rerun() function by replacing with st.experimental_rerun() for compatibility with current Streamlit version, resolving search interface crashes
 - **July 2025**: **CRITICAL CODERABBIT BUGS FIXED** - Fixed two critical bugs identified in CodeRabbit review: (1) Added proper audit trail logging in assign_document_to_requirement function with logging.info() statements for override actions, ensuring compliance and auditability, (2) Fixed deployment script to properly initialize database using ContextStore instead of empty touch command, ensuring production database has correct schema and tables from deployment start

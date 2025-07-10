@@ -291,8 +291,8 @@ def render_search_ui():
     st.title("🔍 QuantaIQ Document Search")
     st.markdown("*Intelligent Document Insight System - Cognitive Interface*")
 
-    # Clear session state button for debugging
-    if st.button("🔄 Clear Search Results"):
+    # Clear search results button with better explanation
+    if st.button("🔄 Clear Search Results", help="Clear all previous search results and start fresh"):
         if 'results' in st.session_state:
             del st.session_state['results']
         if 'search_term' in st.session_state:
@@ -306,7 +306,7 @@ def render_search_ui():
         st.subheader("Search Parameters")
         
         # Use working text area method
-        search_term = st.text_area("Search Document Content", height=100, placeholder="Enter search terms here (e.g., payslip, utility bill)...")
+        search_term = st.text_area("Search Document Content", height=100, placeholder="Enter search terms here (e.g., payslip, utility bill)...", help="Type your search terms and press Enter to search (the 'cmd+enter' popup is optional - regular Enter works fine)")
         
         # Boolean search help
         with st.expander("💡 Boolean Search Tips"):
