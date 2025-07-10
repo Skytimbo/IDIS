@@ -7,7 +7,7 @@ JSON SCHEMA:
   "document_id": "string", "# A unique identifier for the document (e.g., UUID). This will be provided by the system later, return null for now.",
   "ingestion_date": "string", "# The ISO 8601 timestamp of when the document was processed. This will be provided by the system later, return null for now.",
   "document_type": {
-    "predicted_class": "string", "# The best-guess classification of the document. Examples: 'Financial Statement', 'Utility Bill', 'Receipt', 'Legal Contract', 'Medical Report', 'Correspondence', 'Payslip'. A document containing terms like 'Pay Period', 'Gross Pay', and 'Net Pay' should be classified as 'Payslip'.",
+    "predicted_class": "string", "# The best-guess classification of the document. Examples: 'Financial Statement', 'Utility Bill', 'Receipt', 'Legal Contract', 'Medical Report', 'Correspondence', 'Payslip'. A document containing terms like 'Pay Period', 'Gross Pay', and 'Net Pay' should be classified as 'Payslip'. For classification, the text content of the document is more important than the file extension. A .txt file containing pay stub information should be classified as 'Payslip', not 'Correspondence'.",
     "confidence_score": "float" "# Your confidence in the prediction, from 0.0 to 1.0."
   },
   "issuer": {

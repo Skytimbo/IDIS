@@ -32,6 +32,7 @@ def load_application_checklist_with_status(patient_id=None, case_id=None):
         cursor.execute("""
             SELECT ac.id, ac.required_doc_name, ac.description,
                    CASE 
+                       WHEN cd.status = 'Submitted' AND cd.is_override = 1 THEN '🟡 Overridden'
                        WHEN cd.status = 'Submitted' THEN '🔵 Submitted'
                        ELSE '🔴 Missing'
                    END as status
@@ -207,15 +208,15 @@ def assign_document_to_requirement(document_id: int, requirement_id: int, patien
             # Update existing record
             cursor.execute("""
                 UPDATE case_documents 
-                SET document_id = ?, status = 'Submitted', updated_at = CURRENT_TIMESTAMP
+                SET document_id = ?, status = 'Submitted', is_override = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
-            """, (document_id, existing_record[0]))
+            """, (document_id, 1 if override else 0, existing_record[0]))
         else:
             # Insert new record
             cursor.execute("""
-                INSERT INTO case_documents (case_id, entity_id, checklist_item_id, document_id, status, created_at, updated_at)
-                VALUES (?, ?, ?, ?, 'Submitted', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-            """, (case_id, patient_id, requirement_id, document_id))
+                INSERT INTO case_documents (case_id, entity_id, checklist_item_id, document_id, status, is_override, created_at, updated_at)
+                VALUES (?, ?, ?, ?, 'Submitted', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, (case_id, patient_id, requirement_id, document_id, 1 if override else 0))
         
         context_store.conn.commit()
         logging.info("DEBUG: Database update successful, returning True.")
@@ -284,14 +285,32 @@ def render_document_assignment_interface():
                     if selected_requirement:
                         requirement_id = requirement_options[selected_requirement]
                         
-                        # Direct assignment without validation
+                        # Check validation but don't block assignment
+                        validation_result = validate_document_assignment(
+                            doc_info.get('document_type', 'Unknown'), 
+                            selected_requirement
+                        )
+                        
+                        # Always proceed with assignment regardless of validation
+                        is_override = not validation_result['is_valid']
+                        override_reason = ""
+                        
+                        if is_override:
+                            override_reason = f"User override: {doc_info.get('document_type', 'Unknown')} → {selected_requirement}"
+                            st.warning(f"⚠️ {validation_result['warning_message']}")
+                        
                         success = assign_document_to_requirement(
                             doc_info['document_id'], 
-                            requirement_id
+                            requirement_id,
+                            override=is_override,
+                            override_reason=override_reason
                         )
                         
                         if success:
-                            st.success(f"✅ Document assigned to '{selected_requirement}'")
+                            if is_override:
+                                st.success(f"✅ Document assigned to '{selected_requirement}' (Override)")
+                            else:
+                                st.success(f"✅ Document assigned to '{selected_requirement}'")
                             # Mark document for removal
                             documents_to_remove.append(doc_info)
                             rerun_needed = True
