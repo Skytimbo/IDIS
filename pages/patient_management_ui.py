@@ -79,7 +79,7 @@ def render_patient_management_page():
                     logger.info(f"Created new patient: {patient_name} (ID: {patient_id})")
                     
                     # Rerun to refresh the patient list
-                    st.rerun()
+                    st.experimental_rerun()
                     
                 except Exception as e:
                     st.error(f"Error adding patient: {str(e)}")
@@ -100,7 +100,7 @@ def get_all_patients(context_store):
     try:
         cursor = context_store.conn.cursor()
         cursor.execute("""
-            SELECT patient_id, patient_name, created_at 
+            SELECT id, patient_name, created_at 
             FROM patients 
             ORDER BY created_at DESC
         """)
