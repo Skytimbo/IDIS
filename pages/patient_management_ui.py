@@ -69,8 +69,7 @@ def render_patient_management_page():
                 try:
                     # Create new patient record
                     patient_data = {
-                        "patient_name": patient_name.strip(),
-                        "created_at": datetime.now().isoformat()
+                        "patient_name": patient_name.strip()
                     }
                     
                     patient_id = cs.add_patient(patient_data)
@@ -100,9 +99,9 @@ def get_all_patients(context_store):
     try:
         cursor = context_store.conn.cursor()
         cursor.execute("""
-            SELECT id, patient_name, created_at 
+            SELECT id, patient_name, creation_timestamp 
             FROM patients 
-            ORDER BY created_at DESC
+            ORDER BY creation_timestamp DESC
         """)
         
         patients = []
