@@ -83,6 +83,11 @@ def parse_boolean_search(search_term: str) -> Tuple[str, List[str]]:
     search_term = search_term.strip()
     import re
     
+    # Handle quoted strings first - strip quotes and treat as exact phrase
+    if search_term.startswith('"') and search_term.endswith('"'):
+        cleaned_term = search_term[1:-1].strip()
+        return "full_text LIKE ? COLLATE NOCASE", [f"%{cleaned_term}%"]
+    
     # Handle OR operator (case-insensitive)
     if re.search(r'\s+or\s+', search_term, re.IGNORECASE):
         terms = [term.strip() for term in re.split(r'\s+or\s+', search_term, flags=re.IGNORECASE) if term.strip()]
@@ -90,6 +95,9 @@ def parse_boolean_search(search_term: str) -> Tuple[str, List[str]]:
             conditions = []
             params = []
             for term in terms:
+                # Handle quoted terms within OR
+                if term.startswith('"') and term.endswith('"'):
+                    term = term[1:-1].strip()
                 conditions.append("full_text LIKE ? COLLATE NOCASE")
                 params.append(f"%{term}%")
             return f"({' OR '.join(conditions)})", params
@@ -101,6 +109,9 @@ def parse_boolean_search(search_term: str) -> Tuple[str, List[str]]:
             conditions = []
             params = []
             for term in terms:
+                # Handle quoted terms within AND
+                if term.startswith('"') and term.endswith('"'):
+                    term = term[1:-1].strip()
                 conditions.append("full_text LIKE ? COLLATE NOCASE")
                 params.append(f"%{term}%")
             return f"({' AND '.join(conditions)})", params
@@ -111,6 +122,11 @@ def parse_boolean_search(search_term: str) -> Tuple[str, List[str]]:
         if len(parts) == 2:
             include_term = parts[0]
             exclude_term = parts[1]
+            # Handle quoted terms in NOT
+            if include_term.startswith('"') and include_term.endswith('"'):
+                include_term = include_term[1:-1].strip()
+            if exclude_term.startswith('"') and exclude_term.endswith('"'):
+                exclude_term = exclude_term[1:-1].strip()
             return "(full_text LIKE ? COLLATE NOCASE AND full_text NOT LIKE ? COLLATE NOCASE)", [f"%{include_term}%", f"%{exclude_term}%"]
     
     # Default single term search - this should always work for simple terms
@@ -479,15 +495,35 @@ def render_search_ui():
                 search_term = st.session_state.get('search_term', '')
                 
                 if search_term and search_term.strip():
-                    # Replacement style now includes 'color: black;' for dark mode visibility
-                    replacement_style = r"<span style='background-color: #FFFF00; color: black;'>\1</span>"
+                    # Extract the actual search term for highlighting (handle quoted strings)
+                    highlight_term = search_term.strip()
+                    if highlight_term.startswith('"') and highlight_term.endswith('"'):
+                        highlight_term = highlight_term[1:-1].strip()
                     
-                    highlighted_text = re.sub(
-                        f'({re.escape(search_term.strip())})', 
-                        replacement_style, 
-                        full_text, 
-                        flags=re.IGNORECASE
-                    )
+                    # For OR searches, highlight all terms
+                    if re.search(r'\s+or\s+', highlight_term, re.IGNORECASE):
+                        terms = [term.strip() for term in re.split(r'\s+or\s+', highlight_term, flags=re.IGNORECASE) if term.strip()]
+                        highlighted_text = full_text
+                        for term in terms:
+                            # Handle quoted terms within OR
+                            if term.startswith('"') and term.endswith('"'):
+                                term = term[1:-1].strip()
+                            replacement_style = r"<span style='background-color: #FFFF00; color: black;'>\1</span>"
+                            highlighted_text = re.sub(
+                                f'({re.escape(term)})', 
+                                replacement_style, 
+                                highlighted_text, 
+                                flags=re.IGNORECASE
+                            )
+                    else:
+                        # Single term highlighting
+                        replacement_style = r"<span style='background-color: #FFFF00; color: black;'>\1</span>"
+                        highlighted_text = re.sub(
+                            f'({re.escape(highlight_term)})', 
+                            replacement_style, 
+                            full_text, 
+                            flags=re.IGNORECASE
+                        )
                     
                     # Convert newlines to HTML <br> tags for proper rendering in markdown
                     html_text_with_breaks = highlighted_text.replace('\n', '<br>')
