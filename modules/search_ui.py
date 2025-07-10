@@ -504,5 +504,44 @@ def render_search_ui():
                 if filed_path:
                     st.subheader("📁 File Location")
                     st.code(filed_path, language=None)
+                    
+                    # Document Viewer Component
+                    st.subheader("📄 Original Document")
+                    if os.path.exists(filed_path):
+                        file_extension = os.path.splitext(filed_path)[1].lower()
+                        
+                        if file_extension == '.pdf':
+                            # For PDF files, show a download button
+                            with open(filed_path, 'rb') as file:
+                                pdf_bytes = file.read()
+                            st.download_button(
+                                label="📥 Download PDF",
+                                data=pdf_bytes,
+                                file_name=os.path.basename(filed_path),
+                                mime="application/pdf"
+                            )
+                            
+                        elif file_extension in ['.jpg', '.jpeg', '.png', '.gif', '.bmp']:
+                            # For image files, display directly
+                            st.image(filed_path, caption=f"Original Document: {os.path.basename(filed_path)}")
+                            
+                        elif file_extension in ['.txt', '.md']:
+                            # For text files, show content
+                            with open(filed_path, 'r', encoding='utf-8', errors='ignore') as file:
+                                text_content = file.read()
+                            st.text_area("File Content", value=text_content, height=200, disabled=True)
+                            
+                        else:
+                            # For other file types, provide download option
+                            with open(filed_path, 'rb') as file:
+                                file_bytes = file.read()
+                            st.download_button(
+                                label=f"📥 Download {file_extension.upper()} File",
+                                data=file_bytes,
+                                file_name=os.path.basename(filed_path),
+                                mime="application/octet-stream"
+                            )
+                    else:
+                        st.error("⚠️ Original document file not found at the specified location.")
     else:
         st.info("👆 Use the filters in the sidebar and click Search to find documents.")

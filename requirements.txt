@@ -177,3 +177,8 @@ webencodings==0.5.1
     #   tinyhtml5
 zopfli==0.2.3.post1
     # via fonttools
+fpdf
+fpdf2
+langchain
+langchain-openai
+tiktoken
