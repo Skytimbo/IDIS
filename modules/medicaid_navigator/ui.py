@@ -37,7 +37,7 @@ def load_application_checklist_with_status(patient_id=None, case_id=None):
                    END as status
             FROM application_checklists ac
             LEFT JOIN case_documents cd ON ac.id = cd.checklist_item_id 
-                AND cd.patient_id = ?
+                AND cd.entity_id = ?
             WHERE ac.checklist_name = 'SOA Medicaid - Adult'
             ORDER BY ac.id
         """, (patient_id,))
@@ -335,16 +335,16 @@ def get_all_patients():
         context_store = ContextStore(db_path)
         cursor = context_store.conn.cursor()
         cursor.execute("""
-            SELECT id, patient_name 
-            FROM patients 
-            ORDER BY patient_name
+            SELECT id, entity_name 
+            FROM entities 
+            ORDER BY entity_name
         """)
         
         patients = []
         for row in cursor.fetchall():
             patients.append({
-                "patient_id": row[0],
-                "patient_name": row[1]
+                "patient_id": row[0],  # Keep legacy field name for UI compatibility
+                "patient_name": row[1]  # Keep legacy field name for UI compatibility
             })
         
         return patients

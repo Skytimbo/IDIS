@@ -71,12 +71,12 @@ class UnifiedIngestionAgent:
         
         self.logger.info(f"UnifiedIngestionAgent initialized with watch folder: {self.watch_folder}")
     
-    def process_documents_from_folder(self, patient_id: int = 1, session_id: int = 1) -> Tuple[int, List[str]]:
+    def process_documents_from_folder(self, entity_id: int = 1, session_id: int = 1) -> Tuple[int, List[str]]:
         """
         Process all documents found in the watch folder.
         
         Args:
-            patient_id: ID of the patient to associate documents with
+            entity_id: ID of the entity to associate documents with
             session_id: ID of the session to associate documents with
             
         Returns:
@@ -98,7 +98,7 @@ class UnifiedIngestionAgent:
         for filename in files:
             try:
                 file_path = os.path.join(self.watch_folder, filename)
-                success = self._process_single_file(file_path, filename, patient_id, session_id)
+                success = self._process_single_file(file_path, filename, entity_id, session_id)
                 
                 if success:
                     processed_count += 1
@@ -124,14 +124,14 @@ class UnifiedIngestionAgent:
         self.logger.info(f"Document processing complete. Successfully processed: {processed_count}")
         return processed_count, error_messages
     
-    def _process_single_file(self, file_path: str, filename: str, patient_id: int, session_id: int) -> bool:
+    def _process_single_file(self, file_path: str, filename: str, entity_id: int, session_id: int) -> bool:
         """
         Process a single document file through the complete unified pipeline.
         
         Args:
             file_path: Full path to the file
             filename: Name of the file
-            patient_id: Patient ID for database association
+            entity_id: Entity ID for database association
             session_id: Session ID for database association
             
         Returns:
@@ -162,7 +162,7 @@ class UnifiedIngestionAgent:
             # This is the "adapter" logic that bridges LLM output to database storage
             db_record = {
                 'document_id': str(uuid.uuid4()),
-                'patient_id': patient_id,
+                'entity_id': entity_id,
                 'session_id': session_id,
                 'file_name': os.path.basename(file_path),
                 'original_file_type': file_extension.lstrip('.'),
