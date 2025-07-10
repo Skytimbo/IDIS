@@ -305,34 +305,8 @@ def render_document_assignment_interface():
                             else:
                                 st.error("❌ Failed to assign document")
                         else:
-                            # Invalid assignment - show warning
+                            # Invalid assignment - show warning only
                             st.warning(f"⚠️ {validation_result['warning_message']}")
-                            
-                            # Create override option outside of expander to avoid nesting issues
-                            st.write("**Override Options:**")
-                            st.write(f"• AI detected: {doc_info.get('document_type', 'Unknown')}")
-                            st.write(f"• You're assigning to: {selected_requirement}")
-                            st.write("• Risk: This may not meet Medicaid application requirements.")
-                            
-                            if st.button("⚠️ Override and Assign Anyway", key=f"override_{i}", type="secondary"):
-                                st.info("DEBUG: Override button click detected.")
-                                
-                                # Proceed with override assignment
-                                st.info(f"DEBUG: Calling assign_document with doc_id={doc_info['document_id']} and req_id={requirement_id}")
-                                success = assign_document_to_requirement(
-                                    doc_info['document_id'], 
-                                    requirement_id,
-                                    override=True,
-                                    override_reason=f"User override: {doc_info.get('document_type', 'Unknown')} → {selected_requirement}"
-                                )
-                                
-                                if success:
-                                    st.success(f"✅ Document assigned to '{selected_requirement}' (Override)")
-                                    # Mark document for removal
-                                    documents_to_remove.append(doc_info)
-                                    rerun_needed = True
-                                else:
-                                    st.error("❌ Failed to assign document")
                     else:
                         st.warning("Please select a requirement first")
     
