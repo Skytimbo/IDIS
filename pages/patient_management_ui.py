@@ -34,15 +34,7 @@ def render_patient_management_page():
         
         if patients:
             # Display patients in a table format
-            st.dataframe(
-                patients,
-                column_config={
-                    "patient_id": "Patient ID",
-                    "patient_name": "Patient Name",
-                    "created_at": "Created Date"
-                },
-                use_container_width=True
-            )
+            st.dataframe(patients, use_container_width=True)
         else:
             st.info("No patients found in the system.")
     
