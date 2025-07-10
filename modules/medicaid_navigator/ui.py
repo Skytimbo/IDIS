@@ -175,6 +175,8 @@ def assign_document_to_requirement(document_id: int, requirement_id: int, patien
         bool: True if assignment was successful
     """
     try:
+        logging.info("DEBUG: Entered assign_document_to_requirement function.")
+        
         # Log override actions for audit trail
         if override and override_reason:
             logging.info(f"AUDIT: Document assignment override - {override_reason}")
@@ -212,6 +214,7 @@ def assign_document_to_requirement(document_id: int, requirement_id: int, patien
             """, (case_id, patient_id, requirement_id, document_id))
         
         context_store.conn.commit()
+        logging.info("DEBUG: Database update successful, returning True.")
         return True
         
     except Exception as e:
@@ -304,7 +307,10 @@ def render_document_assignment_interface():
                             st.write("• Risk: This may not meet Medicaid application requirements.")
                             
                             if st.button("⚠️ Override and Assign Anyway", key=f"override_{i}", type="secondary"):
+                                st.info("DEBUG: Override button click detected.")
+                                
                                 # Proceed with override assignment
+                                st.info(f"DEBUG: Calling assign_document with doc_id={doc_info['document_id']} and req_id={requirement_id}")
                                 success = assign_document_to_requirement(
                                     doc_info['document_id'], 
                                     requirement_id,
