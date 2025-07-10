@@ -2,13 +2,18 @@ import streamlit as st
 import pandas as pd
 import os
 import logging
+from datetime import datetime
 from context_store import ContextStore
 from unified_ingestion_agent import UnifiedIngestionAgent
 
-def load_application_checklist_with_status():
+def load_application_checklist_with_status(patient_id=None, case_id=None):
     """
     Load the application checklist with current status from database.
     Checks case_documents table for submitted documents.
+    
+    Args:
+        patient_id: ID of the selected patient
+        case_id: ID of the specific case
     
     Returns:
         pd.DataFrame: Formatted checklist with current status
@@ -17,6 +22,10 @@ def load_application_checklist_with_status():
         # Get database path from session state or use default
         db_path = st.session_state.get('database_path', 'production_idis.db')
         context_store = ContextStore(db_path)
+        
+        # Use session state patient_id if not provided
+        if patient_id is None:
+            patient_id = st.session_state.get('selected_patient_id', 1)
         
         # Query checklist requirements with status
         cursor = context_store.conn.cursor()
@@ -28,10 +37,10 @@ def load_application_checklist_with_status():
                    END as status
             FROM application_checklists ac
             LEFT JOIN case_documents cd ON ac.id = cd.checklist_item_id 
-                AND cd.patient_id = 1
+                AND cd.patient_id = ?
             WHERE ac.checklist_name = 'SOA Medicaid - Adult'
             ORDER BY ac.id
-        """)
+        """, (patient_id,))
         
         requirements = cursor.fetchall()
         
@@ -150,14 +159,15 @@ def validate_document_assignment(ai_detected_type: str, selected_requirement: st
         }
 
 
-def assign_document_to_requirement(document_id: int, requirement_id: int, patient_id: int = 1, override: bool = False, override_reason: str = ""):
+def assign_document_to_requirement(document_id: int, requirement_id: int, patient_id: int = None, case_id: str = None, override: bool = False, override_reason: str = ""):
     """
     Assign a document to a specific checklist requirement.
     
     Args:
         document_id: ID of the document to assign
         requirement_id: ID of the checklist requirement
-        patient_id: Patient ID (default: 1)
+        patient_id: Patient ID (uses session state if not provided)
+        case_id: Case ID (uses session state if not provided)
         override: Whether this assignment is an override of validation warnings
         override_reason: Reason for the override (logged for audit trail)
     
@@ -169,6 +179,12 @@ def assign_document_to_requirement(document_id: int, requirement_id: int, patien
         if override and override_reason:
             logging.info(f"AUDIT: Document assignment override - {override_reason}")
         
+        # Use session state values if not provided
+        if patient_id is None:
+            patient_id = st.session_state.get('selected_patient_id', 1)
+        if case_id is None:
+            case_id = st.session_state.get('current_case_id', 'CASE-1-DEFAULT')
+        
         db_path = st.session_state.get('database_path', 'production_idis.db')
         context_store = ContextStore(db_path)
         cursor = context_store.conn.cursor()
@@ -176,8 +192,8 @@ def assign_document_to_requirement(document_id: int, requirement_id: int, patien
         # Check if a record already exists for this requirement
         cursor.execute("""
             SELECT id FROM case_documents 
-            WHERE checklist_item_id = ? AND patient_id = ?
-        """, (requirement_id, patient_id))
+            WHERE checklist_item_id = ? AND patient_id = ? AND case_id = ?
+        """, (requirement_id, patient_id, case_id))
         
         existing_record = cursor.fetchone()
         
@@ -189,13 +205,11 @@ def assign_document_to_requirement(document_id: int, requirement_id: int, patien
                 WHERE id = ?
             """, (document_id, existing_record[0]))
         else:
-
             # Insert new record
             cursor.execute("""
                 INSERT INTO case_documents (case_id, patient_id, checklist_item_id, document_id, status, created_at, updated_at)
-                VALUES (1, ?, ?, ?, 'Submitted', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-
-            """, (patient_id, requirement_id, document_id))
+                VALUES (?, ?, ?, ?, 'Submitted', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, (case_id, patient_id, requirement_id, document_id))
         
         context_store.conn.commit()
         return True
@@ -309,6 +323,99 @@ def render_document_assignment_interface():
                         st.warning("Please select a requirement first")
 
 
+def get_all_patients():
+    """
+    Get all patients from the database for patient selection.
+    
+    Returns:
+        List of patient dictionaries
+    """
+    try:
+        db_path = st.session_state.get('database_path', 'production_idis.db')
+        context_store = ContextStore(db_path)
+        cursor = context_store.conn.cursor()
+        cursor.execute("""
+            SELECT patient_id, patient_name 
+            FROM patients 
+            ORDER BY patient_name
+        """)
+        
+        patients = []
+        for row in cursor.fetchall():
+            patients.append({
+                "patient_id": row[0],
+                "patient_name": row[1]
+            })
+        
+        return patients
+        
+    except Exception as e:
+        logging.error(f"Error retrieving patients: {e}")
+        return []
+
+def generate_case_id(patient_name):
+    """
+    Generate a unique case ID for a patient.
+    
+    Args:
+        patient_name: Name of the patient
+        
+    Returns:
+        str: Unique case ID
+    """
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # Clean patient name for use in case ID
+    clean_name = patient_name.replace(" ", "").replace(".", "")[:20]
+    return f"CASE-{clean_name}-{timestamp}"
+
+def render_patient_selection():
+    """
+    Render the patient selection interface at the top of the Medicaid Navigator.
+    """
+    st.subheader("👤 Patient Selection")
+    
+    # Get all patients
+    patients = get_all_patients()
+    
+    if not patients:
+        st.warning("No patients found. Please go to the Patient Management page to add patients first.")
+        return False
+    
+    # Create options for selectbox
+    patient_options = {f"{p['patient_name']} (ID: {p['patient_id']})": p['patient_id'] for p in patients}
+    
+    # Patient selection
+    selected_patient_display = st.selectbox(
+        "Select a patient:",
+        options=list(patient_options.keys()),
+        key="patient_selector",
+        help="Choose the patient for this Medicaid application case"
+    )
+    
+    if selected_patient_display:
+        selected_patient_id = patient_options[selected_patient_display]
+        selected_patient_name = [p['patient_name'] for p in patients if p['patient_id'] == selected_patient_id][0]
+        
+        # Store in session state
+        st.session_state.selected_patient_id = selected_patient_id
+        st.session_state.selected_patient_name = selected_patient_name
+        
+        # Generate or retrieve case ID for this session
+        if 'current_case_id' not in st.session_state or st.session_state.get('last_selected_patient_id') != selected_patient_id:
+            st.session_state.current_case_id = generate_case_id(selected_patient_name)
+            st.session_state.last_selected_patient_id = selected_patient_id
+        
+        # Display current selection
+        col1, col2 = st.columns(2)
+        with col1:
+            st.info(f"**Selected Patient:** {selected_patient_name}")
+        with col2:
+            st.info(f"**Case ID:** {st.session_state.current_case_id}")
+        
+        return True
+    
+    return False
+
 def render_navigator_ui():
     """
     Renders the user interface for the Medicaid Navigator module.
@@ -317,12 +424,21 @@ def render_navigator_ui():
     st.markdown("---")
     st.markdown("This tool helps you gather, check, and prepare your documents for an Alaska Medicaid application.")
 
+    # --- 0. Patient Selection ---
+    if not render_patient_selection():
+        return  # Stop here if no patient is selected
+    
+    st.markdown("---")
+
     # --- 1. Application Checklist ---
     st.header("1. Application Checklist")
     st.info("Upload your documents below. The system will automatically check them off the list.")
 
-    # Load checklist with current status from database
-    checklist_df = load_application_checklist_with_status()
+    # Load checklist with current status from database for selected patient
+    checklist_df = load_application_checklist_with_status(
+        patient_id=st.session_state.get('selected_patient_id'),
+        case_id=st.session_state.get('current_case_id')
+    )
     
     if not checklist_df.empty:
         st.table(checklist_df)
@@ -343,7 +459,6 @@ def render_navigator_ui():
         file_types=['pdf', 'png', 'jpg', 'jpeg', 'txt', 'docx'],
         accept_multiple=True
     )
-
 
     # --- 2.5. Document Assignment Interface ---
     render_document_assignment_interface()

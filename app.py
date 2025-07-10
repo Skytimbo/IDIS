@@ -22,6 +22,7 @@ import sys
 from modules.search_ui import render_search_ui
 from modules.medicaid_navigator.ui import render_navigator_ui
 from quanta_ui.pages.needs_review_ui import render_needs_review_page
+from pages.patient_management_ui import render_patient_management_page
 
 # --- Main Application Router ---
 def main():
@@ -34,7 +35,7 @@ def main():
     # Module selection in the sidebar
     module_selection = st.sidebar.selectbox(
         "Select a Tool",
-        ("General Document Search", "Medicaid Navigator", "Needs Review (HITL)")
+        ("General Document Search", "Medicaid Navigator", "Patient Management", "Needs Review (HITL)")
     )
 
     st.sidebar.markdown("---")
@@ -45,6 +46,8 @@ def main():
         render_search_ui()
     elif module_selection == "Medicaid Navigator":
         render_navigator_ui()
+    elif module_selection == "Patient Management":
+        render_patient_management_page()
     elif module_selection == "Needs Review (HITL)":
         render_needs_review_page()
     else:
