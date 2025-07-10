@@ -135,13 +135,13 @@ The project is configured for production deployment using Docker Compose with a 
 - Integrated watcher service for automated document processing
 
 ## Recent Changes  
-## Recent Changes
 
 - **July 2025**: **SEARCH FUNCTIONALITY COMPREHENSIVE FIX COMPLETE** - Fixed all remaining search interface issues: (1) Enhanced quoted search term handling to properly process terms like "was prepared" by stripping quotes before database query, (2) Fixed text highlighting to work with quoted terms and OR searches with proper yellow background highlighting, (3) Improved search term processing to handle multiple search patterns correctly, (4) Verified document viewing functionality works for both archived files and test documents, ensuring complete search experience
 - **July 2025**: **SEARCH UI IMPROVEMENTS** - Enhanced search interface user experience: added helpful tooltips explaining that the "cmd+enter" popup is optional (regular Enter works fine), clarified that "Clear Search Results" button removes previous search results and starts fresh, improved overall search interface usability
 - **July 2025**: **CRITICAL ASSIGNMENT BUG FIXED** - Fixed database assignment bug in Medicaid Navigator where case_id schema mismatch (TEXT vs INTEGER) prevented status indicators from updating, corrected assign_document_to_requirement function to use string case_id values, verified fix with test script showing successful "🔵 Submitted" status updates
 - **July 2025**: **SEARCH FUNCTION DATABASE POPULATION** - Resolved search function returning 0 documents by adding test documents to production database (grocery receipt, home depot receipt, restaurant invoice with full text and structured data)
 - **July 2025**: **STREAMLIT COMPATIBILITY FIX** - Fixed AttributeError with st.rerun() function by replacing with st.experimental_rerun() for compatibility with current Streamlit version, resolving search interface crashes
+
 - **July 2025**: **CRITICAL CODERABBIT BUGS FIXED** - Fixed two critical bugs identified in CodeRabbit review: (1) Added proper audit trail logging in assign_document_to_requirement function with logging.info() statements for override actions, ensuring compliance and auditability, (2) Fixed deployment script to properly initialize database using ContextStore instead of empty touch command, ensuring production database has correct schema and tables from deployment start
 - **July 2025**: **CASE MANAGEMENT UI COMPLETE** - Implemented a dynamic, database-driven checklist in the Medicaid Navigator. Added UI for users to assign uploaded documents to specific requirements. Integrated a "Trust, but Verify" system to validate user assignments against AI classification.
 - **July 2025**: **DEPLOYMENT CONFIGURATION COMPLETE** - Created `deploy.sh` script to manage production startup with environment checks. Added `DEPLOYMENT.md` documentation. Verified `docker-compose.yml` is configured for a multi-service production environment.
@@ -208,7 +208,11 @@ The project is configured for production deployment using Docker Compose with a 
 **Active Services**:
 - Main App: Streamlit interface on port 5000 (development) / 8501 (production)
 - Production Watcher Service: Monitoring `data/scanner_output` folder
+<<<<<<< HEAD
 - Database: `production_idis.db` with 3 test documents (grocery receipt, Home Depot receipt, restaurant invoice)
+=======
+- Database: `production_idis.db` with test documents
+>>>>>>> 3e4e71cc5982869c44500a49614d91e05f4caa94
 
 **Next Development Areas**:
 - Performance optimization for large document collections
