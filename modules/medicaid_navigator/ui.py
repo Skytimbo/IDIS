@@ -253,8 +253,11 @@ def render_document_assignment_interface():
         st.error(f"Error loading requirements: {e}")
         return
     
-    # Process each unassigned document
-    for i, doc_info in enumerate(st.session_state.processed_documents):
+    # Process each unassigned document - use a copy to avoid modification during iteration
+    documents_to_process = list(st.session_state.processed_documents)
+    documents_to_remove = []
+    
+    for i, doc_info in enumerate(documents_to_process):
         with st.expander(f"📄 New document '{doc_info['filename']}' processed", expanded=True):
             col1, col2 = st.columns([2, 1])
             
@@ -295,8 +298,8 @@ def render_document_assignment_interface():
                             
                             if success:
                                 st.success(f"✅ Document assigned to '{selected_requirement}'")
-                                # Remove from processed documents list
-                                st.session_state.processed_documents.pop(i)
+                                # Mark document for removal
+                                documents_to_remove.append(doc_info)
                                 st.experimental_rerun()
                             else:
                                 st.error("❌ Failed to assign document")
@@ -324,13 +327,18 @@ def render_document_assignment_interface():
                                 
                                 if success:
                                     st.success(f"✅ Document assigned to '{selected_requirement}' (Override)")
-                                    # Remove from processed documents list
-                                    st.session_state.processed_documents.pop(i)
+                                    # Mark document for removal
+                                    documents_to_remove.append(doc_info)
                                     st.experimental_rerun()
                                 else:
                                     st.error("❌ Failed to assign document")
                     else:
                         st.warning("Please select a requirement first")
+    
+    # Remove assigned documents from the session state
+    for doc_to_remove in documents_to_remove:
+        if doc_to_remove in st.session_state.processed_documents:
+            st.session_state.processed_documents.remove(doc_to_remove)
 
 
 def get_all_patients():
@@ -471,30 +479,7 @@ def render_navigator_ui():
     )
 
     # --- 2.5. Document Assignment Interface ---
-    # render_document_assignment_interface()  # Commented out for debugging
-    
-    # DEBUGGING: Simple override test
-    st.header("🪲 Debugging Override")
-    # Hardcode IDs for a direct test. Let's try to assign Document 4 to Requirement 1.
-    test_doc_id = 4  # test_payslip.txt
-    test_req_id = 1  # Proof of Identity
-    
-    st.write(f"Clicking this button will attempt to assign Document ID {test_doc_id} to Requirement ID {test_req_id} with an override.")
-    
-    if st.button("!! Force Override Test !!", type="primary"):
-        st.info("DEBUG: Force Override Button Clicked.")
-        success = assign_document_to_requirement(
-            document_id=test_doc_id,
-            requirement_id=test_req_id,
-            override=True,
-            override_reason="Forced debug override"
-        )
-        
-        if success:
-            st.success("DEBUG: Assignment function returned True. Rerunning page.")
-            st.experimental_rerun()
-        else:
-            st.error("DEBUG: Assignment function returned False.")
+    render_document_assignment_interface()
     
     # --- 3. Next Steps ---
     st.header("3. Next Steps")
