@@ -5,6 +5,7 @@ import logging
 from datetime import datetime
 from context_store import ContextStore
 from unified_ingestion_agent import UnifiedIngestionAgent
+from modules.shared.confidence_meter import extract_confidence_from_document, render_confidence_meter
 
 def load_application_checklist_with_status(patient_id=None, case_id=None):
     """
@@ -266,6 +267,14 @@ def render_document_assignment_interface():
             with col1:
                 st.write(f"**Filename:** {doc_info['filename']}")
                 st.write(f"**AI-detected type:** {doc_info.get('document_type', 'Unknown')}")
+                
+                # Display confidence meter if we have extracted data
+                if doc_info.get('extracted_data'):
+                    confidence, document_type, has_heuristic_override = extract_confidence_from_document(
+                        {'extracted_data': doc_info['extracted_data']}
+                    )
+                    st.markdown("**AI Classification Confidence:**")
+                    render_confidence_meter(confidence, document_type, compact=True)
                 
                 # Dropdown for assignment
                 options_with_placeholder = ["Select a requirement..."] + list(requirement_options.keys())
