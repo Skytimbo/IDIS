@@ -1,0 +1,15 @@
+Dear Mr. Smith,
+
+I hope this letter finds you well. I am writing to inform you about the recent changes to our payroll system.
+
+Your recent payslip shows the following details:
+- Employee name: John Smith
+- Pay period: January 1-15, 2025
+- Gross pay: $3,500.00
+- Net pay: $2,800.00
+- Deductions: $700.00
+
+Please review your payslip carefully and let me know if you have any questions.
+
+Best regards,
+HR Department
