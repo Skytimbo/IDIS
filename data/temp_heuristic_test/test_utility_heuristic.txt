@@ -1,0 +1,20 @@
+
+    GCI GENERAL COMMUNICATION INC.
+    ALASKA ELECTRIC UTILITY BILL
+    
+    Account Number: 123456789
+    Service Address: 123 Main St, Anchorage, AK
+    Bill Date: June 15, 2024
+    
+    ELECTRIC SERVICE CHARGES:
+    Previous Reading: 1,250 kWh
+    Current Reading: 1,450 kWh
+    Usage: 200 kWh
+    
+    Electric Charges: $89.50
+    Distribution Charge: $15.25
+    Regulatory Fee: $2.50
+    
+    Total Amount Due: $107.25
+    Due Date: July 15, 2024
+    

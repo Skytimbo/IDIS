@@ -6,7 +6,7 @@ managing all SQLite database operations for document intelligence workflows.
 
 Key Responsibilities:
 - Document lifecycle management (ingestion, processing, archiving)
-- Patient and session data management with privacy controls
+- Entity and session data management with privacy controls
 - Agent output storage for AI-powered document analysis results
 - Comprehensive audit logging for compliance and debugging
 - Hybrid V1.3 schema supporting both legacy UI and modern JSON structures
@@ -31,7 +31,7 @@ class ContextStore:
     Manages persistent storage and retrieval of IDIS data using SQLite.
     
     The ContextStore handles all database operations for the Intelligent Document
-    Insight System, providing CRUD operations for patients, sessions, documents,
+    Insight System, providing CRUD operations for entities, sessions, documents,
     agent outputs, and maintaining a comprehensive audit trail of all activities.
     """
     
@@ -62,19 +62,19 @@ class ContextStore:
         """
         cursor = self.conn.cursor()
         
-        # Create patients table
+        # Create entities table
         cursor.execute('''
-            CREATE TABLE IF NOT EXISTS patients (
+            CREATE TABLE IF NOT EXISTS entities (
                 id INTEGER PRIMARY KEY,
-                patient_name TEXT,
+                entity_name TEXT,
                 creation_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                 last_modified_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         ''')
         
-        # Create index on patient_name for faster searches
+        # Create index on entity_name for faster searches
         cursor.execute('''
-            CREATE INDEX IF NOT EXISTS idx_patient_name ON patients(patient_name)
+            CREATE INDEX IF NOT EXISTS idx_entity_name ON entities(entity_name)
         ''')
         
         # Create sessions table
@@ -107,7 +107,7 @@ class ContextStore:
                 filed_path TEXT, -- The final path in the archive
                 ingestion_status TEXT,
                 processing_status TEXT,
-                patient_id INTEGER,
+                entity_id INTEGER,
                 session_id INTEGER,
                 extracted_data TEXT, -- Full JSON object from cognitive agent
                 full_text TEXT, -- Primary text storage
@@ -120,15 +120,15 @@ class ContextStore:
                 upload_timestamp TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_modified_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (patient_id) REFERENCES patients (id),
+                FOREIGN KEY (entity_id) REFERENCES entities (id),
                 FOREIGN KEY (session_id) REFERENCES sessions (id)
             )
         ''')
         
         # Create indexes for documents table
         cursor.execute('''
-            CREATE INDEX IF NOT EXISTS idx_documents_patient_id 
-            ON documents(patient_id)
+            CREATE INDEX IF NOT EXISTS idx_documents_entity_id 
+            ON documents(entity_id)
         ''')
         cursor.execute('''
             CREATE INDEX IF NOT EXISTS idx_documents_session_id 
@@ -207,18 +207,18 @@ class ContextStore:
         
         self.conn.commit()
     
-    # Patient Methods
+    # Entity Methods
     
-    def add_patient(self, patient_data: Dict[str, Any]) -> int:
+    def add_entity(self, entity_data: Dict[str, Any]) -> int:
         """
-        Add a new patient to the database.
+        Add a new entity to the database.
         
         Args:
-            patient_data: Dictionary containing patient information
-                          Required keys: 'patient_name'
+            entity_data: Dictionary containing entity information
+                          Required keys: 'entity_name'
         
         Returns:
-            int: The newly created patient ID
+            int: The newly created entity ID
             
         Raises:
             sqlite3.Error: If there's a database error
@@ -227,28 +227,28 @@ class ContextStore:
             cursor = self.conn.cursor()
             cursor.execute(
                 '''
-                INSERT INTO patients (patient_name)
+                INSERT INTO entities (entity_name)
                 VALUES (?)
                 ''',
-                (patient_data.get('patient_name'),)
+                (entity_data.get('entity_name'),)
             )
             self.conn.commit()
             if cursor.lastrowid is None:
-                raise sqlite3.Error("Failed to get patient ID after insert")
+                raise sqlite3.Error("Failed to get entity ID after insert")
             return cursor.lastrowid
         except sqlite3.Error as e:
             self.conn.rollback()
             raise e
     
-    def get_patient(self, patient_id: int) -> Optional[Dict[str, Any]]:
+    def get_entity(self, entity_id: int) -> Optional[Dict[str, Any]]:
         """
-        Retrieve a patient by ID.
+        Retrieve an entity by ID.
         
         Args:
-            patient_id: The patient's unique identifier
+            entity_id: The entity's unique identifier
         
         Returns:
-            Optional[Dict]: Patient data as a dictionary, or None if not found
+            Optional[Dict]: Entity data as a dictionary, or None if not found
             
         Raises:
             sqlite3.Error: If there's a database error
@@ -256,25 +256,25 @@ class ContextStore:
         try:
             cursor = self.conn.cursor()
             cursor.execute(
-                "SELECT * FROM patients WHERE id = ?", 
-                (patient_id,)
+                "SELECT * FROM entities WHERE id = ?", 
+                (entity_id,)
             )
             row = cursor.fetchone()
             
             if row:
                 result = dict(row)
-                # Add patient_id field for backward compatibility
-                result['patient_id'] = result['id']
+                # Add entity_id field for backward compatibility
+                result['entity_id'] = result['id']
                 return result
             return None
         except sqlite3.Error as e:
             raise e
     
-    def update_patient(self, patient_id: int, update_data: Dict[str, Any]) -> bool:
+    def update_entity(self, entity_id: int, update_data: Dict[str, Any]) -> bool:
         """
-        Update a patient's information safely.
+        Update an entity's information safely.
         """
-        allowed_keys = {'patient_name'} # Whitelist of columns that can be updated
+        allowed_keys = {'entity_name'} # Whitelist of columns that can be updated
         
         # Filter out any keys that are not allowed
         valid_update_data = {k: v for k, v in update_data.items() if k in allowed_keys}
@@ -287,8 +287,8 @@ class ContextStore:
         set_clause = ", ".join([f"{key} = ?" for key in valid_update_data.keys()])
         params = list(valid_update_data.values())
         
-        sql = f"UPDATE patients SET {set_clause}, last_modified_timestamp = CURRENT_TIMESTAMP WHERE id = ?"
-        params.append(patient_id)
+        sql = f"UPDATE entities SET {set_clause}, last_modified_timestamp = CURRENT_TIMESTAMP WHERE id = ?"
+        params.append(entity_id)
         
         try:
             cursor = self.conn.cursor()
@@ -454,7 +454,7 @@ class ContextStore:
         Adds a new document to the database. Expects a dictionary containing
         the file_name and the full extracted_data JSON object.
         """
-        sql = ''' INSERT INTO documents(file_name, original_file_type, ingestion_status, document_type, classification_confidence, processing_status, patient_id, session_id, extracted_data, full_text, document_dates)
+        sql = ''' INSERT INTO documents(file_name, original_file_type, ingestion_status, document_type, classification_confidence, processing_status, entity_id, session_id, extracted_data, full_text, document_dates)
                   VALUES(?,?,?,?,?,?,?,?,?,?,?) '''
         
         # Handle extracted_data field - create JSON structure if needed
@@ -485,7 +485,7 @@ class ContextStore:
                 doc_data.get('document_type'),
                 doc_data.get('classification_confidence'),
                 doc_data.get('processing_status'),
-                doc_data.get('patient_id'),
+                doc_data.get('entity_id') or doc_data.get('patient_id'),  # Support both for backward compatibility
                 doc_data.get('session_id'),
                 extracted_data,
                 doc_data.get('extracted_text') or doc_data.get('full_text'),  # Support both field names
@@ -567,7 +567,7 @@ class ContextStore:
         # Security whitelist: Only allow updates to these specific columns
         allowed_keys = {
             'file_name', 'original_file_type', 'original_watchfolder_path',
-            'ingestion_status', 'processing_status', 'patient_id', 'session_id',
+            'ingestion_status', 'processing_status', 'entity_id', 'patient_id', 'session_id',
             'extracted_data', 'full_text', 'document_type', 'classification_confidence',
             'document_dates', 'associated_entity', 'upload_timestamp'
         }
@@ -863,7 +863,7 @@ class ContextStore:
             # Select essential fields needed by agents for processing
             cursor.execute(
                 """
-                SELECT id as document_id, file_name, patient_id, session_id,
+                SELECT id as document_id, file_name, entity_id, session_id,
                        original_file_type, document_type, classification_confidence, original_watchfolder_path,
                        full_text
                 FROM documents
@@ -888,12 +888,12 @@ class ContextStore:
             # Log the error here
             raise e
     
-    def query_patient_history(self, patient_id: str) -> List[Dict[str, Any]]:
+    def query_entity_history(self, entity_id: str) -> List[Dict[str, Any]]:
         """
-        Retrieve document history for a patient.
+        Retrieve document history for an entity.
         
         Args:
-            patient_id: The patient's unique identifier
+            entity_id: The entity's unique identifier
         
         Returns:
             List[Dict]: List of document summary dictionaries with fields:
@@ -913,16 +913,46 @@ class ContextStore:
                 SELECT id as document_id, file_name, document_type, 
                        processing_status, upload_timestamp
                 FROM documents
-                WHERE patient_id = ?
+                WHERE entity_id = ?
                 ORDER BY upload_timestamp DESC
                 ''',
-                (patient_id,)
+                (entity_id,)
             )
             rows = cursor.fetchall()
             
             return [dict(row) for row in rows]
         except sqlite3.Error as e:
             raise e
+
+    # Backward Compatibility Methods (Patient -> Entity)
+    # These methods provide backward compatibility for existing code
+    
+    def add_patient(self, patient_data: Dict[str, Any]) -> int:
+        """Backward compatibility wrapper for add_entity."""
+        entity_data = patient_data.copy()
+        if 'patient_name' in entity_data:
+            entity_data['entity_name'] = entity_data.pop('patient_name')
+        return self.add_entity(entity_data)
+    
+    def get_patient(self, patient_id: int) -> Optional[Dict[str, Any]]:
+        """Backward compatibility wrapper for get_entity."""
+        entity = self.get_entity(patient_id)
+        if entity:
+            entity['patient_id'] = entity['id']
+            entity['patient_name'] = entity.get('entity_name')
+        return entity
+    
+    def update_patient(self, patient_id: int, update_data: Dict[str, Any]) -> bool:
+        """Backward compatibility wrapper for update_entity."""
+        entity_data = update_data.copy()
+        if 'patient_name' in entity_data:
+            entity_data['entity_name'] = entity_data.pop('patient_name')
+        return self.update_entity(patient_id, entity_data)
+    
+    def query_patient_history(self, patient_id: str) -> List[Dict[str, Any]]:
+        """Backward compatibility wrapper for query_entity_history."""
+        return self.query_entity_history(patient_id)
+
     def update_document_categorization(self, document_id: int, entity_json: str) -> bool:
         """
         Updates a document's associated entity and sets its status to complete.

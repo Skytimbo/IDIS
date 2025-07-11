@@ -60,7 +60,7 @@ class IngestionAgent:
         self.logger.info(f"IngestionAgent initialized - watching folder: {watch_folder}")
     
     def process_pending_documents(self, session_id: Optional[str] = None, 
-                                  patient_id: Optional[str] = None,
+                                  entity_id: Optional[str] = None,
                                   user_id: str = "ingestion_agent_mvp_user") -> List[str]:
         """
         Scan the watchfolder and process all pending documents.
@@ -73,7 +73,7 @@ class IngestionAgent:
         
         Args:
             session_id: Optional session ID to associate with processed documents
-            patient_id: Optional patient ID to associate with processed documents
+            entity_id: Optional entity ID to associate with processed documents
             user_id: User ID for audit trail purposes
             
         Returns:
@@ -118,7 +118,7 @@ class IngestionAgent:
                 'original_watchfolder_path': file_path,
                 'ingestion_status': 'pending_ingestion',
                 'processing_status': 'new',
-                'patient_id': patient_id,
+                'entity_id': entity_id,
                 'session_id': session_id
             }
             
@@ -247,7 +247,7 @@ class IngestionAgent:
         self, 
         file_paths: List[str], 
         session_id: str, 
-        patient_id: Optional[str] = None, 
+        entity_id: Optional[str] = None, 
         user_id: str = "system_watcher"
     ) -> int:
         """
@@ -256,7 +256,7 @@ class IngestionAgent:
         Args:
             file_paths: List of absolute paths to files to process
             session_id: Session ID to associate documents with
-            patient_id: Optional patient ID to associate documents with
+            entity_id: Optional entity ID to associate documents with
             user_id: User ID for audit trail purposes
             
         Returns:
@@ -288,7 +288,7 @@ class IngestionAgent:
                     'original_file_type': file_type,
                     'ingestion_status': 'ingestion_pending',
                     'processing_status': 'new',
-                    'patient_id': patient_id,
+                    'entity_id': entity_id,
                     'session_id': session_id,
                     'original_watchfolder_path': file_path  # Store original path for reference
                 }

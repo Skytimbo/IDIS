@@ -1,0 +1,28 @@
+EMPLOYEE PAYSLIP
+
+Employee Name: John Doe
+Employee ID: 12345
+Pay Period: 12/01/2024 - 12/15/2024
+Pay Date: 12/20/2024
+
+EARNINGS:
+Regular Hours: 80.0 hrs @ $25.00/hr = $2,000.00
+Overtime Hours: 5.0 hrs @ $37.50/hr = $187.50
+Gross Pay: $2,187.50
+
+DEDUCTIONS:
+Federal Tax: $328.13
+State Tax: $131.25
+Social Security: $135.63
+Medicare: $31.72
+Health Insurance: $125.00
+Total Deductions: $751.73
+
+NET PAY: $1,435.77
+
+Year-to-Date Totals:
+Gross Pay YTD: $52,500.00
+Federal Tax YTD: $7,875.00
+Net Pay YTD: $34,458.48
+
+This is an official payslip from ABC Company for the above mentioned pay period.

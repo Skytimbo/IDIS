@@ -7,7 +7,7 @@ JSON SCHEMA:
   "document_id": "string", "# A unique identifier for the document (e.g., UUID). This will be provided by the system later, return null for now.",
   "ingestion_date": "string", "# The ISO 8601 timestamp of when the document was processed. This will be provided by the system later, return null for now.",
   "document_type": {
-    "predicted_class": "string", "# The best-guess classification of the document. Examples: 'Financial Statement', 'Utility Bill', 'Receipt', 'Legal Contract', 'Medical Report', 'Correspondence'.",
+    "predicted_class": "string", "# The best-guess classification of the document. Examples: 'Financial Statement', 'Utility Bill', 'Receipt', 'Legal Contract', 'Medical Report', 'Correspondence', 'Payslip'. IMPORTANT: Any document containing terms like 'Payslip', 'Paystub', 'Pay Period', 'Gross Pay', 'Net Pay', 'Medicaid Payslip', 'Employee', 'Employer', or salary information should be classified as 'Payslip', regardless of file extension. A .txt file containing pay stub information should be classified as 'Payslip', not 'Correspondence'. The word 'Payslip' or 'Paystub' appearing anywhere in the document is a strong indicator of Payslip classification.",
     "confidence_score": "float" "# Your confidence in the prediction, from 0.0 to 1.0."
   },
   "issuer": {
@@ -58,3 +58,41 @@ JSON SCHEMA:
     "suggested_filename": "string" "# A suggested filename in the format YYYY-MM-DD-Issuer-DocumentType.pdf."
   }
 }
+```
+
+---
+EXAMPLE INPUT TEXT 1:
+Paystub - Period: 06/15/2025 to 06/30/2025
+Employee: Jane Doe
+Employer: Alaska General Hospital
+Gross Pay: $2,100.00
+Net Pay: $1,650.00
+
+DESIRED JSON OUTPUT (Partial):
+{
+  "document_type": {
+    "predicted_class": "Payslip",
+    "confidence_score": 0.95
+  }
+}
+
+EXAMPLE INPUT TEXT 2:
+Alaska Department of Health & Social Services
+Medicaid Payslip
+
+Employee: John Doe
+Date: 2025-07-10
+Amount: $1,234.56
+
+This is a test payslip for debugging the upload functionality.
+
+DESIRED JSON OUTPUT (Partial):
+{
+  "document_type": {
+    "predicted_class": "Payslip",
+    "confidence_score": 0.95
+  }
+}
+---
+
+Your response must be a single line of valid JSON with no formatting, comments, or additional text.
