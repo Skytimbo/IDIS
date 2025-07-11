@@ -170,8 +170,13 @@ def extract_confidence_from_document(document: Dict[str, Any]) -> Tuple[float, s
                     confidence = heuristic_meta['confidence_override']
                 document_type = heuristic_meta.get('rule_type', document_type)
             
-            # Get AI confidence from confidence_score field (V1.3 schema)
-            if 'confidence_score' in data and not has_heuristic_override:
+            # Get AI confidence from V1.3 schema structure
+            if 'document_type' in data and isinstance(data['document_type'], dict) and not has_heuristic_override:
+                doc_type_info = data['document_type']
+                confidence = doc_type_info.get('confidence_score', 0.0)
+                document_type = doc_type_info.get('predicted_class', document_type)
+            # Fallback to root-level confidence_score for older formats
+            elif 'confidence_score' in data and not has_heuristic_override:
                 confidence = data['confidence_score']
                 document_type = data.get('document_type', document_type)
                 
