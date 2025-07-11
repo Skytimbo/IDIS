@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """
+
 Test script to verify the assignment fix is working correctly.
 """
 

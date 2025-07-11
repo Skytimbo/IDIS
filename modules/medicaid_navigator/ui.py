@@ -213,11 +213,14 @@ def assign_document_to_requirement(document_id: int, requirement_id: int, patien
                 WHERE id = ?
             """, (document_id, 1 if override else 0, existing_record[0]))
         else:
+
             # Insert new record
             cursor.execute("""
+
                 INSERT INTO case_documents (case_id, entity_id, checklist_item_id, document_id, status, is_override, created_at, updated_at)
                 VALUES (?, ?, ?, ?, 'Submitted', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             """, (case_id, patient_id, requirement_id, document_id, 1 if override else 0))
+
         
         context_store.conn.commit()
         logging.info("DEBUG: Database update successful, returning True.")
