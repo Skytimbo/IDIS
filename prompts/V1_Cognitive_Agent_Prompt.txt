@@ -58,3 +58,23 @@ JSON SCHEMA:
     "suggested_filename": "string" "# A suggested filename in the format YYYY-MM-DD-Issuer-DocumentType.pdf."
   }
 }
+```
+
+---
+EXAMPLE INPUT TEXT:
+Paystub - Period: 06/15/2025 to 06/30/2025
+Employee: Jane Doe
+Employer: Alaska General Hospital
+Gross Pay: $2,100.00
+Net Pay: $1,650.00
+
+DESIRED JSON OUTPUT (Partial):
+{
+  "document_type": {
+    "predicted_class": "Payslip",
+    "confidence_score": 0.95
+  }
+}
+---
+
+Your response must be a single line of valid JSON with no formatting, comments, or additional text.
