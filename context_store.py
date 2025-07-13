@@ -107,7 +107,7 @@ class ContextStore:
                 filed_path TEXT, -- The final path in the archive
                 ingestion_status TEXT,
                 processing_status TEXT,
-                patient_id INTEGER,
+                entity_id INTEGER,
                 session_id INTEGER,
                 extracted_data TEXT, -- Full JSON object from cognitive agent
                 full_text TEXT, -- Primary text storage
@@ -120,15 +120,15 @@ class ContextStore:
                 upload_timestamp TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 last_modified_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (patient_id) REFERENCES patients (id),
+                FOREIGN KEY (entity_id) REFERENCES entities (id),
                 FOREIGN KEY (session_id) REFERENCES sessions (id)
             )
         ''')
         
         # Create indexes for documents table
         cursor.execute('''
-            CREATE INDEX IF NOT EXISTS idx_documents_patient_id 
-            ON documents(patient_id)
+            CREATE INDEX IF NOT EXISTS idx_documents_entity_id 
+            ON documents(entity_id)
         ''')
         cursor.execute('''
             CREATE INDEX IF NOT EXISTS idx_documents_session_id 
@@ -470,7 +470,7 @@ class ContextStore:
         Adds a new document to the database. Expects a dictionary containing
         the file_name and the full extracted_data JSON object.
         """
-        sql = ''' INSERT INTO documents(file_name, original_file_type, ingestion_status, document_type, classification_confidence, processing_status, patient_id, session_id, extracted_data, full_text, document_dates)
+        sql = ''' INSERT INTO documents(file_name, original_file_type, ingestion_status, document_type, classification_confidence, processing_status, entity_id, session_id, extracted_data, full_text, document_dates)
                   VALUES(?,?,?,?,?,?,?,?,?,?,?) '''
         
         # Handle extracted_data field - create JSON structure if needed
@@ -501,7 +501,7 @@ class ContextStore:
                 doc_data.get('document_type'),
                 doc_data.get('classification_confidence'),
                 doc_data.get('processing_status'),
-                doc_data.get('patient_id'),
+                doc_data.get('entity_id'),
                 doc_data.get('session_id'),
                 extracted_data,
                 doc_data.get('extracted_text') or doc_data.get('full_text'),  # Support both field names
@@ -583,7 +583,7 @@ class ContextStore:
         # Security whitelist: Only allow updates to these specific columns
         allowed_keys = {
             'file_name', 'original_file_type', 'original_watchfolder_path',
-            'ingestion_status', 'processing_status', 'patient_id', 'session_id',
+            'ingestion_status', 'processing_status', 'entity_id', 'session_id',
             'extracted_data', 'full_text', 'document_type', 'classification_confidence',
             'document_dates', 'associated_entity', 'upload_timestamp'
         }
@@ -879,7 +879,7 @@ class ContextStore:
             # Select essential fields needed by agents for processing
             cursor.execute(
                 """
-                SELECT id as document_id, file_name, patient_id, session_id,
+                SELECT id as document_id, file_name, entity_id, session_id,
                        original_file_type, document_type, classification_confidence, original_watchfolder_path,
                        full_text
                 FROM documents
@@ -904,12 +904,12 @@ class ContextStore:
             # Log the error here
             raise e
     
-    def query_patient_history(self, patient_id: str) -> List[Dict[str, Any]]:
+    def query_entity_history(self, entity_id: str) -> List[Dict[str, Any]]:
         """
-        Retrieve document history for a patient.
+        Retrieve document history for an entity.
         
         Args:
-            patient_id: The patient's unique identifier
+            entity_id: The entity's unique identifier
         
         Returns:
             List[Dict]: List of document summary dictionaries with fields:
@@ -929,16 +929,29 @@ class ContextStore:
                 SELECT id as document_id, file_name, document_type, 
                        processing_status, upload_timestamp
                 FROM documents
-                WHERE patient_id = ?
+                WHERE entity_id = ?
                 ORDER BY upload_timestamp DESC
                 ''',
-                (patient_id,)
+                (entity_id,)
             )
             rows = cursor.fetchall()
             
             return [dict(row) for row in rows]
         except sqlite3.Error as e:
             raise e
+
+    def query_patient_history(self, patient_id: str) -> List[Dict[str, Any]]:
+        """
+        Backward compatibility method - calls query_entity_history.
+        
+        Args:
+            patient_id: The entity's unique identifier (for backward compatibility)
+        
+        Returns:
+            List[Dict]: List of document summary dictionaries
+        """
+        return self.query_entity_history(patient_id)
+    
     def update_document_categorization(self, document_id: int, entity_json: str) -> bool:
         """
         Updates a document's associated entity and sets its status to complete.
