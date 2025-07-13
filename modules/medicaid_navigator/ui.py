@@ -282,25 +282,148 @@ def render_document_assignment_interface():
                         st.warning("Please select a requirement first")
 
 
-def get_case_dashboard_data():
+def get_current_user_id():
     """
-    Retrieve all active cases with their progress metrics for the dashboard.
+    Get the current user ID (simulated for demo purposes).
+    In a real application, this would come from authentication system.
+    """
+    # For demonstration, we'll simulate different users
+    # In production, this would come from your authentication system
+    return st.session_state.get('current_user_id', 'user_a')
+
+def get_user_entities(user_id):
+    """
+    Get all entities belonging to a specific user.
     
+    Args:
+        user_id: The user ID to filter entities for
+        
     Returns:
-        list: List of dictionaries containing case information
+        list: List of dictionaries containing entity information
     """
     try:
         db_path = st.session_state.get('database_path', 'production_idis.db')
         context_store = ContextStore(db_path)
         cursor = context_store.conn.cursor()
         
-        # Get all distinct cases with entity information
+        cursor.execute("""
+            SELECT id, entity_name, creation_timestamp
+            FROM entities 
+            WHERE user_id = ?
+            ORDER BY entity_name
+        """, (user_id,))
+        
+        entities = cursor.fetchall()
+        return [{'id': row[0], 'name': row[1], 'created': row[2]} for row in entities]
+        
+    except Exception as e:
+        logging.error(f"Error loading user entities: {e}")
+        return []
+
+def create_new_entity(entity_name, user_id):
+    """
+    Create a new entity for the specified user.
+    
+    Args:
+        entity_name: Name of the new entity
+        user_id: ID of the user creating the entity
+        
+    Returns:
+        int: ID of the newly created entity, or None if failed
+    """
+    try:
+        db_path = st.session_state.get('database_path', 'production_idis.db')
+        context_store = ContextStore(db_path)
+        cursor = context_store.conn.cursor()
+        
+        cursor.execute("""
+            INSERT INTO entities (entity_name, user_id, creation_timestamp, last_modified_timestamp)
+            VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """, (entity_name, user_id))
+        
+        entity_id = cursor.lastrowid
+        context_store.conn.commit()
+        
+        logging.info(f"Created new entity '{entity_name}' (ID: {entity_id}) for user {user_id}")
+        return entity_id
+        
+    except Exception as e:
+        logging.error(f"Error creating new entity: {e}")
+        return None
+
+def create_new_case(entity_id, user_id):
+    """
+    Create a new case for the specified entity and user.
+    
+    Args:
+        entity_id: ID of the entity the case belongs to
+        user_id: ID of the user creating the case
+        
+    Returns:
+        str: Case ID of the newly created case, or None if failed
+    """
+    try:
+        db_path = st.session_state.get('database_path', 'production_idis.db')
+        context_store = ContextStore(db_path)
+        cursor = context_store.conn.cursor()
+        
+        # Get entity name for case ID generation
+        cursor.execute("SELECT entity_name FROM entities WHERE id = ?", (entity_id,))
+        entity_result = cursor.fetchone()
+        if not entity_result:
+            return None
+            
+        entity_name = entity_result[0]
+        
+        # Generate case ID with timestamp
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        case_id = f"CASE-{entity_name.replace(' ', '')}-{timestamp}"
+        
+        # Create initial case document entries for all checklist items
+        cursor.execute("""
+            SELECT id FROM application_checklists 
+            WHERE checklist_name = 'SOA Medicaid - Adult'
+        """)
+        
+        checklist_items = cursor.fetchall()
+        
+        for item in checklist_items:
+            cursor.execute("""
+                INSERT INTO case_documents (case_id, entity_id, checklist_item_id, status, user_id, created_at, updated_at)
+                VALUES (?, ?, ?, 'Pending', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, (case_id, entity_id, item[0], user_id))
+        
+        context_store.conn.commit()
+        
+        logging.info(f"Created new case '{case_id}' for entity {entity_id} (user {user_id})")
+        return case_id
+        
+    except Exception as e:
+        logging.error(f"Error creating new case: {e}")
+        return None
+
+def get_case_dashboard_data():
+    """
+    Retrieve all active cases with their progress metrics for the current user.
+    
+    Returns:
+        list: List of dictionaries containing case information
+    """
+    try:
+        current_user = get_current_user_id()
+        db_path = st.session_state.get('database_path', 'production_idis.db')
+        context_store = ContextStore(db_path)
+        cursor = context_store.conn.cursor()
+        
+        # Get all distinct cases with entity information filtered by user
         cursor.execute("""
             SELECT DISTINCT cd.case_id, cd.entity_id, e.entity_name
             FROM case_documents cd
             JOIN entities e ON cd.entity_id = e.id
+            WHERE cd.user_id = ?
             ORDER BY cd.case_id
-        """)
+        """, (current_user,))
         
         cases_raw = cursor.fetchall()
         cases_data = []
@@ -347,9 +470,25 @@ def render_case_dashboard():
     """
     Render the main Case Management Dashboard showing all active cases.
     """
+    current_user = get_current_user_id()
+    
+    # Add user switcher for demo purposes
+    st.sidebar.subheader("🔐 User Simulation")
+    user_options = ['user_a', 'user_b']
+    current_user_display = st.sidebar.selectbox(
+        "Current User:", 
+        options=user_options, 
+        index=user_options.index(current_user),
+        help="For demo purposes - simulates different users"
+    )
+    
+    if current_user_display != current_user:
+        st.session_state.current_user_id = current_user_display
+        st.experimental_rerun()
+    
     st.title("🏥 Active Case Dashboard")
     st.markdown("---")
-    st.markdown("**Caseworker Portal** - View and manage all active Medicaid application cases")
+    st.markdown(f"**Caseworker Portal** - View and manage all active Medicaid application cases (User: {current_user})")
     
     # Add "Start New Application" button
     col1, col2, col3 = st.columns([1, 1, 1])
@@ -501,24 +640,93 @@ def render_case_detail_view():
     st.markdown("**Need help?** Contact Alaska Medicaid Support at 1-800-XXX-XXXX")
 
 
-def render_entity_management_redirect():
+def render_start_new_application():
     """
-    Render a redirect to the Entity Management page for creating new cases.
+    Render the secure multi-user "Start New Application" workflow.
     """
-    st.title("🏢 Create New Case")
-    st.markdown("---")
-    st.info("To start a new Medicaid application case, first create or select an entity.")
+    current_user = get_current_user_id()
     
-    # Button to go back to dashboard
+    st.title("🏢 Start New Application")
+    st.markdown("---")
+    st.markdown(f"**User:** {current_user}")
+    
+    # Back to dashboard button
     if st.button("← Back to Dashboard"):
         st.session_state.show_entity_management = False
         st.experimental_rerun()
     
-    # Instructions for entity creation
-    st.markdown("### Instructions:")
-    st.markdown("1. Navigate to the **Entity Management** page using the sidebar")
-    st.markdown("2. Create a new entity for the applicant")
-    st.markdown("3. Return to the Medicaid Navigator to begin the application process")
+    st.markdown("---")
+    
+    # Two-option workflow
+    st.markdown("### Choose how to proceed:")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("#### Option 1: Create New Entity")
+        st.markdown("Create a new person/entity for this application")
+        
+        with st.form("create_entity_form"):
+            entity_name = st.text_input("Entity Name", help="Enter the full name of the person applying")
+            create_entity_submit = st.form_submit_button("Create Entity & Start Case", type="primary")
+            
+            if create_entity_submit:
+                if entity_name.strip():
+                    # Create new entity
+                    entity_id = create_new_entity(entity_name.strip(), current_user)
+                    if entity_id:
+                        # Create new case
+                        case_id = create_new_case(entity_id, current_user)
+                        if case_id:
+                            st.success(f"✅ Created new entity '{entity_name}' and case '{case_id}'")
+                            st.session_state.show_entity_management = False
+                            st.session_state.show_case_detail = True
+                            st.session_state.current_case_id = case_id
+                            st.session_state.current_entity_id = entity_id
+                            st.experimental_rerun()
+                        else:
+                            st.error("Failed to create case. Please try again.")
+                    else:
+                        st.error("Failed to create entity. Please try again.")
+                else:
+                    st.error("Please enter a valid entity name.")
+    
+    with col2:
+        st.markdown("#### Option 2: Select Existing Entity")
+        st.markdown("Choose from your existing entities")
+        
+        # Get user's entities
+        user_entities = get_user_entities(current_user)
+        
+        if user_entities:
+            with st.form("select_entity_form"):
+                entity_options = {f"{entity['name']} (Created: {entity['created'][:10]})": entity['id'] for entity in user_entities}
+                selected_entity_display = st.selectbox(
+                    "Select Entity:",
+                    options=list(entity_options.keys()),
+                    help="Choose an existing entity to create a new case for"
+                )
+                select_entity_submit = st.form_submit_button("Start New Case", type="primary")
+                
+                if select_entity_submit:
+                    selected_entity_id = entity_options[selected_entity_display]
+                    
+                    # Create new case for selected entity
+                    case_id = create_new_case(selected_entity_id, current_user)
+                    if case_id:
+                        st.success(f"✅ Created new case '{case_id}' for existing entity")
+                        st.session_state.show_entity_management = False
+                        st.session_state.show_case_detail = True
+                        st.session_state.current_case_id = case_id
+                        st.session_state.current_entity_id = selected_entity_id
+                        st.experimental_rerun()
+                    else:
+                        st.error("Failed to create case. Please try again.")
+        else:
+            st.info("No existing entities found. Use Option 1 to create a new entity.")
+    
+    st.markdown("---")
+    st.markdown("**Privacy Notice:** You can only see and create cases for your own entities. This ensures data security in multi-user environments.")
 
 
 def render_navigator_ui():
@@ -537,7 +745,7 @@ def render_navigator_ui():
     
     # Route to appropriate view
     if st.session_state.show_entity_management:
-        render_entity_management_redirect()
+        render_start_new_application()
     elif st.session_state.show_case_detail:
         render_case_detail_view()
     else:
