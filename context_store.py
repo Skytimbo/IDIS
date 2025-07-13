@@ -956,6 +956,77 @@ class ContextStore:
             print(f"Database error in update_document_categorization: {e}")
             return False
     
+    # Entity Management Methods
+    
+    def add_entity(self, entity_name: str) -> int:
+        """
+        Add a new entity to the database.
+        
+        Args:
+            entity_name: The name of the entity to add
+        
+        Returns:
+            int: The newly created entity ID
+            
+        Raises:
+            sqlite3.Error: If there's a database error
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                '''
+                INSERT INTO entities (entity_name, creation_timestamp, last_modified_timestamp)
+                VALUES (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                ''',
+                (entity_name,)
+            )
+            self.conn.commit()
+            if cursor.lastrowid is None:
+                raise sqlite3.Error("Failed to get entity ID after insert")
+            return cursor.lastrowid
+        except sqlite3.Error as e:
+            self.conn.rollback()
+            raise e
+    
+    def get_all_entities(self) -> List[Dict[str, Any]]:
+        """
+        Retrieve all entities from the database.
+        
+        Returns:
+            List[Dict]: List of entity dictionaries
+            
+        Raises:
+            sqlite3.Error: If there's a database error
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM entities ORDER BY entity_name")
+            rows = cursor.fetchall()
+            return [dict(row) for row in rows]
+        except sqlite3.Error as e:
+            raise e
+    
+    def get_entity(self, entity_id: int) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve an entity by ID.
+        
+        Args:
+            entity_id: The entity's unique identifier
+        
+        Returns:
+            Optional[Dict]: Entity data as a dictionary, or None if not found
+            
+        Raises:
+            sqlite3.Error: If there's a database error
+        """
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM entities WHERE id = ?", (entity_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+        except sqlite3.Error as e:
+            raise e
+    
     def test_security_function(self, user_input: str) -> list:
         """
         INTENTIONALLY VULNERABLE FUNCTION FOR CODERABBIT TESTING
