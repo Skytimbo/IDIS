@@ -63,8 +63,7 @@ def render_entity_management_ui():
                 # Display the dataframe
                 st.dataframe(
                     display_df,
-                    use_container_width=True,
-                    hide_index=True
+                    use_container_width=True
                 )
                 
                 st.info(f"Total entities: {len(entities)}")
