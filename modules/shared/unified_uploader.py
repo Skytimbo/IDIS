@@ -107,13 +107,13 @@ def _process_uploaded_files(uploaded_files, context: str, accept_multiple: bool)
                     f.write(uploaded_file.getvalue())
                 
                 # Context-aware processing parameters
-                patient_id, session_id = _get_context_parameters(context)
+                entity_id, session_id = _get_context_parameters(context)
                 
                 # Process directly through UnifiedIngestionAgent
                 success = ingestion_agent._process_single_file(
                     temp_path, 
                     uploaded_file.name, 
-                    patient_id=patient_id, 
+                    entity_id=entity_id, 
                     session_id=session_id
                 )
                 
@@ -155,13 +155,13 @@ def _process_uploaded_files(uploaded_files, context: str, accept_multiple: bool)
 
 def _get_context_parameters(context: str) -> tuple:
     """
-    Get context-specific patient_id and session_id parameters.
+    Get context-specific entity_id and session_id parameters.
     
     Args:
         context: Processing context ('medicaid', 'general', etc.)
     
     Returns:
-        Tuple of (patient_id, session_id)
+        Tuple of (entity_id, session_id)
     """
     
     if context == "medicaid":
@@ -203,7 +203,7 @@ def _store_processed_document(filename: str, context_store: ContextStore) -> Non
         # Query for the most recently added document with this filename
         cursor = context_store.conn.cursor()
         cursor.execute("""
-            SELECT document_id, file_name, document_type, extracted_data
+            SELECT id, file_name, document_type, extracted_data
             FROM documents 
             WHERE file_name = ? 
             ORDER BY upload_timestamp DESC 
@@ -219,15 +219,18 @@ def _store_processed_document(filename: str, context_store: ContextStore) -> Non
             if 'processed_documents' not in st.session_state:
                 st.session_state.processed_documents = []
             
-            # Add to processed documents list
-            document_info = {
-                'document_id': document_id,
-                'filename': file_name,
-                'document_type': document_type,
-                'extracted_data': extracted_data
-            }
-            
-            st.session_state.processed_documents.append(document_info)
+            # Check for duplicate entries before adding
+            existing_filenames = [doc['filename'] for doc in st.session_state.processed_documents]
+            if file_name not in existing_filenames:
+                # Add to processed documents list
+                document_info = {
+                    'document_id': document_id,  # Using the 'id' column instead of 'document_id'
+                    'filename': file_name,
+                    'document_type': document_type,
+                    'extracted_data': extracted_data
+                }
+                
+                st.session_state.processed_documents.append(document_info)
             logging.info(f"Stored processed document: {filename} (ID: {document_id})")
         
     except Exception as e:

@@ -82,7 +82,7 @@ def process_inbox_file(
         processing_success = unified_agent._process_single_file(
             file_path=file_path,
             filename=original_filename,
-            patient_id=int(patient_id_for_new_docs) if patient_id_for_new_docs else 1,
+            entity_id=int(patient_id_for_new_docs) if patient_id_for_new_docs else 1,
             session_id=session_id
         )
         

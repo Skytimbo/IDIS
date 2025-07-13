@@ -12,6 +12,7 @@ from datetime import datetime, date
 from typing import List, Tuple, Optional, Dict, Any
 import os
 import sys
+from modules.shared.confidence_meter import extract_confidence_from_document, render_confidence_meter, render_confidence_badge, render_processing_confidence_summary
 
 # --- Dynamic Application Configuration ---
 
@@ -401,6 +402,16 @@ def render_search_ui():
         results_df = st.session_state.results
         st.success(f"📊 Found {len(results_df)} matching document(s)")
         
+        # Add confidence summary for multiple documents
+        if len(results_df) > 1:
+            documents_data = []
+            for _, row in results_df.iterrows():
+                documents_data.append({
+                    'extracted_data': str(row['extracted_data']) if pd.notna(row['extracted_data']) and row['extracted_data'] != 'None' else None
+                })
+            render_processing_confidence_summary(documents_data)
+            st.markdown("---")
+        
         for index, row in results_df.iterrows():
             # Convert Series values to strings for proper handling
             filed_path = row['filed_path'] if pd.notna(row['filed_path']) else None
@@ -422,6 +433,10 @@ def render_search_ui():
             
             # Create concise one-line summary for expander label
             display_filename = get_display_filename(filed_path, file_name)
+            
+            # Get confidence for badge display
+            confidence, _, has_heuristic_override = extract_confidence_from_document(dict(extracted_data=extracted_data))
+            confidence_badge = render_confidence_badge(confidence, has_heuristic_override)
             
             # Create a clean, scannable expander label with key information
             expander_label = f"📄 {display_filename} | {enhanced_document_type} | {enhanced_issuer} | {processed_date_str}"
@@ -448,11 +463,10 @@ def render_search_ui():
                     try:
                         data = json.loads(extracted_data)
                         
-                        # Show confidence score if available
-                        confidence = data.get('confidence_score')
-                        if confidence is not None:
-                            st.subheader("🎯 Classification Confidence")
-                            st.progress(confidence, text=f"{confidence:.1%}")
+                        # Show confidence meter with enhanced UI
+                        confidence, document_type, has_heuristic_override = extract_confidence_from_document(dict(extracted_data=extracted_data))
+                        st.subheader("🎯 AI Classification Confidence")
+                        render_confidence_meter(confidence, document_type, compact=False)
                         
                         # Show financial information if available
                         financials = data.get('financials', {})

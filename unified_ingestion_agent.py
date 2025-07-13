@@ -71,12 +71,105 @@ class UnifiedIngestionAgent:
         
         self.logger.info(f"UnifiedIngestionAgent initialized with watch folder: {self.watch_folder}")
     
-    def process_documents_from_folder(self, patient_id: int = 1, session_id: int = 1) -> Tuple[int, List[str]]:
+    def apply_heuristic_rules(self, extracted_data: Dict[str, Any], full_text: str) -> Dict[str, Any]:
+        """
+        Apply rule-based heuristics to improve document classification accuracy.
+        
+        This function applies keyword-based rules to override AI classifications when the AI
+        produces generic document types like "Correspondence" or "Unknown". It provides a
+        scalable way to improve classification accuracy through targeted rule matching.
+        
+        Args:
+            extracted_data: The structured data extracted by the CognitiveAgent
+            full_text: The full text content of the document
+            
+        Returns:
+            Updated extracted_data with potentially corrected document classification
+        """
+        # Rule definitions - easily expandable for new document types
+        heuristic_rules = [
+            {
+                "keywords": ["payslip", "paystub", "pay period", "gross pay", "net pay", "salary", "wages", "employee", "employer", "deductions"],
+                "document_type": "Payslip",
+                "confidence": 0.9
+            },
+            {
+                "keywords": ["electric", "electricity", "power", "kwh", "utility", "gci", "homer electric", "alaska electric", "aml&p", "chugach"],
+                "document_type": "Utility Bill",
+                "confidence": 0.85
+            },
+            {
+                "keywords": ["bank statement", "checking account", "savings account", "balance", "deposit", "withdrawal", "account number"],
+                "document_type": "Bank Statement",
+                "confidence": 0.85
+            },
+            {
+                "keywords": ["receipt", "purchase", "total", "tax", "store", "retail", "transaction"],
+                "document_type": "Receipt",
+                "confidence": 0.8
+            },
+            {
+                "keywords": ["invoice", "bill", "amount due", "payment terms", "invoice number", "due date"],
+                "document_type": "Invoice",
+                "confidence": 0.8
+            }
+        ]
+        
+        # Get current AI classification
+        current_classification = extracted_data.get('document_type', {})
+        if not isinstance(current_classification, dict):
+            current_classification = {}
+            
+        current_type = current_classification.get('predicted_class', '').lower()
+        
+        # Generic types that should be overridden by heuristics
+        generic_types = ['correspondence', 'unknown', 'document', 'text', 'file']
+        
+        # Only apply heuristics if the AI classification is generic or has low confidence
+        current_confidence = current_classification.get('confidence_score', 0.0)
+        should_apply_heuristics = (
+            current_type in generic_types or 
+            current_confidence < 0.7 or 
+            not current_type
+        )
+        
+        if should_apply_heuristics:
+            full_text_lower = full_text.lower()
+            
+            # Check each rule for keyword matches
+            for rule in heuristic_rules:
+                keywords_found = [keyword for keyword in rule['keywords'] if keyword in full_text_lower]
+                
+                # If we found keywords for this rule, apply it
+                if keywords_found:
+                    self.logger.info(f"Heuristic Rules Engine: Matched keywords {keywords_found} for {rule['document_type']}")
+                    self.logger.info(f"Overriding AI classification '{current_type}' with '{rule['document_type']}'")
+                    
+                    # Update the document type classification
+                    extracted_data['document_type'] = {
+                        'predicted_class': rule['document_type'],
+                        'confidence_score': rule['confidence']
+                    }
+                    
+                    # Add heuristic metadata to track rule application
+                    if 'heuristic_metadata' not in extracted_data:
+                        extracted_data['heuristic_metadata'] = {}
+                    
+                    extracted_data['heuristic_metadata']['rule_applied'] = True
+                    extracted_data['heuristic_metadata']['matched_keywords'] = keywords_found
+                    extracted_data['heuristic_metadata']['original_classification'] = current_type
+                    extracted_data['heuristic_metadata']['rule_type'] = rule['document_type']
+                    
+                    break  # Apply the first matching rule
+        
+        return extracted_data
+    
+    def process_documents_from_folder(self, entity_id: int = 1, session_id: int = 1) -> Tuple[int, List[str]]:
         """
         Process all documents found in the watch folder.
         
         Args:
-            patient_id: ID of the patient to associate documents with
+            entity_id: ID of the entity to associate documents with
             session_id: ID of the session to associate documents with
             
         Returns:
@@ -98,7 +191,7 @@ class UnifiedIngestionAgent:
         for filename in files:
             try:
                 file_path = os.path.join(self.watch_folder, filename)
-                success = self._process_single_file(file_path, filename, patient_id, session_id)
+                success = self._process_single_file(file_path, filename, entity_id, session_id)
                 
                 if success:
                     processed_count += 1
@@ -124,14 +217,14 @@ class UnifiedIngestionAgent:
         self.logger.info(f"Document processing complete. Successfully processed: {processed_count}")
         return processed_count, error_messages
     
-    def _process_single_file(self, file_path: str, filename: str, patient_id: int, session_id: int) -> bool:
+    def _process_single_file(self, file_path: str, filename: str, entity_id: int, session_id: int) -> bool:
         """
         Process a single document file through the complete unified pipeline.
         
         Args:
             file_path: Full path to the file
             filename: Name of the file
-            patient_id: Patient ID for database association
+            entity_id: Entity ID for database association
             session_id: Session ID for database association
             
         Returns:
@@ -158,11 +251,14 @@ class UnifiedIngestionAgent:
                 self.logger.warning(f"CognitiveAgent failed to extract structured data from {filename}")
                 return False
             
+            # Step 2.5: Apply Heuristic Rules Engine to improve classification accuracy
+            structured_data = self.apply_heuristic_rules(structured_data, extracted_text)
+            
             # Step 3: ADAPTER LOGIC - Prepare document data for Context Store
             # This is the "adapter" logic that bridges LLM output to database storage
             db_record = {
                 'document_id': str(uuid.uuid4()),
-                'patient_id': patient_id,
+                'entity_id': entity_id,
                 'session_id': session_id,
                 'file_name': os.path.basename(file_path),
                 'original_file_type': file_extension.lstrip('.'),

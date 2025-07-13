@@ -33,3 +33,7 @@ With the backend foundation and core data pipeline now complete, stable, and tes
 * **Learning HITL System:** Evolve the Human-in-the-Loop system to learn from user choices, making intelligent suggestions and eventually automating categorization for recurring document types.
 * **Advanced Cognitive Interface:** Evolve the UI into a comprehensive dashboard with proactive insights, data visualizations, and advanced analytics.
 * **Hardware Appliance:** Package the entire software stack (via Docker) onto a dedicated Mini PC with a scanner and touchscreen to create the final turnkey QuantaIQ product.
+* ⚠️ **NOTE**: This repository is currently under license transition.
+The previous MIT license no longer reflects the intent or constraints of the IDIS project.
+A new release will follow shortly under the Noninference License (NIL v0.1) to protect core ethical principles.
+

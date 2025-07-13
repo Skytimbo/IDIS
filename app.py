@@ -19,10 +19,13 @@ import sys
 
 # --- Local Module Imports ---
 # Import the UI functions from the different modules
+# --- Local Module Imports ---
+# Import the UI functions from the different modules
 from modules.search_ui import render_search_ui
 from modules.medicaid_navigator.ui import render_navigator_ui
 from quanta_ui.pages.needs_review_ui import render_needs_review_page
-from pages.entity_management_ui import render_entity_management_ui
+from pages.entity_management_ui import render_entity_management_page
+
 
 # --- Main Application Router ---
 def main():
@@ -35,7 +38,7 @@ def main():
     # Module selection in the sidebar
     module_selection = st.sidebar.selectbox(
         "Select a Tool",
-        ("General Document Search", "Medicaid Navigator", "Needs Review (HITL)", "Entity Management")
+        ("General Document Search", "Medicaid Navigator", "Entity & Case Management", "Needs Review (HITL)")
     )
 
     st.sidebar.markdown("---")
@@ -46,10 +49,10 @@ def main():
         render_search_ui()
     elif module_selection == "Medicaid Navigator":
         render_navigator_ui()
+    elif module_selection == "Entity & Case Management":
+        render_entity_management_page()
     elif module_selection == "Needs Review (HITL)":
         render_needs_review_page()
-    elif module_selection == "Entity Management":
-        render_entity_management_ui()
     else:
         st.error("An unexpected error occurred. Please select a valid module.")
 

@@ -2,19 +2,30 @@ import streamlit as st
 import pandas as pd
 import os
 import logging
+from datetime import datetime
 from context_store import ContextStore
 from unified_ingestion_agent import UnifiedIngestionAgent
+from modules.shared.confidence_meter import extract_confidence_from_document, render_confidence_meter
 
+<<<<<<< HEAD
 
 
 
 def load_application_checklist_with_status_for_entity(entity_id):
+=======
+def load_application_checklist_with_status(patient_id=None, case_id=None):
+>>>>>>> 78c181f1711a5706d2e1e656e094ce786c836d37
     """
     Load the application checklist with current status for a specific entity.
     Checks case_documents table for submitted documents.
     
     Args:
+<<<<<<< HEAD
         entity_id: The entity ID to check status for
+=======
+        patient_id: ID of the selected patient
+        case_id: ID of the specific case
+>>>>>>> 78c181f1711a5706d2e1e656e094ce786c836d37
     
     Returns:
         pd.DataFrame: Formatted checklist with current status
@@ -24,11 +35,20 @@ def load_application_checklist_with_status_for_entity(entity_id):
         db_path = st.session_state.get('database_path', 'production_idis.db')
         context_store = ContextStore(db_path)
         
+<<<<<<< HEAD
         # Query checklist requirements with status for specific entity
+=======
+        # Use session state patient_id if not provided
+        if patient_id is None:
+            patient_id = st.session_state.get('selected_patient_id', 1)
+        
+        # Query checklist requirements with status
+>>>>>>> 78c181f1711a5706d2e1e656e094ce786c836d37
         cursor = context_store.conn.cursor()
         cursor.execute("""
             SELECT ac.id, ac.required_doc_name, ac.description,
                    CASE 
+                       WHEN cd.status = 'Submitted' AND cd.is_override = 1 THEN '🟡 Overridden'
                        WHEN cd.status = 'Submitted' THEN '🔵 Submitted'
                        ELSE '🔴 Missing'
                    END as status
@@ -37,7 +57,11 @@ def load_application_checklist_with_status_for_entity(entity_id):
                 AND cd.entity_id = ?
             WHERE ac.checklist_name = 'SOA Medicaid - Adult'
             ORDER BY ac.id
+<<<<<<< HEAD
         """, (entity_id,))
+=======
+        """, (patient_id,))
+>>>>>>> 78c181f1711a5706d2e1e656e094ce786c836d37
         
         requirements = cursor.fetchall()
         
@@ -86,6 +110,10 @@ def validate_document_assignment(ai_detected_type: str, selected_requirement: st
             'Utility Bill', 'Bank Statement', 'Lease Agreement',
             'Mortgage Statement', 'Rent Receipt'
         ],
+        'Proof of Alaska Residency': [
+            'Utility Bill', 'Bank Statement', 'Lease Agreement',
+            'Mortgage Statement', 'Rent Receipt'
+        ],
         'Proof of Income': [
             'Paystub', 'Employment Letter', 'Social Security Award',
             'Tax Return', 'Bank Statement', 'Payslip'
@@ -118,14 +146,23 @@ def validate_document_assignment(ai_detected_type: str, selected_requirement: st
         }
 
 
+<<<<<<< HEAD
 def assign_document_to_requirement(document_id: int, requirement_id: int, entity_id: int = None, override: bool = False, override_reason: str = ""):
+=======
+def assign_document_to_requirement(document_id: int, requirement_id: int, patient_id: int = None, case_id: str = None, override: bool = False, override_reason: str = ""):
+>>>>>>> 78c181f1711a5706d2e1e656e094ce786c836d37
     """
     Assign a document to a specific checklist requirement.
     
     Args:
         document_id: ID of the document to assign
         requirement_id: ID of the checklist requirement
+<<<<<<< HEAD
         entity_id: Entity ID (gets from session state if not provided)
+=======
+        patient_id: Patient ID (uses session state if not provided)
+        case_id: Case ID (uses session state if not provided)
+>>>>>>> 78c181f1711a5706d2e1e656e094ce786c836d37
         override: Whether this assignment is an override of validation warnings
         override_reason: Reason for the override (logged for audit trail)
     
@@ -133,16 +170,26 @@ def assign_document_to_requirement(document_id: int, requirement_id: int, entity
         bool: True if assignment was successful
     """
     try:
+        logging.info("DEBUG: Entered assign_document_to_requirement function.")
+        
         # Log override actions for audit trail
         if override and override_reason:
             logging.info(f"AUDIT: Document assignment override - {override_reason}")
         
+<<<<<<< HEAD
         # Get entity_id from session state if not provided
         if entity_id is None:
             entity_id = st.session_state.get('current_entity_id', 1)
         
         # Get or create case_id for this entity
         case_id = st.session_state.get('current_case_id', f"CASE-{entity_id}-DEFAULT")
+=======
+        # Use session state values if not provided
+        if patient_id is None:
+            patient_id = st.session_state.get('selected_patient_id', 1)
+        if case_id is None:
+            case_id = st.session_state.get('current_case_id', 'CASE-1-DEFAULT')
+>>>>>>> 78c181f1711a5706d2e1e656e094ce786c836d37
         
         db_path = st.session_state.get('database_path', 'production_idis.db')
         context_store = ContextStore(db_path)
@@ -151,8 +198,13 @@ def assign_document_to_requirement(document_id: int, requirement_id: int, entity
         # Check if a record already exists for this requirement
         cursor.execute("""
             SELECT id FROM case_documents 
+<<<<<<< HEAD
             WHERE checklist_item_id = ? AND entity_id = ?
         """, (requirement_id, entity_id))
+=======
+            WHERE checklist_item_id = ? AND entity_id = ? AND case_id = ?
+        """, (requirement_id, patient_id, case_id))
+>>>>>>> 78c181f1711a5706d2e1e656e094ce786c836d37
         
         existing_record = cursor.fetchone()
         
@@ -160,17 +212,26 @@ def assign_document_to_requirement(document_id: int, requirement_id: int, entity
             # Update existing record
             cursor.execute("""
                 UPDATE case_documents 
-                SET document_id = ?, status = 'Submitted', updated_at = CURRENT_TIMESTAMP
+                SET document_id = ?, status = 'Submitted', is_override = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
-            """, (document_id, existing_record[0]))
+            """, (document_id, 1 if override else 0, existing_record[0]))
         else:
             # Insert new record
             cursor.execute("""
+<<<<<<< HEAD
                 INSERT INTO case_documents (case_id, entity_id, checklist_item_id, document_id, status, created_at, updated_at)
                 VALUES (?, ?, ?, ?, 'Submitted', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             """, (case_id, entity_id, requirement_id, document_id))
+=======
+
+                INSERT INTO case_documents (case_id, entity_id, checklist_item_id, document_id, status, is_override, created_at, updated_at)
+                VALUES (?, ?, ?, ?, 'Submitted', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """, (case_id, patient_id, requirement_id, document_id, 1 if override else 0))
+
+>>>>>>> 78c181f1711a5706d2e1e656e094ce786c836d37
         
         context_store.conn.commit()
+        logging.info("DEBUG: Database update successful, returning True.")
         return True
         
     except Exception as e:
@@ -205,14 +266,26 @@ def render_document_assignment_interface():
         st.error(f"Error loading requirements: {e}")
         return
     
-    # Process each unassigned document
-    for i, doc_info in enumerate(st.session_state.processed_documents):
+    # Process each unassigned document - use a copy to avoid modification during iteration
+    documents_to_process = list(st.session_state.processed_documents)
+    documents_to_remove = []
+    rerun_needed = False
+    
+    for i, doc_info in enumerate(documents_to_process):
         with st.expander(f"📄 New document '{doc_info['filename']}' processed", expanded=True):
             col1, col2 = st.columns([2, 1])
             
             with col1:
                 st.write(f"**Filename:** {doc_info['filename']}")
                 st.write(f"**AI-detected type:** {doc_info.get('document_type', 'Unknown')}")
+                
+                # Display confidence meter if we have extracted data
+                if doc_info.get('extracted_data'):
+                    confidence, document_type, has_heuristic_override = extract_confidence_from_document(
+                        {'extracted_data': doc_info['extracted_data']}
+                    )
+                    st.markdown("**AI Classification Confidence:**")
+                    render_confidence_meter(confidence, document_type, compact=True)
                 
                 # Dropdown for assignment
                 options_with_placeholder = ["Select a requirement..."] + list(requirement_options.keys())
@@ -232,57 +305,148 @@ def render_document_assignment_interface():
                     if selected_requirement:
                         requirement_id = requirement_options[selected_requirement]
                         
-                        # Validate the assignment
+                        # Check validation but don't block assignment
                         validation_result = validate_document_assignment(
                             doc_info.get('document_type', 'Unknown'), 
                             selected_requirement
                         )
                         
-                        if validation_result['is_valid']:
-                            # Valid assignment - proceed normally
-                            success = assign_document_to_requirement(
-                                doc_info['document_id'], 
-                                requirement_id
-                            )
-                            
-                            if success:
-                                st.success(f"✅ Document assigned to '{selected_requirement}'")
-                                # Remove from processed documents list
-                                st.session_state.processed_documents.pop(i)
-                                st.experimental_rerun()
-                            else:
-                                st.error("❌ Failed to assign document")
-                        else:
-                            # Invalid assignment - show warning
+                        # Always proceed with assignment regardless of validation
+                        is_override = not validation_result['is_valid']
+                        override_reason = ""
+                        
+                        if is_override:
+                            override_reason = f"User override: {doc_info.get('document_type', 'Unknown')} → {selected_requirement}"
                             st.warning(f"⚠️ {validation_result['warning_message']}")
-                            
-                            # Create override option outside of expander to avoid nesting issues
-                            st.write("**Override Options:**")
-                            st.write(f"• AI detected: {doc_info.get('document_type', 'Unknown')}")
-                            st.write(f"• You're assigning to: {selected_requirement}")
-                            st.write("• Risk: This may not meet Medicaid application requirements.")
-                            
-                            if st.button("⚠️ Override and Assign Anyway", key=f"override_{i}", type="secondary"):
-                                # Proceed with override assignment
-                                success = assign_document_to_requirement(
-                                    doc_info['document_id'], 
-                                    requirement_id,
-                                    override=True,
-                                    override_reason=f"User override: {doc_info.get('document_type', 'Unknown')} → {selected_requirement}"
-                                )
-                                
-                                if success:
-                                    st.success(f"✅ Document assigned to '{selected_requirement}' (Override)")
-                                    # Remove from processed documents list
-                                    st.session_state.processed_documents.pop(i)
-                                    st.experimental_rerun()
-                                else:
-                                    st.error("❌ Failed to assign document")
+                        
+                        success = assign_document_to_requirement(
+                            doc_info['document_id'], 
+                            requirement_id,
+                            override=is_override,
+                            override_reason=override_reason
+                        )
+                        
+                        if success:
+                            if is_override:
+                                st.success(f"✅ Document assigned to '{selected_requirement}' (Override)")
+                            else:
+                                st.success(f"✅ Document assigned to '{selected_requirement}'")
+                            # Mark document for removal
+                            documents_to_remove.append(doc_info)
+                            rerun_needed = True
+                        else:
+                            st.error("❌ Failed to assign document")
                     else:
                         st.warning("Please select a requirement first")
+    
+    # Remove assigned documents from the session state
+    for doc_to_remove in documents_to_remove:
+        if doc_to_remove in st.session_state.processed_documents:
+            st.session_state.processed_documents.remove(doc_to_remove)
+    
+    # Rerun the app after all processing is complete
+    if rerun_needed:
+        st.experimental_rerun()
 
 
+<<<<<<< HEAD
 def get_current_user_id():
+=======
+def get_all_patients():
+    """
+    Get all patients from the database for patient selection.
+    
+    Returns:
+        List of patient dictionaries
+    """
+    try:
+        db_path = st.session_state.get('database_path', 'production_idis.db')
+        context_store = ContextStore(db_path)
+        cursor = context_store.conn.cursor()
+        cursor.execute("""
+            SELECT id, entity_name 
+            FROM entities 
+            ORDER BY entity_name
+        """)
+        
+        patients = []
+        for row in cursor.fetchall():
+            patients.append({
+                "patient_id": row[0],  # Keep legacy field name for UI compatibility
+                "patient_name": row[1]  # Keep legacy field name for UI compatibility
+            })
+        
+        return patients
+        
+    except Exception as e:
+        logging.error(f"Error retrieving patients: {e}")
+        return []
+
+def generate_case_id(patient_name):
+    """
+    Generate a unique case ID for a patient.
+    
+    Args:
+        patient_name: Name of the patient
+        
+    Returns:
+        str: Unique case ID
+    """
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # Clean patient name for use in case ID
+    clean_name = patient_name.replace(" ", "").replace(".", "")[:20]
+    return f"CASE-{clean_name}-{timestamp}"
+
+def render_patient_selection():
+    """
+    Render the patient selection interface at the top of the Medicaid Navigator.
+    """
+    st.subheader("👤 Patient Selection")
+    
+    # Get all patients
+    patients = get_all_patients()
+    
+    if not patients:
+        st.warning("No patients found. Please go to the Patient Management page to add patients first.")
+        return False
+    
+    # Create options for selectbox
+    patient_options = {f"{p['patient_name']} (ID: {p['patient_id']})": p['patient_id'] for p in patients}
+    
+    # Patient selection
+    selected_patient_display = st.selectbox(
+        "Select a patient:",
+        options=list(patient_options.keys()),
+        key="patient_selector",
+        help="Choose the patient for this Medicaid application case"
+    )
+    
+    if selected_patient_display:
+        selected_patient_id = patient_options[selected_patient_display]
+        selected_patient_name = [p['patient_name'] for p in patients if p['patient_id'] == selected_patient_id][0]
+        
+        # Store in session state
+        st.session_state.selected_patient_id = selected_patient_id
+        st.session_state.selected_patient_name = selected_patient_name
+        
+        # Generate or retrieve case ID for this session
+        if 'current_case_id' not in st.session_state or st.session_state.get('last_selected_patient_id') != selected_patient_id:
+            st.session_state.current_case_id = generate_case_id(selected_patient_name)
+            st.session_state.last_selected_patient_id = selected_patient_id
+        
+        # Display current selection
+        col1, col2 = st.columns(2)
+        with col1:
+            st.info(f"**Selected Patient:** {selected_patient_name}")
+        with col2:
+            st.info(f"**Case ID:** {st.session_state.current_case_id}")
+        
+        return True
+    
+    return False
+
+def render_navigator_ui():
+>>>>>>> 78c181f1711a5706d2e1e656e094ce786c836d37
     """
     Get the current user ID (simulated for demo purposes).
     In a real application, this would come from authentication system.
@@ -596,12 +760,26 @@ def render_case_detail_view():
     st.markdown(f"**Case ID:** {case_id}")
     st.markdown("This tool helps you gather, check, and prepare documents for an Alaska Medicaid application.")
 
+    # --- 0. Patient Selection ---
+    if not render_patient_selection():
+        return  # Stop here if no patient is selected
+    
+    st.markdown("---")
+
     # --- 1. Application Checklist ---
     st.header("1. Application Checklist")
     st.info("Upload documents below. The system will automatically check them off the list.")
 
+<<<<<<< HEAD
     # Load checklist with current status from database (modified to use current entity)
     checklist_df = load_application_checklist_with_status_for_entity(entity_id)
+=======
+    # Load checklist with current status from database for selected patient
+    checklist_df = load_application_checklist_with_status(
+        patient_id=st.session_state.get('selected_patient_id'),
+        case_id=st.session_state.get('current_case_id')
+    )
+>>>>>>> 78c181f1711a5706d2e1e656e094ce786c836d37
     
     if not checklist_df.empty:
         st.table(checklist_df)
