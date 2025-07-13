@@ -205,6 +205,22 @@ class ContextStore:
             ON audit_trail(resource_id)
         ''')
         
+        # Create entities table for Entity Management
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS entities (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entity_name TEXT NOT NULL,
+                creation_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_modified_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Create index for entities table
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_entities_entity_name 
+            ON entities(entity_name)
+        ''')
+        
         self.conn.commit()
     
     # Patient Methods
