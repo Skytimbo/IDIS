@@ -95,7 +95,7 @@ def render_entity_management_ui():
                         st.success(f"✅ Successfully added entity: '{entity_name}' (ID: {entity_id})")
                         
                         # Refresh the page to show the new entity
-                        st.rerun()
+                        st.experimental_rerun()
                         
                     except Exception as e:
                         st.error(f"❌ Error adding entity: {str(e)}")
