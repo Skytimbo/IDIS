@@ -5,51 +5,7 @@ import logging
 from context_store import ContextStore
 from unified_ingestion_agent import UnifiedIngestionAgent
 
-def load_application_checklist_with_status():
-    """
-    Load the application checklist with current status from database.
-    Checks case_documents table for submitted documents.
-    
-    Returns:
-        pd.DataFrame: Formatted checklist with current status
-    """
-    try:
-        # Get database path from session state or use default
-        db_path = st.session_state.get('database_path', 'production_idis.db')
-        context_store = ContextStore(db_path)
-        
-        # Query checklist requirements with status
-        cursor = context_store.conn.cursor()
-        cursor.execute("""
-            SELECT ac.id, ac.required_doc_name, ac.description,
-                   CASE 
-                       WHEN cd.status = 'Submitted' THEN '🔵 Submitted'
-                       ELSE '🔴 Missing'
-                   END as status
-            FROM application_checklists ac
-            LEFT JOIN case_documents cd ON ac.id = cd.checklist_item_id 
-                AND cd.entity_id = 1
-            WHERE ac.checklist_name = 'SOA Medicaid - Adult'
-            ORDER BY ac.id
-        """)
-        
-        requirements = cursor.fetchall()
-        
-        if not requirements:
-            return pd.DataFrame()
-        
-        # Format the data for display
-        checklist_data = {
-            "Document Required": [req[1] for req in requirements],
-            "Status": [req[3] for req in requirements],
-            "Examples": [req[2] for req in requirements]
-        }
-        
-        return pd.DataFrame(checklist_data)
-        
-    except Exception as e:
-        logging.error(f"Error loading application checklist with status: {e}")
-        return pd.DataFrame()
+
 
 
 def load_application_checklist_with_status_for_entity(entity_id):
@@ -102,45 +58,7 @@ def load_application_checklist_with_status_for_entity(entity_id):
         return pd.DataFrame()
 
 
-def load_application_checklist():
-    """
-    Load the application checklist from the database and format it for display.
-    
-    Returns:
-        pd.DataFrame: Formatted checklist with columns for Document, Status, and Examples
-    """
-    try:
-        # Get database path from session state or use default
-        db_path = st.session_state.get('database_path', 'production_idis.db')
-        context_store = ContextStore(db_path)
-        
-        # Query the application_checklists table for SOA Medicaid requirements
-        cursor = context_store.conn.cursor()
-        cursor.execute("""
-            SELECT required_doc_name, description 
-            FROM application_checklists 
-            WHERE checklist_name = 'SOA Medicaid - Adult'
-            ORDER BY id
-        """)
-        
-        requirements = cursor.fetchall()
-        
-        if not requirements:
-            return pd.DataFrame()
-        
-        # Format the data for display
-        checklist_data = {
-            "Document Required": [req[0] for req in requirements],
-            "Status": ["🔴 Missing" for _ in requirements],
-            "Examples": [req[1] for req in requirements]
-        }
-        
-        return pd.DataFrame(checklist_data)
-        
-    except Exception as e:
-        logging.error(f"Error loading application checklist: {e}")
-        # Return empty DataFrame on error
-        return pd.DataFrame()
+
 
 
 def validate_document_assignment(ai_detected_type: str, selected_requirement: str) -> dict:
