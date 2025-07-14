@@ -233,7 +233,7 @@ def render_needs_review_page():
                         success = categorize_document(context_store, doc_id, category_name, category_data)
                         if success:
                             st.success(f"✅ Document categorized as: {category_name}")
-                            st.rerun()
+                            st.experimental_rerun()
                         else:
                             st.error("❌ Failed to categorize document. Please try again.")
             
@@ -247,7 +247,7 @@ def render_needs_review_page():
                     skip_success = skip_document(context_store, doc_id)
                     if skip_success:
                         st.info("Document skipped and moved to later review.")
-                        st.rerun()
+                        st.experimental_rerun()
                     else:
                         st.error("Failed to skip document.")
             

@@ -1,114 +1,74 @@
 """
-Entity Management UI for IDIS
-Allows users to create and manage entity records for case management.
+Entity Management UI Module for IDIS
+
+This module provides a Streamlit interface for managing entities in the IDIS system.
+Users can view all existing entities and create new ones through a simple interface.
 """
 
 import streamlit as st
-import sqlite3
-from datetime import datetime
-import logging
+import pandas as pd
 from context_store import ContextStore
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 def render_entity_management_page():
-    """Main function to render the entity management interface."""
-    st.title("Entity & Case Management")
+    """
+    Main function to render the Entity Management UI.
+    """
+
+    st.title("🏢 Entity & Case Management")
     st.markdown("---")
-    
-    # Initialize context store
+
     try:
-        cs = ContextStore("production_idis.db")
-    except Exception as e:
-        st.error(f"Database connection failed: {str(e)}")
-        return
-    
-    # Display existing entities
-    st.subheader("Existing Entities")
-    
-    try:
-        # Get all entities from the database
-        entities = get_all_entities(cs)
-        
+        context_store = ContextStore("production_idis.db")
+
+        # Display existing entities
+        st.subheader("📋 Existing Entities")
+
+        entities = context_store.get_all_entities()
+
         if entities:
-            # Display entities in a table format
-            st.dataframe(entities, use_container_width=True)
+            entities_df = pd.DataFrame(entities)
+            # Rename columns for a professional display
+            display_df = entities_df.rename(columns={
+                'id': 'Entity ID',
+                'entity_name': 'Entity Name',
+                'creation_timestamp': 'Created',
+                'last_modified_timestamp': 'Last Modified'
+            })
+            st.dataframe(
+                display_df,
+                use_container_width=True,
+                hide_index=True
+            )
+            st.info(f"Total entities: {len(entities)}")
         else:
-            st.info("No entities found in the system.")
-    
-    except Exception as e:
-        st.error(f"Error loading entities: {str(e)}")
-        logger.error(f"Error loading entities: {str(e)}")
-    
-    st.markdown("---")
-    
-    # Add new entity section
-    st.subheader("Add New Entity")
-    
-    with st.form("add_entity_form"):
-        entity_name = st.text_input(
-            "Entity Name",
-            placeholder="Enter entity name (person, organization, etc.)",
-            help="Enter the name of the entity"
-        )
-        
-        submitted = st.form_submit_button("Add New Entity")
-        
-        if submitted:
-            if entity_name.strip():
+            st.info("No entities found. Add one below to get started.")
+
+        # Add new entity section
+        st.markdown("---")
+        st.subheader("➕ Add New Entity")
+
+        with st.form("add_entity_form", clear_on_submit=True):
+            entity_name = st.text_input(
+                "Entity Name",
+                placeholder="Enter the name of the new entity (e.g., John Doe)",
+            )
+
+            submitted = st.form_submit_button("Add New Entity")
+
+            if submitted and entity_name.strip():
                 try:
-                    # Create new entity record
-                    entity_data = {
-                        "entity_name": entity_name.strip()
-                    }
-                    
-                    entity_id = cs.add_entity(entity_data)
-                    
-                    st.success(f"Entity '{entity_name}' added successfully with ID: {entity_id}")
-                    logger.info(f"Created new entity: {entity_name} (ID: {entity_id})")
-                    
+                    entity_id = context_store.add_entity({'entity_name': entity_name.strip()})
+                    st.success(f"✅ Successfully added entity: '{entity_name}' (ID: {entity_id})")
                     # Rerun to refresh the entity list
                     st.experimental_rerun()
-                    
                 except Exception as e:
-                    st.error(f"Error adding entity: {str(e)}")
-                    logger.error(f"Error adding entity {entity_name}: {str(e)}")
-            else:
-                st.warning("Please enter a valid entity name.")
+                    st.error(f"❌ Error adding entity: {str(e)}")
+            elif submitted:
+                st.warning("⚠️ Please enter a valid entity name.")
 
-def get_all_entities(context_store):
-    """
-    Retrieve all entities from the database.
-    
-    Args:
-        context_store: ContextStore instance
-        
-    Returns:
-        List of entity dictionaries
-    """
-    try:
-        cursor = context_store.conn.cursor()
-        cursor.execute("""
-            SELECT id, entity_name, creation_timestamp 
-            FROM entities 
-            ORDER BY creation_timestamp DESC
-        """)
-        
-        entities = []
-        for row in cursor.fetchall():
-            entities.append({
-                "ID": row[0],
-                "Entity Name": row[1],
-                "Created": row[2]
-            })
-        
-        return entities
-        
     except Exception as e:
-        logger.error(f"Error retrieving entities: {str(e)}")
-        raise
+        st.error(f"❌ Database connection error: {str(e)}")
+        st.info("Please ensure the database file exists and is accessible.")
 
 if __name__ == "__main__":
     render_entity_management_page()

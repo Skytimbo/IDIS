@@ -19,10 +19,13 @@ import sys
 
 # --- Local Module Imports ---
 # Import the UI functions from the different modules
+# --- Local Module Imports ---
+# Import the UI functions from the different modules
 from modules.search_ui import render_search_ui
 from modules.medicaid_navigator.ui import render_navigator_ui
 from quanta_ui.pages.needs_review_ui import render_needs_review_page
 from pages.entity_management_ui import render_entity_management_page
+
 
 # --- Main Application Router ---
 def main():

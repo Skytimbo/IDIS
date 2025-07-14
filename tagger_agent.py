@@ -172,42 +172,42 @@ class TaggerAgent:
         # Final fallback to current time
         return datetime.now()
     
-    def _get_patient_folder_name(self, patient_id: str) -> str:
+    def _get_entity_folder_name(self, entity_id: str) -> str:
         """
         Get sanitized patient folder name with patient name and ID prefix.
         
         Args:
-            patient_id: The patient ID to look up
+            entity_id: The entity ID to look up
             
         Returns:
-            Sanitized folder name in format: PatientName_first6chars or patient_id if name not found
+            Sanitized folder name in format: EntityName_first6chars or entity_id if name not found
         """
-        # Convert patient_id to string right away to prevent TypeErrors
-        patient_id = str(patient_id)
+        # Convert entity_id to string right away to prevent TypeErrors
+        entity_id = str(entity_id)
         
         try:
-            # Convert patient_id to int if it's a string (database expects integer)
-            if isinstance(patient_id, str):
+            # Convert entity_id to int if it's a string (database expects integer)
+            if isinstance(entity_id, str):
                 try:
-                    patient_id_int = int(patient_id)
+                    entity_id_int = int(entity_id)
                 except ValueError:
-                    # If patient_id is not a valid integer string, return fallback
-                    return patient_id
+                    # If entity_id is not a valid integer string, return fallback
+                    return entity_id
             else:
-                patient_id_int = patient_id
-            patient_data = self.context_store.get_patient(patient_id_int)
-            if patient_data and patient_data.get('patient_name'):
-                sanitized_name = self._sanitize_for_filename(patient_data['patient_name'])
-                id_prefix = patient_id[:6] if len(patient_id) >= 6 else patient_id
+                entity_id_int = entity_id
+            entity_data = self.context_store.get_entity(entity_id_int)
+            if entity_data and entity_data.get('entity_name'):
+                sanitized_name = self._sanitize_for_filename(entity_data['entity_name'])
+                id_prefix = entity_id[:6] if len(entity_id) >= 6 else entity_id
                 return f"{sanitized_name}_{id_prefix}"
         except Exception as e:
-            self.logger.warning(f"Could not fetch patient name for {patient_id}: {e}")
+            self.logger.warning(f"Could not fetch entity name for {entity_id}: {e}")
         
-        # Fallback to full patient_id
-        return self._sanitize_for_filename(patient_id)
+        # Fallback to full entity_id
+        return self._sanitize_for_filename(entity_id)
     
     def _generate_new_filename(self, document_id: str, file_name: str, document_type: str, 
-                               primary_date: datetime, patient_id: Optional[str], 
+                               primary_date: datetime, entity_id: Optional[str], 
                                issuer_source: Optional[str]) -> str:
         """
         Generate new descriptive filename using the enhanced naming convention.
@@ -217,7 +217,7 @@ class TaggerAgent:
             file_name: Original filename
             document_type: The classified document type
             primary_date: The primary date for the document
-            patient_id: Patient ID if associated with a patient
+            entity_id: Entity ID if associated with an entity
             issuer_source: The document issuer/source
             
         Returns:
@@ -237,8 +237,8 @@ class TaggerAgent:
         ext = ext if ext else '.txt'
         
         # Determine sanitized info part
-        if patient_id:
-            # For patient documents, use sanitized original filename
+        if entity_id:
+            # For entity documents, use sanitized original filename
             base_name = os.path.splitext(file_name)[0]
             sanitized_info = self._sanitize_for_filename(base_name)
         else:
@@ -539,7 +539,7 @@ class TaggerAgent:
             document_id = document["document_id"]
             extracted_text = document.get("full_text")
             original_watchfolder_path = document.get("original_watchfolder_path")
-            patient_id = document.get("patient_id")
+            entity_id = document.get("entity_id")
             file_name = document.get("file_name", "unknown_file")
             document_type = document.get("document_type", "Unclassified")
             
@@ -579,10 +579,10 @@ class TaggerAgent:
                     f"{primary_date.month:02d}"
                 )
                 
-                # Create patient-specific or general folder using new schema
-                if patient_id:
-                    patient_folder_name = self._get_patient_folder_name(patient_id)
-                    relative_folder = os.path.join("patients", patient_folder_name, year_month_folder)
+                # Create entity-specific or general folder using new schema
+                if entity_id:
+                    entity_folder_name = self._get_entity_folder_name(entity_id)
+                    relative_folder = os.path.join("entities", entity_folder_name, year_month_folder)
                 else:
                     # For general documents, create fallback structure for unclassified items
                     if document_type == "Unclassified" or not issuer:
@@ -596,7 +596,7 @@ class TaggerAgent:
                 
                 # Generate new descriptive filename using enhanced naming convention
                 filed_filename = self._generate_new_filename(
-                    str(document_id), file_name, document_type, primary_date, patient_id, issuer
+                    str(document_id), file_name, document_type, primary_date, entity_id, issuer
                 )
                 new_filed_path = os.path.join(filing_dir, filed_filename)
                 
