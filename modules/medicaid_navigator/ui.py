@@ -257,11 +257,22 @@ def get_current_user_id():
     """
     return st.session_state.get('current_user_id', 'user_a')
 
-def get_user_entities(user_id):
+def get_user_entities(user_id, search_term=None):
     """
-    Get all entities belonging to a specific user.
+    Get entities belonging to a specific user, optionally filtered by search term.
+    
+    Args:
+        user_id: The user ID to filter entities by
+        search_term: Optional search term to filter entity names
+        
+    Returns:
+        List of entity dictionaries or empty list if no search term provided
     """
     try:
+        # If no search term provided, return empty list for privacy/scalability
+        if not search_term:
+            return []
+            
         db_path = st.session_state.get('database_path', 'production_idis.db')
         context_store = ContextStore(db_path)
         cursor = context_store.conn.cursor()
@@ -269,9 +280,9 @@ def get_user_entities(user_id):
         cursor.execute("""
             SELECT id, entity_name, creation_timestamp
             FROM entities 
-            WHERE user_id = ?
+            WHERE user_id = ? AND entity_name LIKE ?
             ORDER BY entity_name
-        """, (user_id,))
+        """, (user_id, f"%{search_term}%"))
 
         entities = cursor.fetchall()
         return [{'id': row[0], 'name': row[1], 'created': row[2]} for row in entities]
@@ -613,28 +624,48 @@ def render_start_new_application():
 
     with col2:
         st.markdown("#### Option 2: Use Existing Entity")
-        user_entities = get_user_entities(current_user)
-
-        if user_entities:
-            with st.form("select_entity_form"):
-                entity_options = {f"{entity['name']} (Created: {entity['created'][:10]})": entity['id'] for entity in user_entities}
-                selected_entity_display = st.selectbox(
-                    "Select an existing entity:",
-                    options=list(entity_options.keys())
-                )
-                if st.form_submit_button("Start New Case", type="primary"):
-                    selected_entity_id = entity_options[selected_entity_display]
-                    case_id = create_new_case(selected_entity_id, current_user)
-                    if case_id:
-                        st.success(f"✅ Created new case '{case_id}'")
-                        st.session_state.current_case_id = case_id
-                        st.session_state.current_entity_id = selected_entity_id
-                        st.session_state.medicaid_view = 'case_detail'
-                        st.rerun()
-                    else:
-                        st.error("Failed to create a case.")
+        
+        # Search input and button
+        search_term = st.text_input("Search for Existing Entity by Name:", key="entity_search_term")
+        
+        if st.button("Search", key="search_entity_button"):
+            if search_term.strip():
+                search_results = get_user_entities(current_user, search_term.strip())
+                st.session_state.entity_search_results = search_results
+            else:
+                st.warning("Please enter a search term.")
+                st.session_state.entity_search_results = []
+        
+        # Display search results if available
+        if hasattr(st.session_state, 'entity_search_results') and st.session_state.entity_search_results:
+            st.markdown("**Search Results:**")
+            entity_options = {f"{entity['name']} (Created: {entity['created'][:10]})": entity['id'] for entity in st.session_state.entity_search_results}
+            
+            selected_entity_display = st.radio(
+                "Select an entity to start a new case:",
+                options=list(entity_options.keys()),
+                key="selected_entity_radio"
+            )
+            
+            if st.button("Start New Case", key="start_case_from_search", type="primary"):
+                selected_entity_id = entity_options[selected_entity_display]
+                case_id = create_new_case(selected_entity_id, current_user)
+                if case_id:
+                    st.success(f"✅ Created new case '{case_id}'")
+                    st.session_state.current_case_id = case_id
+                    st.session_state.current_entity_id = selected_entity_id
+                    st.session_state.medicaid_view = 'case_detail'
+                    # Clear search results
+                    st.session_state.entity_search_results = []
+                    st.rerun()
+                else:
+                    st.error("Failed to create a case.")
+                    
+        elif hasattr(st.session_state, 'entity_search_results') and st.session_state.entity_search_results == []:
+            if search_term:  # Only show if user actually searched
+                st.info("No entities found matching your search. Use Option 1 to create a new one.")
         else:
-            st.info("No existing entities found. Use Option 1 to create a new one.")
+            st.info("Enter a name above and click 'Search' to find existing entities.")
 
     st.markdown("---")
     st.markdown("**Privacy Notice:** You can only see and create cases for your own entities.")
