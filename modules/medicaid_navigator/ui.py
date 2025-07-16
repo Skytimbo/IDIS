@@ -551,10 +551,20 @@ def render_case_detail_view():
         entity_name = "Unknown Entity"
 
     if st.button("← Back to Active Cases"):
-        st.session_state.medicaid_view = 'active_cases'
-        st.session_state.current_case_id = None
-        st.session_state.current_entity_id = None
-        st.rerun()
+        try:
+            st.session_state.medicaid_view = 'active_cases'
+            st.session_state.current_case_id = None
+            st.session_state.current_entity_id = None
+            # Clear any search results to prevent state conflicts
+            if hasattr(st.session_state, 'entity_search_results'):
+                st.session_state.entity_search_results = []
+            st.rerun()
+        except Exception as e:
+            logging.error(f"Error navigating back to active cases: {e}")
+            st.error("Navigation error occurred. Please try again.")
+            # Force fallback to home page
+            st.session_state.medicaid_view = 'home'
+            st.rerun()
 
     st.title(f"🩺 Case Details: {entity_name}")
     st.markdown("---")
@@ -673,23 +683,34 @@ def render_start_new_application():
 
 def render_navigator_ui():
     """Main router for the Medicaid Navigator module."""
-    if 'medicaid_view' not in st.session_state:
-        st.session_state.medicaid_view = 'home'  # New default
+    try:
+        if 'medicaid_view' not in st.session_state:
+            st.session_state.medicaid_view = 'home'  # New default
 
-    # Add a "Back to Home" button on all pages except the home page
-    if st.session_state.medicaid_view != 'home':
-        if st.sidebar.button("🏠 Back to Home Dashboard"):
-            st.session_state.medicaid_view = 'home'
-            st.rerun()
-        st.sidebar.markdown("---")
+        # Add a "Back to Home" button on all pages except the home page
+        if st.session_state.medicaid_view != 'home':
+            if st.sidebar.button("🏠 Back to Home Dashboard"):
+                st.session_state.medicaid_view = 'home'
+                # Clear any state that might cause conflicts
+                st.session_state.current_case_id = None
+                st.session_state.current_entity_id = None
+                if hasattr(st.session_state, 'entity_search_results'):
+                    st.session_state.entity_search_results = []
+                st.rerun()
+            st.sidebar.markdown("---")
 
-    if st.session_state.medicaid_view == 'home':
-        render_home_page()  # New function call
-    elif st.session_state.medicaid_view == 'active_cases':
-        render_active_cases_view()  # Renamed function
-    elif st.session_state.medicaid_view == 'new_application':
-        render_start_new_application()
-    elif st.session_state.medicaid_view == 'case_detail':
-        render_case_detail_view()
-    else:  # Default fallback
+        if st.session_state.medicaid_view == 'home':
+            render_home_page()  # New function call
+        elif st.session_state.medicaid_view == 'active_cases':
+            render_active_cases_view()  # Renamed function
+        elif st.session_state.medicaid_view == 'new_application':
+            render_start_new_application()
+        elif st.session_state.medicaid_view == 'case_detail':
+            render_case_detail_view()
+        else:  # Default fallback
+            render_home_page()
+    except Exception as e:
+        logging.error(f"Error in navigator UI router: {e}")
+        st.error("Navigation error occurred. Returning to home page.")
+        st.session_state.medicaid_view = 'home'
         render_home_page()
