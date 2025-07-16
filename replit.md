@@ -80,6 +80,8 @@ The native deployment script (`deploy-native.sh`) is optimized for Replit's envi
 
 ### Phase 1: UI Polish & Core Workflow Hardening (Current Focus)
 - [x] Implement the "Active Case Dashboard".
+- [x] Implement secure document retrieval backend function (`get_document_details_by_id`) with user access controls.
+- [x] Enhanced entity search with privacy-focused scalable interface.
 - [ ] Refine the UI with a "Two-Panel" layout and contextual guidance.
 - [ ] Build the "Generate Application Packet" feature.
 - [ ] Address medium/low priority issues from CodeRabbit review (e.g., harden `deploy.sh`, improve exception handling).

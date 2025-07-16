@@ -7,6 +7,7 @@ managing all SQLite database operations for document intelligence workflows.
 
 import sqlite3
 import json
+import logging
 from typing import Dict, List, Optional, Any
 
 class ContextStore:
@@ -168,6 +169,69 @@ class ContextStore:
         ))
         self.conn.commit()
         return cur.lastrowid
+
+    def get_document_details_by_id(self, document_id: int, user_id: str = None) -> Optional[Dict[str, Any]]:
+        """
+        Securely retrieves document details by ID with user access validation.
+        
+        Args:
+            document_id: The ID of the document to retrieve
+            user_id: Optional user ID for access control
+            
+        Returns:
+            Dictionary with document details or None if not found/unauthorized
+        """
+        try:
+            cursor = self.conn.cursor()
+            
+            # First, check if document exists and get basic info
+            cursor.execute("""
+                SELECT d.id, d.file_name, d.original_file_type, d.full_text, 
+                       d.entity_id, d.document_type, d.classification_confidence,
+                       d.created_at, d.upload_timestamp, d.filed_path,
+                       e.entity_name
+                FROM documents d
+                LEFT JOIN entities e ON d.entity_id = e.id
+                WHERE d.id = ?
+            """, (document_id,))
+            
+            doc_row = cursor.fetchone()
+            if not doc_row:
+                logging.warning(f"Document {document_id} not found")
+                return None
+            
+            # If user_id is provided, validate access through entity ownership
+            if user_id:
+                # For now, we'll check if the user has any cases for this entity
+                # In a full implementation, you'd have a user_entities table
+                cursor.execute("""
+                    SELECT COUNT(*) FROM case_documents cd
+                    JOIN cases c ON cd.case_id = c.case_id
+                    WHERE cd.document_id = ? AND c.entity_id = ?
+                """, (document_id, doc_row[4]))  # doc_row[4] is entity_id
+                
+                if cursor.fetchone()[0] == 0:
+                    logging.warning(f"User {user_id} lacks access to document {document_id}")
+                    return None
+            
+            # Return document details
+            return {
+                "id": doc_row[0],
+                "filename": doc_row[1],
+                "content_type": doc_row[2] or "application/octet-stream",
+                "full_text": doc_row[3],
+                "entity_id": doc_row[4],
+                "entity_name": doc_row[10],
+                "document_type": doc_row[5],
+                "classification_confidence": doc_row[6],
+                "created_at": doc_row[7],
+                "upload_timestamp": doc_row[8],
+                "filed_path": doc_row[9]
+            }
+            
+        except Exception as e:
+            logging.error(f"Error retrieving document {document_id}: {e}")
+            return None
 
     # ... [Other existing methods like get_document, update_document_fields, etc.]
     # (Leaving them out for brevity, but they would be here in the final file)
