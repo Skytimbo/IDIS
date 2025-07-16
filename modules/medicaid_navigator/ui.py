@@ -421,9 +421,8 @@ def render_case_dashboard():
     st.markdown(f"**Caseworker Portal** - View and manage all active Medicaid application cases (User: {current_user})")
 
     if st.button("➕ Start New Application", type="primary", use_container_width=True):
-        st.session_state.show_case_detail = False
+        st.session_state.medicaid_view = 'new_application'
         st.session_state.current_case_id = None
-        st.session_state.show_entity_management = True
         st.experimental_rerun()
 
     st.markdown("---")
@@ -448,10 +447,9 @@ def render_case_dashboard():
                 st.progress(case['progress_percentage'] / 100)
 
                 if st.button(f"📝 View Case Details", key=f"view_case_{case['case_id']}", use_container_width=True):
-                    st.session_state.show_case_detail = True
                     st.session_state.current_case_id = case['case_id']
                     st.session_state.current_entity_id = case['entity_id']
-                    st.session_state.show_entity_management = False
+                    st.session_state.medicaid_view = 'case_detail'
                     st.experimental_rerun()
                 st.markdown("---")
 
@@ -479,7 +477,7 @@ def render_case_detail_view():
         entity_name = "Unknown Entity"
 
     if st.button("← Back to Dashboard"):
-        st.session_state.show_case_detail = False
+        st.session_state.medicaid_view = 'dashboard'
         st.session_state.current_case_id = None
         st.session_state.current_entity_id = None
         st.experimental_rerun()
@@ -521,7 +519,7 @@ def render_start_new_application():
     st.markdown("---")
 
     if st.button("← Back to Dashboard"):
-        st.session_state.show_entity_management = False
+        st.session_state.medicaid_view = 'dashboard'
         st.experimental_rerun()
 
     st.markdown("### Choose an option to proceed:")
@@ -539,10 +537,9 @@ def render_start_new_application():
                         case_id = create_new_case(entity_id, current_user)
                         if case_id:
                             st.success(f"✅ Created new case '{case_id}'")
-                            st.session_state.show_entity_management = False
-                            st.session_state.show_case_detail = True
                             st.session_state.current_case_id = case_id
                             st.session_state.current_entity_id = entity_id
+                            st.session_state.medicaid_view = 'case_detail'
                             st.experimental_rerun()
                         else:
                             st.error("Failed to create a case.")
@@ -567,10 +564,9 @@ def render_start_new_application():
                     case_id = create_new_case(selected_entity_id, current_user)
                     if case_id:
                         st.success(f"✅ Created new case '{case_id}'")
-                        st.session_state.show_entity_management = False
-                        st.session_state.show_case_detail = True
                         st.session_state.current_case_id = case_id
                         st.session_state.current_entity_id = selected_entity_id
+                        st.session_state.medicaid_view = 'case_detail'
                         st.experimental_rerun()
                     else:
                         st.error("Failed to create a case.")
@@ -582,17 +578,13 @@ def render_start_new_application():
 
 
 def render_navigator_ui():
-    """
-    Main router for the Medicaid Navigator module.
-    """
-    if 'show_case_detail' not in st.session_state:
-        st.session_state.show_case_detail = False
-    if 'show_entity_management' not in st.session_state:
-        st.session_state.show_entity_management = False
+    """Main router for the Medicaid Navigator module."""
+    if 'medicaid_view' not in st.session_state:
+        st.session_state.medicaid_view = 'dashboard'
 
-    if st.session_state.show_entity_management:
+    if st.session_state.medicaid_view == 'new_application':
         render_start_new_application()
-    elif st.session_state.show_case_detail:
+    elif st.session_state.medicaid_view == 'case_detail':
         render_case_detail_view()
-    else:
+    else:  # Default to dashboard
         render_case_dashboard()
