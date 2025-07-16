@@ -38,6 +38,7 @@ services:
     environment:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
     volumes:
+      - .:/app
       - ./data:/app/data
       - ./production_idis.db:/app/production_idis.db
     ports:
