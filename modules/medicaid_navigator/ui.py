@@ -414,7 +414,8 @@ def render_case_dashboard():
 
     if current_user_display != current_user:
         st.session_state.current_user_id = current_user_display
-        st.experimental_rerun()
+        # Removed st.experimental_rerun() to prevent infinite loop
+        # The page will update naturally on next interaction
 
     st.title("🏥 Active Case Dashboard")
     st.markdown("---")
