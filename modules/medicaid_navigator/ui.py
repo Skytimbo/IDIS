@@ -501,9 +501,9 @@ def render_case_detail_view():
     render_unified_uploader(
         context="medicaid",
         title="",
-        description="Drag and drop PDFs or images for this case.",
+        description="Drag and drop PDFs, images, or text files for this case.",
         button_text="Analyze Documents",
-        file_types=['pdf', 'png', 'jpg', 'jpeg'],
+        file_types=['pdf', 'png', 'jpg', 'jpeg', 'txt', 'docx'],
         accept_multiple=True
     )
 
