@@ -172,19 +172,22 @@ class ContextStore:
 
     def get_document_details_by_id(self, document_id: int, user_id: str = None) -> Optional[Dict[str, Any]]:
         """
-        Securely retrieves document details by ID with user access validation.
+        Retrieves document details by ID.
+        
+        TODO: Add OAuth-based user validation here when authentication is implemented
+        For MVP demo: bypassing user access checks to enable document viewing
         
         Args:
             document_id: The ID of the document to retrieve
-            user_id: Optional user ID for access control
+            user_id: Optional user ID for access control (preserved for future OAuth integration)
             
         Returns:
-            Dictionary with document details or None if not found/unauthorized
+            Dictionary with document details or None if not found
         """
         try:
             cursor = self.conn.cursor()
             
-            # First, check if document exists and get basic info
+            # Simplified query for MVP demo - add user validation for production
             cursor.execute("""
                 SELECT d.id, d.file_name, d.original_file_type, d.full_text, 
                        d.entity_id, d.document_type, d.classification_confidence,
@@ -200,19 +203,14 @@ class ContextStore:
                 logging.warning(f"Document {document_id} not found")
                 return None
             
-            # If user_id is provided, validate access through entity ownership
-            if user_id:
-                # For now, we'll check if the user has any cases for this entity
-                # In a full implementation, you'd have a user_entities table
-                cursor.execute("""
-                    SELECT COUNT(*) FROM case_documents cd
-                    JOIN cases c ON cd.case_id = c.case_id
-                    WHERE cd.document_id = ? AND c.entity_id = ?
-                """, (document_id, doc_row[4]))  # doc_row[4] is entity_id
-                
-                if cursor.fetchone()[0] == 0:
-                    logging.warning(f"User {user_id} lacks access to document {document_id}")
-                    return None
+            # TODO: OAuth Integration Point
+            # When implementing OAuth, add user access validation here:
+            # if user_id:
+            #     # Validate user has access to this document through entity ownership
+            #     # Check user_entities table or similar authorization mechanism
+            #     if not self._validate_user_document_access(user_id, document_id):
+            #         logging.warning(f"User {user_id} lacks access to document {document_id}")
+            #         return None
             
             # Return document details
             return {

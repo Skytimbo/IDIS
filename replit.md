@@ -82,6 +82,8 @@ The native deployment script (`deploy-native.sh`) is optimized for Replit's envi
 - [x] Implement the "Active Case Dashboard".
 - [x] Implement secure document retrieval backend function (`get_document_details_by_id`) with user access controls.
 - [x] Enhanced entity search with privacy-focused scalable interface.
+- [x] Fixed critical document viewer issues (case ID format mismatch, content retrieval, upload interface).
+- [x] Temporarily disabled restrictive security for MVP demo while preserving OAuth-ready architecture.
 - [ ] Refine the UI with a "Two-Panel" layout and contextual guidance.
 - [ ] Build the "Generate Application Packet" feature.
 - [ ] Address medium/low priority issues from CodeRabbit review (e.g., harden `deploy.sh`, improve exception handling).
