@@ -397,9 +397,71 @@ def get_case_dashboard_data():
         return []
 
 
-def render_case_dashboard():
+def render_home_page():
     """
-    Render the main Case Management Dashboard showing all active cases.
+    Render the Case Manager Home Dashboard with KPIs and navigation.
+    """
+    current_user = get_current_user_id()
+
+    st.sidebar.subheader("🔐 User Simulation")
+    user_options = ['user_a', 'user_b']
+    current_user_display = st.sidebar.selectbox(
+        "Current User:", 
+        options=user_options, 
+        index=user_options.index(current_user),
+        help="For demo purposes - simulates different users"
+    )
+
+    if current_user_display != current_user:
+        st.session_state.current_user_id = current_user_display
+        # The page will update naturally on next interaction
+
+    st.title("🏠 Case Manager Home Dashboard")
+    st.markdown("---")
+    st.markdown(f"**Welcome, {current_user}** - Your comprehensive case management overview")
+
+    # KPIs Section
+    st.subheader("📊 Key Performance Indicators")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Active Cases", "42", "2 New")
+    with col2:
+        st.metric("Clients Managed", "65")
+    with col3:
+        st.metric("Deadlines This Week", "3", "-1 vs last week")
+
+    st.markdown("---")
+
+    # Status Chart Section
+    st.subheader("📈 Case Status Overview")
+    status_data = pd.DataFrame({
+        'Status': ['In Progress', 'Awaiting SOA', 'Client Action', 'Complete'],
+        'Count': [25, 10, 5, 57]
+    })
+    st.bar_chart(status_data.set_index('Status'))
+
+    st.markdown("---")
+
+    # Action Buttons Section
+    st.subheader("🚀 Quick Actions")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("📋 View All Active Cases", type="primary", use_container_width=True):
+            st.session_state.medicaid_view = 'active_cases'
+            st.rerun()
+    
+    with col2:
+        if st.button("➕ Start New Application", type="secondary", use_container_width=True):
+            st.session_state.medicaid_view = 'new_application'
+            st.session_state.current_case_id = None
+            st.rerun()
+
+
+def render_active_cases_view():
+    """
+    Render the detailed view showing all active cases (formerly render_case_dashboard).
     """
     current_user = get_current_user_id()
 
@@ -477,8 +539,8 @@ def render_case_detail_view():
         logging.error(f"Error getting entity name: {e}")
         entity_name = "Unknown Entity"
 
-    if st.button("← Back to Dashboard"):
-        st.session_state.medicaid_view = 'dashboard'
+    if st.button("← Back to Active Cases"):
+        st.session_state.medicaid_view = 'active_cases'
         st.session_state.current_case_id = None
         st.session_state.current_entity_id = None
         st.rerun()
@@ -519,8 +581,8 @@ def render_start_new_application():
     st.title("🏢 Start New Application")
     st.markdown("---")
 
-    if st.button("← Back to Dashboard"):
-        st.session_state.medicaid_view = 'dashboard'
+    if st.button("← Back to Home"):
+        st.session_state.medicaid_view = 'home'
         st.rerun()
 
     st.markdown("### Choose an option to proceed:")
@@ -581,11 +643,22 @@ def render_start_new_application():
 def render_navigator_ui():
     """Main router for the Medicaid Navigator module."""
     if 'medicaid_view' not in st.session_state:
-        st.session_state.medicaid_view = 'dashboard'
+        st.session_state.medicaid_view = 'home'  # New default
 
-    if st.session_state.medicaid_view == 'new_application':
+    # Add a "Back to Home" button on all pages except the home page
+    if st.session_state.medicaid_view != 'home':
+        if st.sidebar.button("🏠 Back to Home Dashboard"):
+            st.session_state.medicaid_view = 'home'
+            st.rerun()
+        st.sidebar.markdown("---")
+
+    if st.session_state.medicaid_view == 'home':
+        render_home_page()  # New function call
+    elif st.session_state.medicaid_view == 'active_cases':
+        render_active_cases_view()  # Renamed function
+    elif st.session_state.medicaid_view == 'new_application':
         render_start_new_application()
     elif st.session_state.medicaid_view == 'case_detail':
         render_case_detail_view()
-    else:  # Default to dashboard
-        render_case_dashboard()
+    else:  # Default fallback
+        render_home_page()
