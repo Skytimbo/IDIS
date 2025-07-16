@@ -528,6 +528,45 @@ def render_active_cases_view():
                 st.markdown("---")
 
 
+def get_documents_for_case(case_id):
+    """
+    Helper function to get all documents assigned to a specific case.
+    
+    Args:
+        case_id: The case ID to retrieve documents for
+        
+    Returns:
+        List of dictionaries containing document id and filename
+    """
+    try:
+        db_path = st.session_state.get('database_path', 'production_idis.db')
+        context_store = ContextStore(db_path)
+        cursor = context_store.conn.cursor()
+        
+        # Query to get documents for the case
+        cursor.execute("""
+            SELECT DISTINCT d.id, d.file_name, d.document_type, d.created_at
+            FROM documents d
+            JOIN case_documents cd ON d.id = cd.document_id
+            WHERE cd.case_id = ?
+            ORDER BY d.created_at DESC
+        """, (case_id,))
+        
+        documents = cursor.fetchall()
+        return [
+            {
+                'id': doc[0],
+                'filename': doc[1],
+                'document_type': doc[2] or 'Unknown',
+                'created_at': doc[3]
+            }
+            for doc in documents
+        ]
+    except Exception as e:
+        logging.error(f"Error getting documents for case {case_id}: {e}")
+        return []
+
+
 def render_case_detail_view():
     """
     Render the detailed view for a specific case (the existing checklist interface).
@@ -578,7 +617,99 @@ def render_case_detail_view():
     else:
         st.warning("Unable to load application checklist.")
 
-    st.header("2. Upload & Assign Documents")
+    st.header("2. Case Documents")
+    case_documents = get_documents_for_case(case_id)
+    
+    if case_documents:
+        st.markdown(f"**Found {len(case_documents)} document(s) for this case:**")
+        
+        # Display documents with view buttons
+        for doc in case_documents:
+            col1, col2 = st.columns([3, 1])
+            
+            with col1:
+                st.markdown(f"📄 **{doc['filename']}** ({doc['document_type']})")
+                st.caption(f"Added: {doc['created_at']}")
+            
+            with col2:
+                if st.button("View Document", key=f"view_doc_{doc['id']}"):
+                    current_user = get_current_user_id()
+                    
+                    # Create a new context store instance for the document retrieval
+                    db_path = st.session_state.get('database_path', 'production_idis.db')
+                    context_store_instance = ContextStore(db_path)
+                    
+                    # Use the secure document retrieval function
+                    doc_details = context_store_instance.get_document_details_by_id(doc['id'], user_id=current_user)
+                    
+                    if doc_details:
+                        st.session_state.viewed_document = doc_details
+                        st.rerun()
+                    else:
+                        st.error("Unable to retrieve document or access denied.")
+        
+        # Document viewer area
+        if hasattr(st.session_state, 'viewed_document') and st.session_state.viewed_document:
+            viewed_doc = st.session_state.viewed_document
+            
+            with st.expander(f"📖 Document Viewer: {viewed_doc['filename']}", expanded=True):
+                st.markdown(f"**Document Type:** {viewed_doc.get('document_type', 'Unknown')}")
+                st.markdown(f"**Entity:** {viewed_doc.get('entity_name', 'Unknown')}")
+                st.markdown(f"**Created:** {viewed_doc.get('created_at', 'Unknown')}")
+                
+                content_type = viewed_doc.get('content_type', '').lower()
+                
+                # Handle different content types
+                if content_type in ['image/jpeg', 'image/png', 'image/jpg']:
+                    if viewed_doc.get('filed_path'):
+                        try:
+                            # Try to read the image file from the filed path
+                            import os
+                            if os.path.exists(viewed_doc['filed_path']):
+                                st.image(viewed_doc['filed_path'], caption=viewed_doc['filename'])
+                            else:
+                                st.warning("Image file not found at the stored path.")
+                        except Exception as e:
+                            st.error(f"Error displaying image: {e}")
+                    else:
+                        st.warning("No file path available for this image.")
+                
+                elif content_type == 'text/plain' or viewed_doc['filename'].endswith('.txt'):
+                    # Display text content directly
+                    if viewed_doc.get('full_text'):
+                        st.text_area("Document Content:", value=viewed_doc['full_text'], height=300)
+                    else:
+                        st.warning("No text content available.")
+                
+                else:
+                    # For PDFs and other file types, provide download option
+                    if viewed_doc.get('filed_path'):
+                        try:
+                            import os
+                            if os.path.exists(viewed_doc['filed_path']):
+                                with open(viewed_doc['filed_path'], 'rb') as file:
+                                    st.download_button(
+                                        label=f"📥 Download {viewed_doc['filename']}",
+                                        data=file.read(),
+                                        file_name=viewed_doc['filename'],
+                                        mime=content_type or 'application/octet-stream'
+                                    )
+                            else:
+                                st.warning("File not found at the stored path.")
+                        except Exception as e:
+                            st.error(f"Error preparing download: {e}")
+                    else:
+                        st.warning("No file path available for download.")
+                
+                # Clear button
+                if st.button("❌ Close Document Viewer"):
+                    if hasattr(st.session_state, 'viewed_document'):
+                        del st.session_state.viewed_document
+                    st.rerun()
+    else:
+        st.info("No documents have been assigned to this case yet.")
+
+    st.header("3. Upload & Assign Documents")
 
     from modules.shared.unified_uploader import render_unified_uploader
     render_unified_uploader(
