@@ -247,7 +247,7 @@ def render_document_assignment_interface():
                 st.session_state.processed_documents.remove(doc_to_remove)
 
     if rerun_needed:
-        st.experimental_rerun()
+        st.rerun()
 
 
 def get_current_user_id():
@@ -424,7 +424,7 @@ def render_case_dashboard():
     if st.button("➕ Start New Application", type="primary", use_container_width=True):
         st.session_state.medicaid_view = 'new_application'
         st.session_state.current_case_id = None
-        st.experimental_rerun()
+        st.rerun()
 
     st.markdown("---")
 
@@ -451,7 +451,7 @@ def render_case_dashboard():
                     st.session_state.current_case_id = case['case_id']
                     st.session_state.current_entity_id = case['entity_id']
                     st.session_state.medicaid_view = 'case_detail'
-                    st.experimental_rerun()
+                    st.rerun()
                 st.markdown("---")
 
 
@@ -481,7 +481,7 @@ def render_case_detail_view():
         st.session_state.medicaid_view = 'dashboard'
         st.session_state.current_case_id = None
         st.session_state.current_entity_id = None
-        st.experimental_rerun()
+        st.rerun()
 
     st.title(f"🩺 Case Details: {entity_name}")
     st.markdown("---")
@@ -521,7 +521,7 @@ def render_start_new_application():
 
     if st.button("← Back to Dashboard"):
         st.session_state.medicaid_view = 'dashboard'
-        st.experimental_rerun()
+        st.rerun()
 
     st.markdown("### Choose an option to proceed:")
 
@@ -541,7 +541,7 @@ def render_start_new_application():
                             st.session_state.current_case_id = case_id
                             st.session_state.current_entity_id = entity_id
                             st.session_state.medicaid_view = 'case_detail'
-                            st.experimental_rerun()
+                            st.rerun()
                         else:
                             st.error("Failed to create a case.")
                     else:
@@ -568,7 +568,7 @@ def render_start_new_application():
                         st.session_state.current_case_id = case_id
                         st.session_state.current_entity_id = selected_entity_id
                         st.session_state.medicaid_view = 'case_detail'
-                        st.experimental_rerun()
+                        st.rerun()
                     else:
                         st.error("Failed to create a case.")
         else:
