@@ -543,14 +543,14 @@ def get_documents_for_case(case_id):
         context_store = ContextStore(db_path)
         cursor = context_store.conn.cursor()
         
-        # Query to get documents for the case
+        # Query to get documents for the case - handle both integer and string case IDs
         cursor.execute("""
-            SELECT DISTINCT d.id, d.file_name, d.document_type, d.created_at
+            SELECT DISTINCT d.id, d.file_name, d.document_type, d.created_at, d.filed_path, d.full_text
             FROM documents d
             JOIN case_documents cd ON d.id = cd.document_id
-            WHERE cd.case_id = ?
+            WHERE cd.case_id = ? OR cd.case_id = CAST(? AS TEXT)
             ORDER BY d.created_at DESC
-        """, (case_id,))
+        """, (case_id, case_id))
         
         documents = cursor.fetchall()
         return [
@@ -558,7 +558,9 @@ def get_documents_for_case(case_id):
                 'id': doc[0],
                 'filename': doc[1],
                 'document_type': doc[2] or 'Unknown',
-                'created_at': doc[3]
+                'created_at': doc[3],
+                'filed_path': doc[4],
+                'full_text': doc[5]
             }
             for doc in documents
         ]
@@ -657,49 +659,68 @@ def render_case_detail_view():
                 st.markdown(f"**Entity:** {viewed_doc.get('entity_name', 'Unknown')}")
                 st.markdown(f"**Created:** {viewed_doc.get('created_at', 'Unknown')}")
                 
-                content_type = viewed_doc.get('content_type', '').lower()
+                # Determine file type from filename extension
+                filename = viewed_doc.get('filename', '').lower()
+                filed_path = viewed_doc.get('filed_path')
+                full_text = viewed_doc.get('full_text')
                 
-                # Handle different content types
-                if content_type in ['image/jpeg', 'image/png', 'image/jpg']:
-                    if viewed_doc.get('filed_path'):
-                        try:
-                            # Try to read the image file from the filed path
-                            import os
-                            if os.path.exists(viewed_doc['filed_path']):
-                                st.image(viewed_doc['filed_path'], caption=viewed_doc['filename'])
-                            else:
-                                st.warning("Image file not found at the stored path.")
-                        except Exception as e:
-                            st.error(f"Error displaying image: {e}")
+                # Handle different file types
+                if filename.endswith(('.png', '.jpg', '.jpeg')):
+                    if filed_path and os.path.exists(filed_path):
+                        st.image(filed_path, caption=viewed_doc['filename'])
                     else:
-                        st.warning("No file path available for this image.")
+                        st.warning("Image file not found. The file may have been moved or deleted.")
+                        # Show text content if available
+                        if full_text:
+                            st.text_area("Extracted Text Content:", value=full_text, height=200)
                 
-                elif content_type == 'text/plain' or viewed_doc['filename'].endswith('.txt'):
+                elif filename.endswith('.txt') or viewed_doc.get('document_type') == 'Payslip':
                     # Display text content directly
-                    if viewed_doc.get('full_text'):
-                        st.text_area("Document Content:", value=viewed_doc['full_text'], height=300)
+                    if full_text:
+                        st.text_area("Document Content:", value=full_text, height=300)
                     else:
                         st.warning("No text content available.")
                 
-                else:
-                    # For PDFs and other file types, provide download option
-                    if viewed_doc.get('filed_path'):
+                elif filename.endswith('.pdf'):
+                    # For PDFs, show text content and download option
+                    if full_text:
+                        st.subheader("Extracted Text Content:")
+                        st.text_area("Content:", value=full_text, height=300)
+                    
+                    # Try to provide download if file exists
+                    if filed_path and os.path.exists(filed_path):
                         try:
-                            import os
-                            if os.path.exists(viewed_doc['filed_path']):
-                                with open(viewed_doc['filed_path'], 'rb') as file:
-                                    st.download_button(
-                                        label=f"📥 Download {viewed_doc['filename']}",
-                                        data=file.read(),
-                                        file_name=viewed_doc['filename'],
-                                        mime=content_type or 'application/octet-stream'
-                                    )
-                            else:
-                                st.warning("File not found at the stored path.")
+                            with open(filed_path, 'rb') as file:
+                                st.download_button(
+                                    label=f"📥 Download {viewed_doc['filename']}",
+                                    data=file.read(),
+                                    file_name=viewed_doc['filename'],
+                                    mime='application/pdf'
+                                )
                         except Exception as e:
                             st.error(f"Error preparing download: {e}")
                     else:
-                        st.warning("No file path available for download.")
+                        st.warning("Original PDF file not found. Only extracted text is available.")
+                
+                else:
+                    # For other file types, show text content and try download
+                    if full_text:
+                        st.subheader("Extracted Text Content:")
+                        st.text_area("Content:", value=full_text, height=300)
+                    
+                    if filed_path and os.path.exists(filed_path):
+                        try:
+                            with open(filed_path, 'rb') as file:
+                                st.download_button(
+                                    label=f"📥 Download {viewed_doc['filename']}",
+                                    data=file.read(),
+                                    file_name=viewed_doc['filename'],
+                                    mime='application/octet-stream'
+                                )
+                        except Exception as e:
+                            st.error(f"Error preparing download: {e}")
+                    else:
+                        st.warning("Original file not found. Only extracted text is available.")
                 
                 # Clear button
                 if st.button("❌ Close Document Viewer"):

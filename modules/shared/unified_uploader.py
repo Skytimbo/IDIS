@@ -40,11 +40,16 @@ def render_unified_uploader(
     
     # Render the upload interface
     st.markdown("---")
-    with st.expander(f"➕ {title}"):
+    with st.expander(f"➕ {title}", expanded=True):
+        # Add clear instructions
+        st.info("📁 **Drag and drop files here or click 'Browse files' to select documents**")
+        st.markdown(f"**Supported file types:** {', '.join(file_types).upper()}")
+        
         uploaded_files = st.file_uploader(
             description,
             accept_multiple_files=accept_multiple,
-            type=file_types
+            type=file_types,
+            help="Upload PDFs, images, or text files for processing"
         )
         
         if uploaded_files:
