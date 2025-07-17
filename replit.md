@@ -77,6 +77,19 @@ The application is containerized and designed for a one-step launch.
 - **Fix**: Added missing methods: `get_documents_by_processing_status`, `update_document_fields`, `get_entity`, `add_audit_log_entry`.
 - **Impact**: All components now have access to required database operations.
 
+### Complete Case-Document Association Fix (2025-07-17)
+- **Issue**: Documents uploaded in Medicaid cases were not appearing in the Case Documents section due to multiple pipeline issues.
+- **Root Causes**: 
+  - Database column name mismatch (`filename` vs `file_name`)
+  - Hardcoded entity IDs in uploader instead of using session state
+  - Missing case-document association creation during upload
+- **Fixes**:
+  - Fixed `get_documents_for_case()` to use correct column name `file_name`
+  - Modified `_get_context_parameters()` to use actual entity ID from session state
+  - Added `_create_case_document_association()` function to automatically link uploads to current case
+  - Added missing `get_document_details_by_id()` method for "View Document" functionality
+- **Impact**: Complete case-document workflow now functional - uploads appear in Case Documents section with working "View Document" buttons.
+
 ## 8. Product Roadmap
 
 ### Phase 1: UI Polish & Core Workflow Hardening (Current Focus)

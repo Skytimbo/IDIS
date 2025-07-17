@@ -230,6 +230,31 @@ class ContextStore:
         self.conn.commit()
         return cursor.lastrowid
     
+    def get_document_details_by_id(self, document_id: int, user_id: str = None) -> dict | None:
+        """
+        Retrieves document details by ID (bypassing user validation for MVP demo).
+        TODO: Add OAuth-based user validation when authentication is implemented
+        """
+        try:
+            import logging
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "SELECT file_name, 'text/plain' as content_type, full_text FROM documents WHERE id = ?",
+                (document_id,)
+            )
+            doc = cursor.fetchone()
+            if doc:
+                return {
+                    "filename": doc[0],
+                    "content_type": doc[1], 
+                    "content": doc[2]
+                }
+            return None
+        except Exception as e:
+            import logging
+            logging.error(f"Error retrieving document {document_id}: {e}")
+            return None
+    
     def close(self):
         """Close the database connection."""
         self.conn.close()
