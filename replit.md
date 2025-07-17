@@ -64,11 +64,25 @@ The application is containerized and designed for a one-step launch.
 2.  Set the `OPENAI_API_KEY` in your environment.
 3.  Run the deployment script: `./deploy.sh`
 
-## 7. Product Roadmap
+## 7. Recent Technical Fixes
+
+### Critical Document Archiving Pipeline Fix (2025-07-17)
+- **Issue**: Documents uploaded through the UI were failing to archive due to premature temp file deletion.
+- **Root Cause**: The `unified_uploader.py` was deleting temporary files before the TaggerAgent could process them for archiving.
+- **Fix**: Modified the upload pipeline to preserve temp files until after successful archiving.
+- **Impact**: UI uploads now complete the full processing pipeline including automatic archiving to organized folders.
+
+### ContextStore Method Completeness (2025-07-17)
+- **Issue**: Missing methods in ContextStore class causing compatibility issues.
+- **Fix**: Added missing methods: `get_documents_by_processing_status`, `update_document_fields`, `get_entity`, `add_audit_log_entry`.
+- **Impact**: All components now have access to required database operations.
+
+## 8. Product Roadmap
 
 ### Phase 1: UI Polish & Core Workflow Hardening (Current Focus)
 - [x] Implement the "Active Case Dashboard".
 - [x] Build FastAPI Layer for backend decoupling and scalability.
+- [x] Fix critical document archiving pipeline regression (TaggerAgent integration).
 - [ ] Refine the UI with a "Two-Panel" layout and contextual guidance.
 - [ ] Build the "Generate Application Packet" feature.
 - [ ] Address medium/low priority issues from CodeRabbit review (e.g., harden `deploy.sh`, improve exception handling).

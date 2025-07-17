@@ -12,6 +12,7 @@ import logging
 from typing import List, Optional
 from context_store import ContextStore
 from unified_ingestion_agent import UnifiedIngestionAgent
+from tagger_agent import TaggerAgent
 
 
 def render_unified_uploader(
@@ -89,6 +90,12 @@ def _process_uploaded_files(uploaded_files, context: str, accept_multiple: bool)
         holding_folder=holding_folder
     )
     
+    # Initialize the tagger agent for archiving
+    tagger_agent = TaggerAgent(
+        context_store=context_store,
+        base_filed_folder=os.path.join("data", "archive")
+    )
+    
     with st.spinner("Processing documents through AI pipeline..."):
         processed_count = 0
         failed_count = 0
@@ -121,21 +128,45 @@ def _process_uploaded_files(uploaded_files, context: str, accept_multiple: bool)
                     st.write(f"✅ Successfully processed {uploaded_file.name}")
                     processed_count += 1
                     
+                    # Complete the archiving pipeline by running TaggerAgent
+                    archiving_success = False
+                    try:
+                        # Process documents that are ready for tagging and filing
+                        filed_count, failed_count = tagger_agent.process_documents_for_tagging_and_filing(
+                            status_to_process="processing_complete",
+                            new_status_after_filing="filed_and_tagged"
+                        )
+                        
+                        if filed_count > 0:
+                            st.write(f"📁 Successfully archived {filed_count} document(s)")
+                            archiving_success = True
+                        elif failed_count > 0:
+                            st.write(f"⚠️  Document processed but archiving failed for {failed_count} document(s)")
+                    
+                    except Exception as e:
+                        logging.error(f"Error during archiving: {e}")
+                        st.write(f"⚠️  Document processed but archiving failed: {str(e)}")
 
                     # Store processed document info in session state for assignment
                     if context == "medicaid":
                         _store_processed_document(uploaded_file.name, context_store)
                     
-
                     # Context-specific success actions
                     _handle_success_context(context, uploaded_file.name)
+                    
+                    # Clean up temporary file ONLY after successful archiving
+                    if archiving_success and os.path.exists(temp_path):
+                        os.remove(temp_path)
+                        logging.info(f"Cleaned up temp file: {temp_path}")
+                    elif os.path.exists(temp_path):
+                        logging.warning(f"Keeping temp file due to archiving failure: {temp_path}")
                 else:
                     st.write(f"❌ Failed to process {uploaded_file.name}")
                     failed_count += 1
-                
-                # Clean up temporary file
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
+                    
+                    # Clean up temporary file on processing failure
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
                     
             except Exception as e:
                 st.write(f"❌ Error processing {uploaded_file.name}: {str(e)}")
