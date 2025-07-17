@@ -575,7 +575,7 @@ def get_documents_for_case(case_id: str):
         context_store = ContextStore(db_path)
         cursor = context_store.conn.cursor()
         query = """
-            SELECT d.id, d.filename
+            SELECT d.id, d.file_name
             FROM documents d
             JOIN case_documents cd ON d.id = cd.document_id
             WHERE cd.case_id = ?

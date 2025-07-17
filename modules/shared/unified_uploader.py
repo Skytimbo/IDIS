@@ -150,6 +150,8 @@ def _process_uploaded_files(uploaded_files, context: str, accept_multiple: bool)
                     # Store processed document info in session state for assignment
                     if context == "medicaid":
                         _store_processed_document(uploaded_file.name, context_store)
+                        # Create case-document association for Medicaid uploads
+                        _create_case_document_association(uploaded_file.name, context_store)
                     
                     # Context-specific success actions
                     _handle_success_context(context, uploaded_file.name)
@@ -196,8 +198,11 @@ def _get_context_parameters(context: str) -> tuple:
     """
     
     if context == "medicaid":
-        # Medicaid Navigator uses specific IDs for tracking
-        return (1, 1)
+        # Medicaid Navigator uses active case's entity ID
+        entity_id = st.session_state.get('current_entity_id', 1)
+        session_id = 1  # Default session ID
+        logging.info(f"Medicaid context: Using entity_id={entity_id}, session_id={session_id}")
+        return (entity_id, session_id)
     elif context == "general":
         # General document search uses default IDs
         return (1, 1)
@@ -221,6 +226,61 @@ def _handle_success_context(context: str, filename: str) -> None:
     elif context == "general":
         # Future: Update general document index, trigger search indexing
         logging.info(f"General document processed: {filename}")
+
+def _create_case_document_association(filename: str, context_store: ContextStore) -> None:
+    """
+    Create a case-document association for Medicaid uploads.
+    
+    Args:
+        filename: Name of the processed file
+        context_store: Database connection
+    """
+    try:
+        # Get the current case and entity IDs from session state
+        case_id = st.session_state.get('current_case_id')
+        entity_id = st.session_state.get('current_entity_id')
+        
+        if not case_id or not entity_id:
+            logging.warning(f"No current case or entity ID found for document {filename}")
+            return
+        
+        # Get the document ID for the uploaded file
+        cursor = context_store.conn.cursor()
+        cursor.execute("""
+            SELECT id FROM documents 
+            WHERE file_name = ? AND entity_id = ?
+            ORDER BY upload_timestamp DESC 
+            LIMIT 1
+        """, (filename, entity_id))
+        
+        result = cursor.fetchone()
+        if not result:
+            logging.error(f"Could not find document ID for {filename} with entity {entity_id}")
+            return
+        
+        document_id = result[0]
+        
+        # Check if association already exists
+        cursor.execute("""
+            SELECT id FROM case_documents 
+            WHERE case_id = ? AND document_id = ?
+        """, (case_id, document_id))
+        
+        if cursor.fetchone():
+            logging.info(f"Case-document association already exists for {filename}")
+            return
+        
+        # Create the case-document association
+        cursor.execute("""
+            INSERT INTO case_documents (case_id, entity_id, document_id, status, user_id, created_at, updated_at)
+            VALUES (?, ?, ?, 'Pending', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """, (case_id, entity_id, document_id, st.session_state.get('current_user_id', 'user_a')))
+        
+        context_store.conn.commit()
+        logging.info(f"Created case-document association: Case={case_id}, Document={document_id} ({filename})")
+        
+    except Exception as e:
+        logging.error(f"Error creating case-document association for {filename}: {e}")
 
 def _store_processed_document(filename: str, context_store: ContextStore) -> None:
     """
