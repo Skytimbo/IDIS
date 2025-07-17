@@ -232,22 +232,47 @@ class ContextStore:
     
     def get_document_details_by_id(self, document_id: int, user_id: str = None) -> dict | None:
         """
-        Retrieves document details by ID (bypassing user validation for MVP demo).
+        Retrieves comprehensive document details by ID (bypassing user validation for MVP demo).
         TODO: Add OAuth-based user validation when authentication is implemented
         """
         try:
             import logging
             cursor = self.conn.cursor()
-            cursor.execute(
-                "SELECT file_name, 'text/plain' as content_type, full_text FROM documents WHERE id = ?",
-                (document_id,)
-            )
+            cursor.execute("""
+                SELECT 
+                    file_name, 
+                    original_file_type,
+                    filed_path,
+                    full_text,
+                    document_type,
+                    classification_confidence,
+                    issuer_source,
+                    recipient,
+                    document_dates,
+                    tags_extracted,
+                    extracted_data,
+                    processing_status,
+                    upload_timestamp
+                FROM documents 
+                WHERE id = ?
+            """, (document_id,))
             doc = cursor.fetchone()
             if doc:
                 return {
                     "filename": doc[0],
-                    "content_type": doc[1], 
-                    "content": doc[2]
+                    "original_file_type": doc[1],
+                    "filed_path": doc[2],
+                    "full_text": doc[3],
+                    "document_type": doc[4],
+                    "classification_confidence": doc[5],
+                    "issuer_source": doc[6],
+                    "recipient": doc[7],
+                    "document_dates": doc[8],
+                    "tags_extracted": doc[9],
+                    "extracted_data": doc[10],
+                    "processing_status": doc[11],
+                    "upload_timestamp": doc[12],
+                    "content_type": doc[1] if doc[1] else "application/pdf"
                 }
             return None
         except Exception as e:

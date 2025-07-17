@@ -90,6 +90,18 @@ The application is containerized and designed for a one-step launch.
   - Added missing `get_document_details_by_id()` method for "View Document" functionality
 - **Impact**: Complete case-document workflow now functional - uploads appear in Case Documents section with working "View Document" buttons.
 
+### Enhanced Document Viewer UX (2025-07-17)
+- **Issue**: Document viewer showed confusing raw OCR text instead of showcasing excellent AI analysis results.
+- **Root Cause**: UI emphasized problematic raw text extraction over valuable structured AI insights.
+- **Fixes**:
+  - Enhanced `get_document_details_by_id()` method to return comprehensive document metadata
+  - Completely rebuilt document viewer in `modules/medicaid_navigator/ui.py`
+  - Added prominent "AI Analysis" section with document classification, confidence scores, and structured data
+  - Added original file download functionality
+  - Moved raw OCR text to collapsed "Advanced Options" section with warnings
+  - Added visual indicators for document type, confidence, and processing status
+- **Impact**: Document viewer now showcases AI intelligence with clean, professional interface that builds user confidence in the system.
+
 ## 8. Product Roadmap
 
 ### Phase 1: UI Polish & Core Workflow Hardening (Current Focus)

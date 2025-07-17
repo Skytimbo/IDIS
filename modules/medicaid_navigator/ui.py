@@ -644,33 +644,112 @@ def render_case_detail_view():
         db_path = st.session_state.get('database_path', 'production_idis.db')
         context_store = ContextStore(db_path)
 
-        with st.expander("Document Viewer", expanded=True):
+        with st.expander("📄 Document Analysis", expanded=True):
             # TODO: Add OAuth-based user validation here when authentication is implemented
             # For MVP demo: bypassing user access checks
             retrieved_doc = context_store.get_document_details_by_id(doc_id, user_id=None)
 
             if retrieved_doc:
-                st.write(f"**Viewing:** {retrieved_doc['filename']}")
-                content_type = retrieved_doc['content_type']
-
-                if 'image' in content_type:
-                    st.image(retrieved_doc['content'])
-                elif 'text' in content_type:
-                    # Handle both string and binary content
-                    content = retrieved_doc['content']
-                    if isinstance(content, bytes):
-                        content = content.decode('utf-8', errors='replace')
-                    st.text(content)
-                else:
-                    st.download_button(
-                        label=f"Download {retrieved_doc['filename']}",
-                        data=retrieved_doc['content'],
-                        file_name=retrieved_doc['filename'],
-                        mime=content_type)
-
-                if st.button("Close Viewer"):
-                    st.session_state.document_to_view = None
-                    st.rerun()
+                # Header with file info and download button
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.markdown(f"### {retrieved_doc['filename']}")
+                    if retrieved_doc.get('upload_timestamp'):
+                        st.caption(f"Uploaded: {retrieved_doc['upload_timestamp']}")
+                
+                with col2:
+                    # Original file download button
+                    if retrieved_doc.get('filed_path'):
+                        try:
+                            with open(retrieved_doc['filed_path'], 'rb') as f:
+                                file_data = f.read()
+                            st.download_button(
+                                label="📥 Download Original",
+                                data=file_data,
+                                file_name=retrieved_doc['filename'],
+                                mime=retrieved_doc['content_type'])
+                        except (FileNotFoundError, TypeError):
+                            st.caption("Original file not available")
+                
+                st.markdown("---")
+                
+                # AI Analysis Section (Emphasized)
+                st.markdown("## 🤖 AI Analysis")
+                
+                # Document Classification
+                if retrieved_doc.get('document_type'):
+                    confidence = retrieved_doc.get('classification_confidence', 0)
+                    confidence_color = "green" if confidence and confidence > 0.7 else "orange" if confidence and confidence > 0.4 else "red"
+                    st.markdown(f"**Document Type:** ::{confidence_color}[{retrieved_doc['document_type']}]")
+                    if confidence:
+                        st.progress(confidence, f"Confidence: {confidence:.1%}")
+                
+                # Key Information (Structured Data)
+                col1, col2 = st.columns(2)
+                with col1:
+                    if retrieved_doc.get('issuer_source'):
+                        st.markdown(f"**Issuer:** {retrieved_doc['issuer_source']}")
+                    if retrieved_doc.get('recipient'):
+                        st.markdown(f"**Recipient:** {retrieved_doc['recipient']}")
+                
+                with col2:
+                    if retrieved_doc.get('document_dates'):
+                        st.markdown(f"**Document Dates:** {retrieved_doc['document_dates']}")
+                    if retrieved_doc.get('processing_status'):
+                        status_color = "green" if retrieved_doc['processing_status'] == 'filed' else "blue"
+                        st.markdown(f"**Status:** ::{status_color}[{retrieved_doc['processing_status']}]")
+                
+                # Extracted Data (JSON structured information)
+                if retrieved_doc.get('extracted_data'):
+                    st.markdown("### 📋 Extracted Information")
+                    try:
+                        import json
+                        extracted = json.loads(retrieved_doc['extracted_data'])
+                        for key, value in extracted.items():
+                            if value and str(value).strip():
+                                st.markdown(f"**{key.replace('_', ' ').title()}:** {value}")
+                    except (json.JSONDecodeError, TypeError):
+                        st.text(retrieved_doc['extracted_data'])
+                
+                # Tags
+                if retrieved_doc.get('tags_extracted'):
+                    st.markdown("### 🏷️ Tags")
+                    try:
+                        import json
+                        tags = json.loads(retrieved_doc['tags_extracted'])
+                        if isinstance(tags, list):
+                            for tag in tags:
+                                st.badge(tag)
+                        else:
+                            st.text(tags)
+                    except (json.JSONDecodeError, TypeError):
+                        st.text(retrieved_doc['tags_extracted'])
+                
+                # Advanced options (collapsed by default)
+                with st.expander("⚙️ Advanced Options", expanded=False):
+                    st.markdown("### Raw Text Content")
+                    st.caption("⚠️ This is the raw extracted text and may contain OCR errors")
+                    if retrieved_doc.get('full_text'):
+                        st.text_area(
+                            "Full Text",
+                            value=retrieved_doc['full_text'],
+                            height=200,
+                            disabled=True,
+                            help="Raw OCR text extraction - may contain errors"
+                        )
+                    else:
+                        st.info("No text content available")
+                
+                # Control buttons
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.button("🔄 Refresh Analysis"):
+                        st.rerun()
+                with col2:
+                    if st.button("❌ Close Viewer"):
+                        st.session_state.document_to_view = None
+                        st.rerun()
+                        
             else:
                 st.error(
                     "Could not retrieve document or you do not have permission."
