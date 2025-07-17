@@ -656,8 +656,11 @@ def render_case_detail_view():
                 if 'image' in content_type:
                     st.image(retrieved_doc['content'])
                 elif 'text' in content_type:
-                    st.text(retrieved_doc['content'].decode('utf-8',
-                                                          errors='ignore'))
+                    # Handle both string and binary content
+                    content = retrieved_doc['content']
+                    if isinstance(content, bytes):
+                        content = content.decode('utf-8', errors='replace')
+                    st.text(content)
                 else:
                     st.download_button(
                         label=f"Download {retrieved_doc['filename']}",
