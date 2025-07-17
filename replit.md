@@ -151,6 +151,23 @@ The application is containerized and designed for a one-step launch.
   - Added database validation to prevent cross-case document viewing
 - **Impact**: Resolved critical data integrity issues that could cause serious confusion in real case management scenarios. Clean separation between cases ensures professional reliability.
 
+### Enhanced Document Viewer & Intelligent Metadata Extraction (2025-07-17)
+- **Issues**:
+  - Close button not prominently visible in document viewer
+  - Issuer metadata showing "RETURN SERVICE REQUESTED" instead of actual issuer "FNB Alaska"
+  - Raw OCR data prioritized over intelligent AI-extracted metadata
+- **Root Causes**:
+  - Close button buried at bottom of document viewer interface
+  - No filtering of postal/shipping instructions from issuer field
+  - Metadata extraction logic prioritized raw OCR over AI analysis
+- **Fixes**:
+  - Moved close button to top of document viewer as prominent primary button
+  - Implemented intelligent issuer detection that prioritizes AI-extracted data
+  - Added postal instruction filtering to ignore common shipping labels
+  - Enhanced metadata extraction to check multiple AI-extracted data sources
+  - Fallback logic filters out postal instructions from raw OCR data
+- **Impact**: Professional document viewer with clear navigation controls and accurate metadata that showcases AI intelligence over raw text extraction.
+
 ## 8. Product Roadmap
 
 ### Phase 1: UI Polish & Core Workflow Hardening (Current Focus)

@@ -683,6 +683,13 @@ def render_case_detail_view():
             return
 
         with st.expander("📄 Document Analysis", expanded=True):
+            # Prominent close button at the top
+            if st.button("✕ Close Document Viewer", type="primary", use_container_width=True):
+                st.session_state.document_to_view = None
+                st.rerun()
+            
+            st.markdown("---")
+            
             # TODO: Add OAuth-based user validation here when authentication is implemented
             # For MVP demo: bypassing user access checks
             retrieved_doc = context_store.get_document_details_by_id(doc_id, user_id=None)
@@ -775,11 +782,47 @@ def render_case_detail_view():
                     if confidence:
                         st.progress(confidence, f"Confidence: {confidence:.1%}")
                 
-                # Key Information (Structured Data)
+                # Key Information (Structured Data) - Prioritize AI-extracted data
                 col1, col2 = st.columns(2)
                 with col1:
-                    if retrieved_doc.get('issuer_source'):
-                        st.markdown(f"**Issuer:** {retrieved_doc['issuer_source']}")
+                    # Smart issuer detection - prioritize AI-extracted data over raw OCR
+                    issuer_to_display = None
+                    if retrieved_doc.get('extracted_data'):
+                        try:
+                            import json
+                            extracted = json.loads(retrieved_doc['extracted_data'])
+                            
+                            # Check for AI-extracted issuer in various locations
+                            if extracted.get('issuer_info', {}).get('organization_name'):
+                                issuer_to_display = extracted['issuer_info']['organization_name']
+                            elif extracted.get('content', {}).get('issuer'):
+                                issuer_to_display = extracted['content']['issuer']
+                            elif extracted.get('sender', {}).get('organization'):
+                                issuer_to_display = extracted['sender']['organization']
+                            elif extracted.get('sender', {}).get('name'):
+                                issuer_to_display = extracted['sender']['name']
+                        except (json.JSONDecodeError, TypeError):
+                            pass
+                    
+                    # Fallback to raw OCR but filter out postal instructions
+                    if not issuer_to_display and retrieved_doc.get('issuer_source'):
+                        raw_issuer = retrieved_doc['issuer_source']
+                        # Filter out common postal/shipping instructions
+                        postal_instructions = [
+                            'RETURN SERVICE REQUESTED',
+                            'RETURN RECEIPT REQUESTED', 
+                            'FORWARDING SERVICE REQUESTED',
+                            'ADDRESS SERVICE REQUESTED',
+                            'DO NOT FORWARD',
+                            'PRESORTED FIRST-CLASS'
+                        ]
+                        if raw_issuer.upper() not in postal_instructions:
+                            issuer_to_display = raw_issuer
+                    
+                    if issuer_to_display:
+                        st.markdown(f"**Issuer:** {issuer_to_display}")
+                    
+                    # Recipient information
                     if retrieved_doc.get('recipient'):
                         st.markdown(f"**Recipient:** {retrieved_doc['recipient']}")
                 
@@ -892,15 +935,9 @@ def render_case_detail_view():
                     else:
                         st.info("No text content available")
                 
-                # Control buttons
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("🔄 Refresh Analysis"):
-                        st.rerun()
-                with col2:
-                    if st.button("✕ Close Document Viewer", type="secondary"):
-                        st.session_state.document_to_view = None
-                        st.rerun()
+                # Control buttons (only refresh now, close button is at top)
+                if st.button("🔄 Refresh Analysis", use_container_width=True):
+                    st.rerun()
                         
             else:
                 st.error(
