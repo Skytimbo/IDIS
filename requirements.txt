@@ -182,3 +182,6 @@ fpdf2
 langchain
 langchain-openai
 tiktoken
+fastapi
+python-dotenv
+uvicorn

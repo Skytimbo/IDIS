@@ -22,13 +22,14 @@
 The system is a **Modular Monolith** designed for simplicity and rapid development, running as a set of coordinated services via Docker Compose.
 
 **High-Level Flow:**
-[ User ] --> [ QuantaIQ UI (Streamlit) ] <--> [ IDIS Engine (Python) ] <--> [ Database (SQLite) ]
+[ User ] --> [ QuantaIQ UI (Streamlit) ] <--> [ FastAPI Layer ] <--> [ IDIS Engine (Python) ] <--> [ Database (SQLite) ]
 |
 V
 [ Document Archive (Local Files) ]
 
 
 * **QuantaIQ UI:** The web-based front-end, built with Streamlit, for all user interaction. It includes modules for Entity/Case Management, Document Search, and more.
+* **FastAPI Layer:** A professional API layer (`/api/`) that provides secure, structured endpoints for the Streamlit UI to interact with the backend services.
 * **IDIS Engine:** The core backend, including the `watcher_service` for file system monitoring and the `UnifiedIngestionAgent` for document processing.
 * **Database:** A local SQLite database (`production_idis.db`) acts as the central "source of truth".
 * **Document Archive:** A local directory (`data/archive`) for storing the original, unaltered files.
@@ -67,6 +68,7 @@ The application is containerized and designed for a one-step launch.
 
 ### Phase 1: UI Polish & Core Workflow Hardening (Current Focus)
 - [x] Implement the "Active Case Dashboard".
+- [x] Build FastAPI Layer for backend decoupling and scalability.
 - [ ] Refine the UI with a "Two-Panel" layout and contextual guidance.
 - [ ] Build the "Generate Application Packet" feature.
 - [ ] Address medium/low priority issues from CodeRabbit review (e.g., harden `deploy.sh`, improve exception handling).
