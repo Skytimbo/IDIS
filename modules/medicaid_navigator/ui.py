@@ -630,12 +630,12 @@ def render_case_detail_view():
     if not case_documents:
         st.info("No documents have been assigned to this case yet.")
     else:
-        for doc in case_documents:
+        for index, doc in enumerate(case_documents):
             col1, col2 = st.columns([3, 1])
             with col1:
                 st.write(doc['filename'])
             with col2:
-                if st.button("View Document", key=f"view_doc_{doc['id']}"):
+                if st.button("View Document", key=f"view_doc_{case_id}_{doc['id']}_{index}"):
                     st.session_state.document_to_view = doc['id']
 
     if 'document_to_view' in st.session_state and st.session_state.document_to_view:
@@ -699,27 +699,88 @@ def render_case_detail_view():
                         status_color = "green" if retrieved_doc['processing_status'] == 'filed' else "blue"
                         st.markdown(f"**Status:** ::{status_color}[{retrieved_doc['processing_status']}]")
                 
-                # Extracted Data (JSON structured information)
+                # Human-readable document information
                 if retrieved_doc.get('extracted_data'):
-                    st.markdown("### 📋 Extracted Information")
+                    st.markdown("### 📋 Document Summary")
                     try:
                         import json
                         extracted = json.loads(retrieved_doc['extracted_data'])
-                        for key, value in extracted.items():
-                            if value and str(value).strip():
-                                st.markdown(f"**{key.replace('_', ' ').title()}:** {value}")
+                        
+                        # Show the AI-generated summary first (most readable)
+                        if extracted.get('content', {}).get('summary'):
+                            st.markdown(f"**Summary:** {extracted['content']['summary']}")
+                            st.markdown("---")
+                        
+                        # Document Type with confidence
+                        if extracted.get('document_type'):
+                            doc_type = extracted['document_type']
+                            if isinstance(doc_type, dict):
+                                confidence = doc_type.get('confidence_score', 0)
+                                doc_class = doc_type.get('predicted_class', 'Unknown')
+                                confidence_pct = f"({confidence:.0%} confidence)" if confidence else ""
+                                st.markdown(f"**Document Type:** {doc_class} {confidence_pct}")
+                        
+                        # Financial Information (human-readable)
+                        if extracted.get('financials'):
+                            financials = extracted['financials']
+                            financial_info = []
+                            
+                            if financials.get('total_amount'):
+                                currency = financials.get('currency', 'USD')
+                                total = financials['total_amount']
+                                financial_info.append(f"Total Amount: ${total:,.2f} {currency}")
+                            
+                            if financials.get('subtotal'):
+                                financial_info.append(f"Subtotal: ${financials['subtotal']:,.2f}")
+                            
+                            if financials.get('tax_total'):
+                                financial_info.append(f"Tax: ${financials['tax_total']:,.2f}")
+                            
+                            if financial_info:
+                                st.markdown("**Financial Details:** " + " | ".join(financial_info))
+                        
+                        # Key Dates (human-readable)
+                        if extracted.get('key_dates'):
+                            dates = extracted['key_dates']
+                            date_info = []
+                            
+                            if dates.get('primary_date'):
+                                date_type = dates.get('date_type', 'Document Date')
+                                date_info.append(f"{date_type.replace('_', ' ').title()}: {dates['primary_date']}")
+                            
+                            if dates.get('due_date'):
+                                date_info.append(f"Due Date: {dates['due_date']}")
+                            
+                            if date_info:
+                                st.markdown("**Important Dates:** " + " | ".join(date_info))
+                        
+                        # Payment Information
+                        if extracted.get('payment_details'):
+                            payment = extracted['payment_details']
+                            if payment.get('method'):
+                                method_info = f"Payment Method: {payment['method']}"
+                                if payment.get('card_last4'):
+                                    method_info += f" (ending {payment['card_last4']})"
+                                st.markdown(f"**{method_info}**")
+                        
+                        # Account Information
+                        if extracted.get('recipient', {}).get('account_number'):
+                            account = extracted['recipient']['account_number']
+                            st.markdown(f"**Account Number:** {account}")
+                    
                     except (json.JSONDecodeError, TypeError):
                         st.text(retrieved_doc['extracted_data'])
                 
-                # Tags
+                # Tags (human-readable)
                 if retrieved_doc.get('tags_extracted'):
-                    st.markdown("### 🏷️ Tags")
+                    st.markdown("### 🏷️ Document Tags")
                     try:
                         import json
                         tags = json.loads(retrieved_doc['tags_extracted'])
-                        if isinstance(tags, list):
-                            for tag in tags:
-                                st.badge(tag)
+                        if isinstance(tags, list) and tags:
+                            # Display tags in a more readable format
+                            tag_display = " • ".join(tags)
+                            st.markdown(f"**Tags:** {tag_display}")
                         else:
                             st.text(tags)
                     except (json.JSONDecodeError, TypeError):

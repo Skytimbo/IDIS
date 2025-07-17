@@ -102,6 +102,21 @@ The application is containerized and designed for a one-step launch.
   - Added visual indicators for document type, confidence, and processing status
 - **Impact**: Document viewer now showcases AI intelligence with clean, professional interface that builds user confidence in the system.
 
+### Human-Readable Document Display & Duplicate Key Fix (2025-07-17)
+- **Issues**: 
+  - Document display showed raw JSON data instead of clean, human-friendly information
+  - Duplicate key errors from multiple documents with same ID causing button conflicts
+- **Root Causes**:
+  - Technical JSON structures displayed directly to business users
+  - Button keys only using document ID without case context
+- **Fixes**:
+  - Transformed technical JSON into conversational format (e.g., "Document Type: Payslip (95% confidence)")
+  - Implemented human-readable financial display (e.g., "Total Amount: $150.00 USD")
+  - Added conversational date formatting and payment method display
+  - Fixed duplicate keys using format: `f"view_doc_{case_id}_{doc['id']}_{index}"`
+  - Enhanced tags display with bullet-point format for better readability
+- **Impact**: Professional, business-friendly interface with no technical jargon and zero duplicate key errors.
+
 ## 8. Product Roadmap
 
 ### Phase 1: UI Polish & Core Workflow Hardening (Current Focus)
