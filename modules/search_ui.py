@@ -340,8 +340,8 @@ def render_search_ui():
         # Additional filters - expanded by default for better accessibility
         with st.expander("Advanced Filters", expanded=True):
             selected_types = st.multiselect("Document Type", options=get_document_types())
-            issuer_filter = st.text_area("Issuer / Source", height=60, placeholder="Enter issuer or source organization...")
-            tags_filter = st.text_area("Tags (comma-separated)", height=60, placeholder="Enter tags separated by commas...")
+            issuer_filter = st.text_area("Issuer / Source", height=68, placeholder="Enter issuer or source organization...")
+            tags_filter = st.text_area("Tags (comma-separated)", height=68, placeholder="Enter tags separated by commas...")
             
             col_date1, col_date2 = st.columns(2)
             with col_date1:
