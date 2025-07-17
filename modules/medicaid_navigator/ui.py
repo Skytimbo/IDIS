@@ -8,6 +8,130 @@ from unified_ingestion_agent import UnifiedIngestionAgent
 from modules.shared.confidence_meter import extract_confidence_from_document, render_confidence_meter
 
 
+def render_persistent_ai_analysis(doc_id, case_id):
+    """
+    Render the persistent AI analysis for a document that stays visible in the case documents section.
+    """
+    user_id = get_current_user_id()
+    db_path = st.session_state.get('database_path', 'production_idis.db')
+    context_store = ContextStore(db_path)
+    
+    # Get document details
+    retrieved_doc = context_store.get_document_details_by_id(doc_id, user_id=None)
+    
+    if not retrieved_doc:
+        st.warning("AI analysis not available for this document.")
+        return
+    
+    # Create a container for the AI analysis
+    with st.container(border=True):
+        st.markdown("### 🤖 AI Analysis")
+        
+        # Document Classification
+        if retrieved_doc.get('document_type'):
+            confidence = retrieved_doc.get('classification_confidence', 0)
+            confidence_color = "green" if confidence and confidence > 0.7 else "orange" if confidence and confidence > 0.4 else "red"
+            st.markdown(f"**Document Type:** ::{confidence_color}[{retrieved_doc['document_type']}]")
+            if confidence:
+                st.progress(confidence, f"Confidence: {confidence:.1%}")
+        
+        # Key Information in columns
+        col1, col2 = st.columns(2)
+        with col1:
+            # Smart issuer detection - prioritize AI-extracted data over raw OCR
+            issuer_to_display = None
+            if retrieved_doc.get('extracted_data'):
+                try:
+                    import json
+                    extracted = json.loads(retrieved_doc['extracted_data'])
+                    
+                    # Check for AI-extracted issuer in various locations
+                    if extracted.get('issuer_info', {}).get('organization_name'):
+                        issuer_to_display = extracted['issuer_info']['organization_name']
+                    elif extracted.get('content', {}).get('issuer'):
+                        issuer_to_display = extracted['content']['issuer']
+                    elif extracted.get('sender', {}).get('organization'):
+                        issuer_to_display = extracted['sender']['organization']
+                    elif extracted.get('sender', {}).get('name'):
+                        issuer_to_display = extracted['sender']['name']
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            
+            # Fallback to raw OCR but filter out postal instructions
+            if not issuer_to_display and retrieved_doc.get('issuer_source'):
+                raw_issuer = retrieved_doc['issuer_source']
+                # Filter out common postal/shipping instructions
+                postal_instructions = [
+                    'RETURN SERVICE REQUESTED',
+                    'RETURN RECEIPT REQUESTED', 
+                    'FORWARDING SERVICE REQUESTED',
+                    'ADDRESS SERVICE REQUESTED',
+                    'DO NOT FORWARD',
+                    'PRESORTED FIRST-CLASS'
+                ]
+                if raw_issuer.upper() not in postal_instructions:
+                    issuer_to_display = raw_issuer
+            
+            if issuer_to_display:
+                st.markdown(f"**Issuer:** {issuer_to_display}")
+            
+            # Recipient information
+            if retrieved_doc.get('recipient'):
+                st.markdown(f"**Recipient:** {retrieved_doc['recipient']}")
+        
+        with col2:
+            if retrieved_doc.get('document_dates'):
+                st.markdown(f"**Document Dates:** {retrieved_doc['document_dates']}")
+            if retrieved_doc.get('processing_status'):
+                status_color = "green" if retrieved_doc['processing_status'] == 'filed' else "blue"
+                st.markdown(f"**Status:** ::{status_color}[{retrieved_doc['processing_status']}]")
+        
+        # Human-readable document summary
+        if retrieved_doc.get('extracted_data'):
+            try:
+                import json
+                extracted = json.loads(retrieved_doc['extracted_data'])
+                
+                # Show key financial information
+                if extracted.get('financials'):
+                    financials = extracted['financials']
+                    financial_info = []
+                    
+                    if financials.get('total_amount'):
+                        currency = financials.get('currency', 'USD')
+                        total = financials['total_amount']
+                        financial_info.append(f"Total Amount: ${total:,.2f} {currency}")
+                    
+                    if financial_info:
+                        st.markdown("**Financial Details:** " + " | ".join(financial_info))
+                
+                # Show key dates
+                if extracted.get('key_dates'):
+                    dates = extracted['key_dates']
+                    date_info = []
+                    
+                    if dates.get('primary_date'):
+                        date_type = dates.get('date_type', 'Document Date')
+                        date_info.append(f"{date_type.replace('_', ' ').title()}: {dates['primary_date']}")
+                    
+                    if date_info:
+                        st.markdown("**Important Dates:** " + " | ".join(date_info))
+            
+            except (json.JSONDecodeError, TypeError):
+                pass
+        
+        # Tags display
+        if retrieved_doc.get('tags_extracted'):
+            try:
+                import json
+                tags = json.loads(retrieved_doc['tags_extracted'])
+                if isinstance(tags, list) and tags:
+                    tag_display = " • ".join(tags)
+                    st.markdown(f"**Tags:** {tag_display}")
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+
 def load_application_checklist_with_status_for_case(case_id: str,
                                                     entity_id: int):
     """
@@ -590,6 +714,153 @@ def get_documents_for_case(case_id: str):
         logging.error(f"Error retrieving documents for case {case_id}: {e}")
         return []
 
+def render_persistent_ai_analysis(doc_id: str, case_id: str):
+    """
+    Render persistent AI analysis for a document that stays visible without opening the PDF viewer.
+    """
+    try:
+        db_path = st.session_state.get('database_path', 'production_idis.db')
+        context_store = ContextStore(db_path)
+        retrieved_doc = context_store.get_document_details_by_id(doc_id, user_id=None)
+        
+        if not retrieved_doc:
+            st.error("Could not retrieve document details")
+            return
+        
+        # Container for AI analysis
+        with st.container(border=True):
+            st.markdown("### 🤖 AI Analysis")
+            
+            # Document Classification
+            if retrieved_doc.get('document_type'):
+                confidence = retrieved_doc.get('classification_confidence', 0)
+                confidence_color = "green" if confidence and confidence > 0.7 else "orange" if confidence and confidence > 0.4 else "red"
+                st.markdown(f"**Document Type:** ::{confidence_color}[{retrieved_doc['document_type']}]")
+                if confidence:
+                    st.progress(confidence, f"Confidence: {confidence:.1%}")
+            
+            # Key Information in columns
+            col1, col2 = st.columns(2)
+            with col1:
+                # Enhanced issuer detection with priority to AI-extracted data
+                issuer_to_display = None
+                if retrieved_doc.get('extracted_data'):
+                    try:
+                        import json
+                        extracted = json.loads(retrieved_doc['extracted_data'])
+                        
+                        # Check AI-extracted issuer from multiple sources
+                        if extracted.get('issuer_info', {}).get('organization_name'):
+                            issuer_to_display = extracted['issuer_info']['organization_name']
+                        elif extracted.get('content', {}).get('issuer'):
+                            issuer_to_display = extracted['content']['issuer']
+                        elif extracted.get('sender', {}).get('organization'):
+                            issuer_to_display = extracted['sender']['organization']
+                        elif extracted.get('sender', {}).get('name'):
+                            issuer_to_display = extracted['sender']['name']
+                        elif extracted.get('issuer'):
+                            issuer_to_display = extracted['issuer']
+                        
+                        # Check for issuer in the summary text
+                        if not issuer_to_display and extracted.get('content', {}).get('summary'):
+                            summary = extracted['content']['summary']
+                            # Look for "FNB Alaska" or similar patterns in the summary
+                            if "FNB Alaska" in summary:
+                                issuer_to_display = "FNB Alaska"
+                            elif "Alaska" in summary and "bank" in summary.lower():
+                                # Extract bank name from summary
+                                words = summary.split()
+                                for i, word in enumerate(words):
+                                    if "alaska" in word.lower() and i > 0:
+                                        prev_word = words[i-1]
+                                        if any(bank_term in prev_word.lower() for bank_term in ["fnb", "bank", "first"]):
+                                            issuer_to_display = f"{prev_word} {word}"
+                                            break
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+                
+                # Fallback to raw OCR but filter out postal instructions
+                if not issuer_to_display and retrieved_doc.get('issuer_source'):
+                    raw_issuer = retrieved_doc['issuer_source']
+                    postal_instructions = [
+                        'RETURN SERVICE REQUESTED',
+                        'RETURN RECEIPT REQUESTED', 
+                        'FORWARDING SERVICE REQUESTED',
+                        'ADDRESS SERVICE REQUESTED',
+                        'DO NOT FORWARD',
+                        'PRESORTED FIRST-CLASS'
+                    ]
+                    if raw_issuer.upper() not in postal_instructions:
+                        issuer_to_display = raw_issuer
+                
+                if issuer_to_display:
+                    st.markdown(f"**Issuer:** {issuer_to_display}")
+                
+                # Recipient information
+                if retrieved_doc.get('recipient'):
+                    st.markdown(f"**Recipient:** {retrieved_doc['recipient']}")
+            
+            with col2:
+                if retrieved_doc.get('document_dates'):
+                    st.markdown(f"**Document Dates:** {retrieved_doc['document_dates']}")
+                if retrieved_doc.get('processing_status'):
+                    status_color = "green" if retrieved_doc['processing_status'] == 'filed' else "blue"
+                    st.markdown(f"**Status:** ::{status_color}[{retrieved_doc['processing_status']}]")
+            
+            # Human-readable summary from AI analysis
+            if retrieved_doc.get('extracted_data'):
+                try:
+                    import json
+                    extracted = json.loads(retrieved_doc['extracted_data'])
+                    
+                    # Show the AI-generated summary
+                    if extracted.get('content', {}).get('summary'):
+                        st.markdown("**AI Summary:**")
+                        st.markdown(extracted['content']['summary'])
+                    
+                    # Financial Information (if available)
+                    if extracted.get('financials'):
+                        financials = extracted['financials']
+                        financial_info = []
+                        
+                        if financials.get('total_amount'):
+                            currency = financials.get('currency', 'USD')
+                            total = financials['total_amount']
+                            financial_info.append(f"Total Amount: ${total:,.2f} {currency}")
+                        
+                        if financial_info:
+                            st.markdown("**Financial Details:** " + " | ".join(financial_info))
+                    
+                    # Key Dates (if available)
+                    if extracted.get('key_dates'):
+                        dates = extracted['key_dates']
+                        date_info = []
+                        
+                        if dates.get('primary_date'):
+                            date_type = dates.get('date_type', 'Document Date')
+                            date_info.append(f"{date_type.replace('_', ' ').title()}: {dates['primary_date']}")
+                        
+                        if date_info:
+                            st.markdown("**Important Dates:** " + " | ".join(date_info))
+                
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            
+            # Tags (if available)
+            if retrieved_doc.get('tags_extracted'):
+                try:
+                    import json
+                    tags = json.loads(retrieved_doc['tags_extracted'])
+                    if isinstance(tags, list) and tags:
+                        tag_display = " • ".join(tags)
+                        st.markdown(f"**Tags:** {tag_display}")
+                except (json.JSONDecodeError, TypeError):
+                    pass
+    
+    except Exception as e:
+        st.error(f"Error rendering AI analysis: {e}")
+        logging.error(f"Error rendering AI analysis for doc {doc_id}: {e}")
+
 
 def render_case_detail_view():
     """
@@ -634,11 +905,12 @@ def render_case_detail_view():
         st.info("No documents have been assigned to this case yet.")
     else:
         for index, doc in enumerate(case_documents):
+            # Document header with filename and actions
             col1, col2, col3 = st.columns([3, 1, 1])
             with col1:
-                st.write(doc['filename'])
+                st.markdown(f"**📄 {doc['filename']}**")
             with col2:
-                if st.button("👁️ View in App", key=f"view_doc_{case_id}_{doc['id']}_{index}"):
+                if st.button("👁️ View PDF", key=f"view_doc_{case_id}_{doc['id']}_{index}"):
                     st.session_state.document_to_view = doc['id']
             with col3:
                 # Get document details for download
@@ -660,6 +932,12 @@ def render_case_detail_view():
                         )
                     except (FileNotFoundError, TypeError):
                         st.caption("File not available")
+            
+            # Persistent AI Analysis - always visible
+            render_persistent_ai_analysis(doc['id'], case_id)
+            
+            # Add spacing between documents
+            st.markdown("---")
 
     if 'document_to_view' in st.session_state and st.session_state.document_to_view:
         doc_id = st.session_state.document_to_view
@@ -682,9 +960,9 @@ def render_case_detail_view():
             st.rerun()
             return
 
-        with st.expander("📄 Document Analysis", expanded=True):
+        with st.expander("📄 PDF Document Viewer", expanded=True):
             # Prominent close button at the top
-            if st.button("✕ Close Document Viewer", type="primary", use_container_width=True):
+            if st.button("✕ Close PDF Viewer", type="primary", use_container_width=True):
                 st.session_state.document_to_view = None
                 st.rerun()
             
@@ -770,9 +1048,11 @@ def render_case_detail_view():
                     st.info("Document file not found on disk.")
                 
                 st.markdown("---")
+                st.info("💡 AI Analysis is now shown persistently above. This viewer is for the original document only.")
                 
-                # AI Analysis Section (Emphasized)
-                st.markdown("## 🤖 AI Analysis")
+                # Control buttons (only refresh now, close button is at top)
+                if st.button("🔄 Refresh Document", use_container_width=True):
+                    st.rerun()
                 
                 # Document Classification
                 if retrieved_doc.get('document_type'):
