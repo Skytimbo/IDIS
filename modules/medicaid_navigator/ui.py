@@ -792,4 +792,13 @@ def render_navigator_ui():
 
     if st.session_state.medicaid_view == 'home':
         render_home_page()
-    elif st.session_state.medicaid_view ==
+    elif st.session_state.medicaid_view == 'active_cases':
+        render_active_cases_view()
+    elif st.session_state.medicaid_view == 'case_detail':
+        render_case_detail_view()
+    elif st.session_state.medicaid_view == 'new_application':
+        render_start_new_application()
+    else:
+        st.error(f"Unknown view: {st.session_state.medicaid_view}")
+        st.session_state.medicaid_view = 'home'
+        st.rerun()
