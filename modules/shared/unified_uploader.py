@@ -39,27 +39,27 @@ def render_unified_uploader(
     if file_types is None:
         file_types = ['pdf', 'png', 'jpg', 'jpeg', 'txt', 'docx']
     
-    # Render the upload interface
+    # Render the upload interface - EXPANDED BY DEFAULT
     st.markdown("---")
-    with st.expander(f"➕ {title}"):
-        uploaded_files = st.file_uploader(
-            description,
-            accept_multiple_files=accept_multiple,
-            type=file_types
-        )
+    st.subheader(f"➕ {title}")
+    uploaded_files = st.file_uploader(
+        description,
+        accept_multiple_files=accept_multiple,
+        type=file_types
+    )
+    
+    if uploaded_files:
+        # Show uploaded files
+        if accept_multiple:
+            st.success(f"{len(uploaded_files)} file(s) uploaded successfully. Ready for processing.")
+            for uploaded_file in uploaded_files:
+                st.write(f"- {uploaded_file.name}")
+        else:
+            st.success(f"File '{uploaded_files.name}' uploaded successfully. Ready for processing.")
         
-        if uploaded_files:
-            # Show uploaded files
-            if accept_multiple:
-                st.success(f"{len(uploaded_files)} file(s) uploaded successfully. Ready for processing.")
-                for uploaded_file in uploaded_files:
-                    st.write(f"- {uploaded_file.name}")
-            else:
-                st.success(f"File '{uploaded_files.name}' uploaded successfully. Ready for processing.")
-            
-            # Process button
-            if st.button(f"✨ {button_text}", type="primary"):
-                _process_uploaded_files(uploaded_files, context, accept_multiple)
+        # Process button
+        if st.button(f"✨ {button_text}", type="primary"):
+            _process_uploaded_files(uploaded_files, context, accept_multiple)
 
 
 def _process_uploaded_files(uploaded_files, context: str, accept_multiple: bool) -> None:

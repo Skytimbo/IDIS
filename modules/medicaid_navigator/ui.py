@@ -487,6 +487,26 @@ def render_home_page():
         f"**Welcome, {current_user}** - Your comprehensive case management overview"
     )
 
+    # Quick Actions Section - MOVED TO TOP
+    st.subheader("🚀 Quick Actions")
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button("📋 View All Active Cases",
+                      type="primary",
+                      use_container_width=True):
+            st.session_state.medicaid_view = 'active_cases'
+            st.rerun()
+
+    with col2:
+        if st.button("➕ Start New Application",
+                      type="secondary",
+                      use_container_width=True):
+            st.session_state.medicaid_view = 'new_application'
+            st.rerun()
+
+    st.markdown("---")
+
     # KPIs Section
     st.subheader("📊 Key Performance Indicators")
     col1, col2, col3 = st.columns(3)
@@ -507,26 +527,6 @@ def render_home_page():
         'Count': [25, 10, 5, 57]
     })
     st.bar_chart(status_data.set_index('Status'))
-
-    st.markdown("---")
-
-    # Action Buttons Section
-    st.subheader("🚀 Quick Actions")
-    col1, col2 = st.columns(2)
-
-    with col1:
-        if st.button("📋 View All Active Cases",
-                      type="primary",
-                      use_container_width=True):
-            st.session_state.medicaid_view = 'active_cases'
-            st.rerun()
-
-    with col2:
-        if st.button("➕ Start New Application",
-                      type="secondary",
-                      use_container_width=True):
-            st.session_state.medicaid_view = 'new_application'
-            st.rerun()
 
 
 def render_active_cases_view():
@@ -631,12 +631,32 @@ def render_case_detail_view():
         st.info("No documents have been assigned to this case yet.")
     else:
         for index, doc in enumerate(case_documents):
-            col1, col2 = st.columns([3, 1])
+            col1, col2, col3 = st.columns([3, 1, 1])
             with col1:
                 st.write(doc['filename'])
             with col2:
-                if st.button("View Document", key=f"view_doc_{case_id}_{doc['id']}_{index}"):
+                if st.button("👁️ View in App", key=f"view_doc_{case_id}_{doc['id']}_{index}"):
                     st.session_state.document_to_view = doc['id']
+            with col3:
+                # Get document details for download
+                user_id = get_current_user_id()
+                db_path = st.session_state.get('database_path', 'production_idis.db')
+                context_store = ContextStore(db_path)
+                retrieved_doc = context_store.get_document_details_by_id(doc['id'], user_id=None)
+                
+                if retrieved_doc and retrieved_doc.get('filed_path'):
+                    try:
+                        with open(retrieved_doc['filed_path'], 'rb') as f:
+                            file_data = f.read()
+                        st.download_button(
+                            label="📥 Download",
+                            data=file_data,
+                            file_name=retrieved_doc['filename'],
+                            mime=retrieved_doc.get('content_type', 'application/octet-stream'),
+                            key=f"download_doc_{case_id}_{doc['id']}_{index}"
+                        )
+                    except (FileNotFoundError, TypeError):
+                        st.caption("File not available")
 
     if 'document_to_view' in st.session_state and st.session_state.document_to_view:
         doc_id = st.session_state.document_to_view
@@ -670,6 +690,59 @@ def render_case_detail_view():
                                 mime=retrieved_doc['content_type'])
                         except (FileNotFoundError, TypeError):
                             st.caption("Original file not available")
+                
+                # In-app document viewing
+                if retrieved_doc.get('filed_path'):
+                    st.markdown("---")
+                    st.markdown("## 📄 Document Preview")
+                    
+                    # Check if it's a PDF file
+                    if retrieved_doc['filename'].lower().endswith('.pdf'):
+                        try:
+                            with open(retrieved_doc['filed_path'], 'rb') as f:
+                                file_data = f.read()
+                            
+                            # Display PDF inline using base64 encoding
+                            import base64
+                            base64_pdf = base64.b64encode(file_data).decode('utf-8')
+                            
+                            # Create embedded PDF viewer
+                            pdf_display = f"""
+                            <iframe src="data:application/pdf;base64,{base64_pdf}" 
+                                width="100%" height="600px" type="application/pdf">
+                                <p>Your browser does not support PDFs. 
+                                <a href="data:application/pdf;base64,{base64_pdf}">Download the PDF</a>.</p>
+                            </iframe>
+                            """
+                            st.markdown(pdf_display, unsafe_allow_html=True)
+                            
+                        except Exception as e:
+                            st.error(f"Could not display PDF: {str(e)}")
+                            st.info("Use the 'Download Original' button to view the document.")
+                    
+                    # Handle image files
+                    elif retrieved_doc['filename'].lower().endswith(('.png', '.jpg', '.jpeg')):
+                        try:
+                            st.image(retrieved_doc['filed_path'], caption=retrieved_doc['filename'], use_column_width=True)
+                        except Exception as e:
+                            st.error(f"Could not display image: {str(e)}")
+                            st.info("Use the 'Download Original' button to view the document.")
+                    
+                    # Handle text files
+                    elif retrieved_doc['filename'].lower().endswith(('.txt', '.md')):
+                        try:
+                            with open(retrieved_doc['filed_path'], 'r', encoding='utf-8') as f:
+                                text_content = f.read()
+                            st.text_area("Document Content", value=text_content, height=400, disabled=True)
+                        except Exception as e:
+                            st.error(f"Could not display text file: {str(e)}")
+                            st.info("Use the 'Download Original' button to view the document.")
+                    
+                    # Unsupported file types
+                    else:
+                        st.info("In-app preview not available for this file type. Use the 'Download Original' button to view the document.")
+                else:
+                    st.info("Document file not found on disk.")
                 
                 st.markdown("---")
                 
@@ -818,7 +891,7 @@ def render_case_detail_view():
 
     st.header("3. Upload & Assign Documents")
 
-    # Make the file uploader clearly visible by default
+    # Upload interface - now expanded by default with clear container
     with st.container(border=True):
         from modules.shared.unified_uploader import render_unified_uploader
         render_unified_uploader(

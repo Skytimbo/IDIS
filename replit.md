@@ -117,6 +117,23 @@ The application is containerized and designed for a one-step launch.
   - Enhanced tags display with bullet-point format for better readability
 - **Impact**: Professional, business-friendly interface with no technical jargon and zero duplicate key errors.
 
+### Professional UX Improvements (2025-07-17)
+- **Issues**:
+  - Document viewer only had download functionality
+  - Quick Actions buried at bottom of dashboard
+  - Upload interface hidden behind expandable section
+- **Root Causes**:
+  - Users needed both in-app viewing and download options
+  - Most-used functions not prominently positioned
+  - Upload workflow required extra clicks to access
+- **Fixes**:
+  - Added in-app document viewing with PDF inline display, image preview, and text viewing
+  - Moved Quick Actions section to top of dashboard (above KPI metrics)
+  - Made upload interface expanded by default, removing clickable expansion box
+  - Enhanced Case Documents section with both "View in App" and "Download" buttons
+  - Added comprehensive file type support for in-app viewing (PDF, images, text)
+- **Impact**: Professional UX that separates good software from great software - immediate access to key functions, dual viewing options, and intuitive upload workflow.
+
 ## 8. Product Roadmap
 
 ### Phase 1: UI Polish & Core Workflow Hardening (Current Focus)
