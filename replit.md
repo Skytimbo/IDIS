@@ -134,6 +134,23 @@ The application is containerized and designed for a one-step launch.
   - Added comprehensive file type support for in-app viewing (PDF, images, text)
 - **Impact**: Professional UX that separates good software from great software - immediate access to key functions, dual viewing options, and intuitive upload workflow.
 
+### Critical Session State & Document Viewer Bug Fixes (2025-07-17)
+- **Issues**:
+  - Document viewer had no close button, causing permanent interface clutter
+  - Session state bleeding between cases - documents from one case appearing in different applications
+  - Data integrity risk from cross-case document contamination
+- **Root Causes**:
+  - Missing close button functionality in document viewer
+  - Session state (`document_to_view`) not cleared during case navigation
+  - No validation to ensure viewed documents belong to current case
+- **Fixes**:
+  - Added prominent "✕ Close Document Viewer" button with proper state clearing
+  - Implemented comprehensive session state cleanup across all navigation paths
+  - Added data integrity check to verify document belongs to current case
+  - Session state cleared when: navigating to home, switching cases, creating new applications, viewing active cases
+  - Added database validation to prevent cross-case document viewing
+- **Impact**: Resolved critical data integrity issues that could cause serious confusion in real case management scenarios. Clean separation between cases ensures professional reliability.
+
 ## 8. Product Roadmap
 
 ### Phase 1: UI Polish & Core Workflow Hardening (Current Focus)

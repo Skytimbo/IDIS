@@ -560,6 +560,9 @@ def render_active_cases_view():
                 if st.button(f"📝 View Case Details",
                              key=f"view_case_{case['case_id']}",
                              use_container_width=True):
+                    # Clear document viewer state when switching to a different case
+                    if 'document_to_view' in st.session_state:
+                        del st.session_state.document_to_view
                     st.session_state.current_case_id = case['case_id']
                     st.session_state.current_entity_id = case['entity_id']
                     st.session_state.medicaid_view = 'case_detail'
@@ -663,6 +666,21 @@ def render_case_detail_view():
         user_id = get_current_user_id()
         db_path = st.session_state.get('database_path', 'production_idis.db')
         context_store = ContextStore(db_path)
+
+        # Verify that the document belongs to the current case (data integrity check)
+        cursor = context_store.conn.cursor()
+        cursor.execute("""
+            SELECT COUNT(*) FROM case_documents cd
+            JOIN documents d ON cd.document_id = d.id
+            WHERE d.id = ? AND cd.case_id = ?
+        """, (doc_id, case_id))
+        doc_belongs_to_case = cursor.fetchone()[0] > 0
+
+        if not doc_belongs_to_case:
+            st.error("🚨 Data integrity error: Document does not belong to this case. Clearing viewer.")
+            st.session_state.document_to_view = None
+            st.rerun()
+            return
 
         with st.expander("📄 Document Analysis", expanded=True):
             # TODO: Add OAuth-based user validation here when authentication is implemented
@@ -880,7 +898,7 @@ def render_case_detail_view():
                     if st.button("🔄 Refresh Analysis"):
                         st.rerun()
                 with col2:
-                    if st.button("❌ Close Viewer"):
+                    if st.button("✕ Close Document Viewer", type="secondary"):
                         st.session_state.document_to_view = None
                         st.rerun()
                         
@@ -933,6 +951,9 @@ def render_start_new_application():
                         case_id = create_new_case(entity_id, current_user)
                         if case_id:
                             st.success(f"✅ Created new case '{case_id}'")
+                            # Clear document viewer state when creating new case
+                            if 'document_to_view' in st.session_state:
+                                del st.session_state.document_to_view
                             st.session_state.current_case_id = case_id
                             st.session_state.current_entity_id = entity_id
                             st.session_state.medicaid_view = 'case_detail'
@@ -976,6 +997,9 @@ def render_start_new_application():
                     case_id = create_new_case(selected_entity_id, current_user)
                     if case_id:
                         st.success(f"✅ Created new case '{case_id}'")
+                        # Clear document viewer state when creating new case
+                        if 'document_to_view' in st.session_state:
+                            del st.session_state.document_to_view
                         st.session_state.current_case_id = case_id
                         st.session_state.current_entity_id = selected_entity_id
                         st.session_state.medicaid_view = 'case_detail'
@@ -1002,17 +1026,29 @@ def render_navigator_ui():
     # Add a "Back to Home" button on all pages except the home page
     if st.session_state.medicaid_view != 'home':
         if st.sidebar.button("🏠 Back to Home Dashboard"):
+            # Clear document viewer state when navigating away from case details
+            if 'document_to_view' in st.session_state:
+                del st.session_state.document_to_view
             st.session_state.medicaid_view = 'home'
             st.rerun()
         st.sidebar.markdown("---")
 
     if st.session_state.medicaid_view == 'home':
+        # Clear document viewer state when returning to home
+        if 'document_to_view' in st.session_state:
+            del st.session_state.document_to_view
         render_home_page()
     elif st.session_state.medicaid_view == 'active_cases':
+        # Clear document viewer state when viewing active cases
+        if 'document_to_view' in st.session_state:
+            del st.session_state.document_to_view
         render_active_cases_view()
     elif st.session_state.medicaid_view == 'case_detail':
         render_case_detail_view()
     elif st.session_state.medicaid_view == 'new_application':
+        # Clear document viewer state when starting new application
+        if 'document_to_view' in st.session_state:
+            del st.session_state.document_to_view
         render_start_new_application()
     else:
         st.error(f"Unknown view: {st.session_state.medicaid_view}")
