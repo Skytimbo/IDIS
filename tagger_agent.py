@@ -605,7 +605,7 @@ class TaggerAgent:
                 self.logger.info(f"TAGGER: Processing document_id: {document_id}, filename: {file_name}")
                 self.logger.info(f"TAGGER: Attempting to find file for doc {document_id} at path: {current_file_path}")
                 
-                # Attempt file movement if the path exists and is a file
+                # Check if the file exists at the database path
                 if current_file_path and os.path.isfile(current_file_path):
                     self.logger.info(f"TAGGER: Found file at: {current_file_path}")
                     filing_successful = self._safe_file_move(current_file_path, new_filed_path)
@@ -616,9 +616,29 @@ class TaggerAgent:
                         new_filed_path = None
                         filing_successful = False
                 else:
-                    # This block now means the file is truly lost or the DB path is wrong
-                    self.logger.error(f"CRITICAL: File not found at the path specified in database: {current_file_path}")
-                    filing_successful = False
+                    # File not found at database path - check common temp directories for UI uploads
+                    temp_directories = [
+                        "data/temp_medicaid_upload",
+                        "data/temp_general_upload",
+                        "data/temp_debug"
+                    ]
+                    
+                    file_found = False
+                    for temp_dir in temp_directories:
+                        alternative_path = os.path.join(temp_dir, file_name)
+                        if os.path.isfile(alternative_path):
+                            self.logger.info(f"TAGGER: Found file in temp directory: {alternative_path}")
+                            filing_successful = self._safe_file_move(alternative_path, new_filed_path)
+                            if filing_successful:
+                                self.logger.info(f"Successfully moved document {document_id} from {alternative_path} to {new_filed_path}")
+                                file_found = True
+                                break
+                            else:
+                                self.logger.error(f"Failed to safely move document {document_id} from {alternative_path}")
+                    
+                    if not file_found:
+                        self.logger.error(f"CRITICAL: File not found at database path or any temp directories: {current_file_path}")
+                        filing_successful = False
             
             except Exception as e:
                 self.logger.error(f"Error filing document {document_id}: {str(e)}")

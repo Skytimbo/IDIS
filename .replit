@@ -46,6 +46,10 @@ args = "Test Search Input Fixed"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
+args = "FastAPI Server"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
 args = "Test Dashboard"
 
 [[workflows.workflow]]
@@ -115,6 +119,15 @@ args = "streamlit run test_search_input.py --server.port 5001 --server.address 0
 waitForPort = 5001
 
 [[workflows.workflow]]
+name = "FastAPI Server"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd api && python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000"
+waitForPort = 8000
+
+[[workflows.workflow]]
 name = "Test Dashboard"
 author = "agent"
 
@@ -122,6 +135,7 @@ author = "agent"
 task = "shell.exec"
 args = "STREAMLIT_SERVER_HEADLESS=true streamlit run app.py --server.port 5000 --server.address 0.0.0.0 -- --database-path production_idis.db --archive-path data/idis_archive"
 waitForPort = 5000
+
 
 [deployment]
 run = ["sh", "-c", "python -m unittest discover tests"]
@@ -134,6 +148,10 @@ externalPort = 80
 [[ports]]
 localPort = 5001
 externalPort = 3001
+
+[[ports]]
+localPort = 8000
+externalPort = 8000
 
 [[ports]]
 localPort = 8501
