@@ -12,6 +12,7 @@ import logging
 from typing import List, Optional
 from context_store import ContextStore
 from unified_ingestion_agent import UnifiedIngestionAgent
+from tagger_agent import TaggerAgent
 
 
 def render_unified_uploader(
@@ -38,27 +39,27 @@ def render_unified_uploader(
     if file_types is None:
         file_types = ['pdf', 'png', 'jpg', 'jpeg', 'txt', 'docx']
     
-    # Render the upload interface
+    # Render the upload interface - EXPANDED BY DEFAULT
     st.markdown("---")
-    with st.expander(f"➕ {title}"):
-        uploaded_files = st.file_uploader(
-            description,
-            accept_multiple_files=accept_multiple,
-            type=file_types
-        )
+    st.subheader(f"➕ {title}")
+    uploaded_files = st.file_uploader(
+        description,
+        accept_multiple_files=accept_multiple,
+        type=file_types
+    )
+    
+    if uploaded_files:
+        # Show uploaded files
+        if accept_multiple:
+            st.success(f"{len(uploaded_files)} file(s) uploaded successfully. Ready for processing.")
+            for uploaded_file in uploaded_files:
+                st.write(f"- {uploaded_file.name}")
+        else:
+            st.success(f"File '{uploaded_files.name}' uploaded successfully. Ready for processing.")
         
-        if uploaded_files:
-            # Show uploaded files
-            if accept_multiple:
-                st.success(f"{len(uploaded_files)} file(s) uploaded successfully. Ready for processing.")
-                for uploaded_file in uploaded_files:
-                    st.write(f"- {uploaded_file.name}")
-            else:
-                st.success(f"File '{uploaded_files.name}' uploaded successfully. Ready for processing.")
-            
-            # Process button
-            if st.button(f"✨ {button_text}", type="primary"):
-                _process_uploaded_files(uploaded_files, context, accept_multiple)
+        # Process button
+        if st.button(f"✨ {button_text}", type="primary"):
+            _process_uploaded_files(uploaded_files, context, accept_multiple)
 
 
 def _process_uploaded_files(uploaded_files, context: str, accept_multiple: bool) -> None:
@@ -87,6 +88,12 @@ def _process_uploaded_files(uploaded_files, context: str, accept_multiple: bool)
         context_store=context_store,
         watch_folder=temp_folder,
         holding_folder=holding_folder
+    )
+    
+    # Initialize the tagger agent for archiving
+    tagger_agent = TaggerAgent(
+        context_store=context_store,
+        base_filed_folder=os.path.join("data", "archive")
     )
     
     with st.spinner("Processing documents through AI pipeline..."):
@@ -121,21 +128,47 @@ def _process_uploaded_files(uploaded_files, context: str, accept_multiple: bool)
                     st.write(f"✅ Successfully processed {uploaded_file.name}")
                     processed_count += 1
                     
+                    # Complete the archiving pipeline by running TaggerAgent
+                    archiving_success = False
+                    try:
+                        # Process documents that are ready for tagging and filing
+                        filed_count, failed_count = tagger_agent.process_documents_for_tagging_and_filing(
+                            status_to_process="processing_complete",
+                            new_status_after_filing="filed_and_tagged"
+                        )
+                        
+                        if filed_count > 0:
+                            st.write(f"📁 Successfully archived {filed_count} document(s)")
+                            archiving_success = True
+                        elif failed_count > 0:
+                            st.write(f"⚠️  Document processed but archiving failed for {failed_count} document(s)")
+                    
+                    except Exception as e:
+                        logging.error(f"Error during archiving: {e}")
+                        st.write(f"⚠️  Document processed but archiving failed: {str(e)}")
 
                     # Store processed document info in session state for assignment
                     if context == "medicaid":
                         _store_processed_document(uploaded_file.name, context_store)
+                        # Create case-document association for Medicaid uploads
+                        _create_case_document_association(uploaded_file.name, context_store)
                     
-
                     # Context-specific success actions
                     _handle_success_context(context, uploaded_file.name)
+                    
+                    # Clean up temporary file ONLY after successful archiving
+                    if archiving_success and os.path.exists(temp_path):
+                        os.remove(temp_path)
+                        logging.info(f"Cleaned up temp file: {temp_path}")
+                    elif os.path.exists(temp_path):
+                        logging.warning(f"Keeping temp file due to archiving failure: {temp_path}")
                 else:
                     st.write(f"❌ Failed to process {uploaded_file.name}")
                     failed_count += 1
-                
-                # Clean up temporary file
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
+                    
+                    # Clean up temporary file on processing failure
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
                     
             except Exception as e:
                 st.write(f"❌ Error processing {uploaded_file.name}: {str(e)}")
@@ -165,8 +198,11 @@ def _get_context_parameters(context: str) -> tuple:
     """
     
     if context == "medicaid":
-        # Medicaid Navigator uses specific IDs for tracking
-        return (1, 1)
+        # Medicaid Navigator uses active case's entity ID
+        entity_id = st.session_state.get('current_entity_id', 1)
+        session_id = 1  # Default session ID
+        logging.info(f"Medicaid context: Using entity_id={entity_id}, session_id={session_id}")
+        return (entity_id, session_id)
     elif context == "general":
         # General document search uses default IDs
         return (1, 1)
@@ -190,6 +226,61 @@ def _handle_success_context(context: str, filename: str) -> None:
     elif context == "general":
         # Future: Update general document index, trigger search indexing
         logging.info(f"General document processed: {filename}")
+
+def _create_case_document_association(filename: str, context_store: ContextStore) -> None:
+    """
+    Create a case-document association for Medicaid uploads.
+    
+    Args:
+        filename: Name of the processed file
+        context_store: Database connection
+    """
+    try:
+        # Get the current case and entity IDs from session state
+        case_id = st.session_state.get('current_case_id')
+        entity_id = st.session_state.get('current_entity_id')
+        
+        if not case_id or not entity_id:
+            logging.warning(f"No current case or entity ID found for document {filename}")
+            return
+        
+        # Get the document ID for the uploaded file
+        cursor = context_store.conn.cursor()
+        cursor.execute("""
+            SELECT id FROM documents 
+            WHERE file_name = ? AND entity_id = ?
+            ORDER BY upload_timestamp DESC 
+            LIMIT 1
+        """, (filename, entity_id))
+        
+        result = cursor.fetchone()
+        if not result:
+            logging.error(f"Could not find document ID for {filename} with entity {entity_id}")
+            return
+        
+        document_id = result[0]
+        
+        # Check if association already exists
+        cursor.execute("""
+            SELECT id FROM case_documents 
+            WHERE case_id = ? AND document_id = ?
+        """, (case_id, document_id))
+        
+        if cursor.fetchone():
+            logging.info(f"Case-document association already exists for {filename}")
+            return
+        
+        # Create the case-document association
+        cursor.execute("""
+            INSERT INTO case_documents (case_id, entity_id, document_id, status, user_id, created_at, updated_at)
+            VALUES (?, ?, ?, 'Pending', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        """, (case_id, entity_id, document_id, st.session_state.get('current_user_id', 'user_a')))
+        
+        context_store.conn.commit()
+        logging.info(f"Created case-document association: Case={case_id}, Document={document_id} ({filename})")
+        
+    except Exception as e:
+        logging.error(f"Error creating case-document association for {filename}: {e}")
 
 def _store_processed_document(filename: str, context_store: ContextStore) -> None:
     """

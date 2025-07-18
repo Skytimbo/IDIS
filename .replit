@@ -34,15 +34,19 @@ args = "Run Watcher Service Demo"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
-args = "Run Main App (Correct Paths)"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
 args = "Production Watcher Service"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
 args = "Test Search Input Fixed"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "FastAPI Server"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Run Demo App"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
@@ -89,15 +93,6 @@ task = "shell.exec"
 args = "python watcher_service.py --watch-folder ./demo_watch --inbox-folder ./demo_inbox --holding-folder ./demo_holding --archive-folder ./demo_archive --cover-sheets-folder ./demo_coversheets --db-path ./watcher_demo.db --openai"
 
 [[workflows.workflow]]
-name = "Run Main App (Correct Paths)"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "STREAMLIT_SERVER_HEADLESS=true streamlit run app.py --server.port 5000 --server.address 0.0.0.0 -- --database-path production_idis.db --archive-path data/idis_archive"
-waitForPort = 5000
-
-[[workflows.workflow]]
 name = "Production Watcher Service"
 author = "agent"
 
@@ -113,6 +108,24 @@ author = "agent"
 task = "shell.exec"
 args = "streamlit run test_search_input.py --server.port 5001 --server.address 0.0.0.0"
 waitForPort = 5001
+
+[[workflows.workflow]]
+name = "FastAPI Server"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd api && python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000"
+waitForPort = 8000
+
+[[workflows.workflow]]
+name = "Run Demo App"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "STREAMLIT_SERVER_HEADLESS=true streamlit run app.py --server.port 5000 --server.address 0.0.0.0 -- --database-path demo_idis.db --archive-path data/demo_archive"
+waitForPort = 5000
 
 [[workflows.workflow]]
 name = "Test Dashboard"
@@ -134,6 +147,10 @@ externalPort = 80
 [[ports]]
 localPort = 5001
 externalPort = 3001
+
+[[ports]]
+localPort = 8000
+externalPort = 8000
 
 [[ports]]
 localPort = 8501

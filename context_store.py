@@ -169,5 +169,117 @@ class ContextStore:
         self.conn.commit()
         return cur.lastrowid
 
-    # ... [Other existing methods like get_document, update_document_fields, etc.]
-    # (Leaving them out for brevity, but they would be here in the final file)
+    def get_documents_by_processing_status(self, processing_status: str) -> List[Dict]:
+        """
+        Get documents filtered by processing status.
+        
+        Args:
+            processing_status: The processing status to filter by
+            
+        Returns:
+            List of document dictionaries
+        """
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT id as document_id, file_name, processing_status, full_text, 
+                   original_watchfolder_path, entity_id, document_type
+            FROM documents 
+            WHERE processing_status = ?
+            ORDER BY upload_timestamp DESC
+        """, (processing_status,))
+        
+        columns = [desc[0] for desc in cursor.description]
+        results = []
+        
+        for row in cursor.fetchall():
+            doc_dict = dict(zip(columns, row))
+            results.append(doc_dict)
+        
+        return results
+    
+    def get_entity(self, entity_id: int) -> Optional[Dict]:
+        """Get entity by ID."""
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT * FROM entities WHERE id = ?", (entity_id,))
+        row = cursor.fetchone()
+        return dict(row) if row else None
+    
+    def update_document_fields(self, document_id: int, update_data: Dict) -> None:
+        """Update document fields."""
+        # Build dynamic update query
+        fields = []
+        values = []
+        for field, value in update_data.items():
+            fields.append(f"{field} = ?")
+            values.append(value)
+        
+        values.append(document_id)  # Add document_id for WHERE clause
+        
+        query = f"UPDATE documents SET {', '.join(fields)} WHERE id = ?"
+        cursor = self.conn.cursor()
+        cursor.execute(query, values)
+        self.conn.commit()
+    
+    def add_audit_log_entry(self, user_id: str, event_type: str, event_name: str, status: str = "success", resource_type: str = None, resource_id: int = None, details: str = "", action: str = None) -> int:
+        """Add an audit log entry."""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            INSERT INTO audit_trail (user_id, event_type, event_name, status, resource_type, resource_id, details, timestamp)
+            VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        """, (user_id, event_type, event_name, status, resource_type, str(resource_id) if resource_id else None, details))
+        self.conn.commit()
+        return cursor.lastrowid
+    
+    def get_document_details_by_id(self, document_id: int, user_id: str = None) -> dict | None:
+        """
+        Retrieves comprehensive document details by ID (bypassing user validation for MVP demo).
+        TODO: Add OAuth-based user validation when authentication is implemented
+        """
+        try:
+            import logging
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT 
+                    file_name, 
+                    original_file_type,
+                    filed_path,
+                    full_text,
+                    document_type,
+                    classification_confidence,
+                    issuer_source,
+                    recipient,
+                    document_dates,
+                    tags_extracted,
+                    extracted_data,
+                    processing_status,
+                    upload_timestamp
+                FROM documents 
+                WHERE id = ?
+            """, (document_id,))
+            doc = cursor.fetchone()
+            if doc:
+                return {
+                    "filename": doc[0],
+                    "original_file_type": doc[1],
+                    "filed_path": doc[2],
+                    "full_text": doc[3],
+                    "document_type": doc[4],
+                    "classification_confidence": doc[5],
+                    "issuer_source": doc[6],
+                    "recipient": doc[7],
+                    "document_dates": doc[8],
+                    "tags_extracted": doc[9],
+                    "extracted_data": doc[10],
+                    "processing_status": doc[11],
+                    "upload_timestamp": doc[12],
+                    "content_type": doc[1] if doc[1] else "application/pdf"
+                }
+            return None
+        except Exception as e:
+            import logging
+            logging.error(f"Error retrieving document {document_id}: {e}")
+            return None
+    
+    def close(self):
+        """Close the database connection."""
+        self.conn.close()
