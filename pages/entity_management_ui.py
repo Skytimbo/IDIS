@@ -60,7 +60,7 @@ def render_entity_management_page():
                     entity_id = context_store.add_entity({'entity_name': entity_name.strip()})
                     st.success(f"✅ Successfully added entity: '{entity_name}' (ID: {entity_id})")
                     # Rerun to refresh the entity list
-                    st.experimental_rerun()
+                    st.rerun()
                 except Exception as e:
                     st.error(f"❌ Error adding entity: {str(e)}")
             elif submitted:

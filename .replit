@@ -48,6 +48,10 @@ args = "FastAPI Server"
 task = "workflow.run"
 args = "Run Demo App"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Test Dashboard"
+
 [[workflows.workflow]]
 name = "Run Context Store Tests"
 author = "agent"
@@ -121,6 +125,15 @@ author = "agent"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "STREAMLIT_SERVER_HEADLESS=true streamlit run app.py --server.port 5000 --server.address 0.0.0.0 -- --database-path demo_idis.db --archive-path data/demo_archive"
+waitForPort = 5000
+
+[[workflows.workflow]]
+name = "Test Dashboard"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "STREAMLIT_SERVER_HEADLESS=true streamlit run app.py --server.port 5000 --server.address 0.0.0.0 -- --database-path production_idis.db --archive-path data/idis_archive"
 waitForPort = 5000
 
 [deployment]

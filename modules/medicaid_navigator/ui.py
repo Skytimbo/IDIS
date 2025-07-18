@@ -132,8 +132,7 @@ def render_persistent_ai_analysis(doc_id, case_id):
                 pass
 
 
-def load_application_checklist_with_status_for_case(case_id: str,
-                                                    entity_id: int):
+def load_application_checklist_with_status_for_case(case_id: str, entity_id: int):
     """
     Load the application checklist with current status for a specific case.
     Checks case_documents table for submitted documents.
@@ -179,13 +178,11 @@ def load_application_checklist_with_status_for_case(case_id: str,
         return pd.DataFrame(checklist_data)
 
     except Exception as e:
-        logging.error(
-            f"Error loading application checklist for case {case_id}: {e}")
+        logging.error(f"Error loading application checklist for case {case_id}: {e}")
         return pd.DataFrame()
 
 
-def validate_document_assignment(ai_detected_type: str,
-                                 selected_requirement: str) -> dict:
+def validate_document_assignment(ai_detected_type: str, selected_requirement: str) -> dict:
     """
     Validate if a document assignment is appropriate based on AI classification.
 
@@ -197,56 +194,31 @@ def validate_document_assignment(ai_detected_type: str,
         dict: {'is_valid': bool, 'warning_message': str}
     """
     valid_mappings = {
-        'Proof of Identity': [
-            'Driver License', 'State ID', 'Passport', 'Birth Certificate',
-            'Business License', 'Identity Document'
-        ],
-        'Proof of Citizenship': [
-            'Birth Certificate', 'Passport', 'Citizenship Document',
-            'Naturalization Certificate'
-        ],
-        'Proof of Residency': [
-            'Utility Bill', 'Bank Statement', 'Lease Agreement',
-            'Mortgage Statement', 'Rent Receipt'
-        ],
-        'Proof of Alaska Residency': [
-            'Utility Bill', 'Bank Statement', 'Lease Agreement',
-            'Mortgage Statement', 'Rent Receipt'
-        ],
-        'Proof of Income': [
-            'Paystub', 'Employment Letter', 'Social Security Award',
-            'Tax Return', 'Bank Statement', 'Payslip'
-        ],
-        'Proof of Resources/Assets': [
-            'Bank Statement', 'Investment Statement', 'Asset Valuation',
-            'Property Deed', 'Vehicle Title'
-        ]
+        'Proof of Identity': ['Driver License', 'State ID', 'Passport', 'Birth Certificate', 'Business License', 'Identity Document'],
+        'Proof of Citizenship': ['Birth Certificate', 'Passport', 'Citizenship Document', 'Naturalization Certificate'],
+        'Proof of Residency': ['Utility Bill', 'Bank Statement', 'Lease Agreement', 'Mortgage Statement', 'Rent Receipt'],
+        'Proof of Alaska Residency': ['Utility Bill', 'Bank Statement', 'Lease Agreement', 'Mortgage Statement', 'Rent Receipt'],
+        'Proof of Income': ['Paystub', 'Employment Letter', 'Social Security Award', 'Tax Return', 'Bank Statement', 'Payslip'],
+        'Proof of Resources/Assets': ['Bank Statement', 'Investment Statement', 'Asset Valuation', 'Property Deed', 'Vehicle Title']
     }
 
     valid_types = valid_mappings.get(selected_requirement, [])
 
     if ai_detected_type in ['None', 'Unknown', '']:
         return {
-            'is_valid':
-            False,
-            'warning_message':
-            f"The AI could not determine the document type. Please verify this document is appropriate for '{selected_requirement}'. Expected types: {', '.join(valid_types)}"
+            'is_valid': False,
+            'warning_message': f"The AI could not determine the document type. Please verify this document is appropriate for '{selected_requirement}'. Expected types: {', '.join(valid_types)}"
         }
     elif ai_detected_type in valid_types:
         return {'is_valid': True, 'warning_message': ''}
     else:
         return {
-            'is_valid':
-            False,
-            'warning_message':
-            f"A '{ai_detected_type}' document may not be appropriate for '{selected_requirement}'. Expected types: {', '.join(valid_types)}"
+            'is_valid': False,
+            'warning_message': f"A '{ai_detected_type}' document may not be appropriate for '{selected_requirement}'. Expected types: {', '.join(valid_types)}"
         }
 
 
-def assign_document_to_requirement(document_id: int,
-                                   requirement_id: int,
-                                   override: bool = False,
-                                   override_reason: str = ""):
+def assign_document_to_requirement(document_id: int, requirement_id: int, override: bool = False, override_reason: str = ""):
     """
     Assign a document to a specific checklist requirement for the current case.
 
@@ -263,8 +235,7 @@ def assign_document_to_requirement(document_id: int,
         logging.info("DEBUG: Entered assign_document_to_requirement function.")
 
         if override and override_reason:
-            logging.info(
-                f"AUDIT: Document assignment override - {override_reason}")
+            logging.info(f"AUDIT: Document assignment override - {override_reason}")
 
         entity_id = st.session_state.get('current_entity_id')
         case_id = st.session_state.get('current_case_id')
@@ -277,8 +248,7 @@ def assign_document_to_requirement(document_id: int,
         context_store = ContextStore(db_path)
         cursor = context_store.conn.cursor()
 
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT id FROM case_documents 
             WHERE checklist_item_id = ? AND entity_id = ? AND case_id = ?
         """, (requirement_id, entity_id, case_id))
@@ -286,34 +256,27 @@ def assign_document_to_requirement(document_id: int,
         existing_record = cursor.fetchone()
 
         if existing_record:
-            cursor.execute(
-                """
+            cursor.execute("""
                 UPDATE case_documents 
                 SET document_id = ?, status = 'Submitted', is_override = ?, updated_at = CURRENT_TIMESTAMP
                 WHERE id = ?
             """, (document_id, 1 if override else 0, existing_record[0]))
         else:
             # This path is less likely with the new "create_new_case" logic, but is good for robustness.
-            cursor.execute(
-                """
+            cursor.execute("""
                 INSERT INTO case_documents (case_id, entity_id, checklist_item_id, document_id, status, is_override, user_id, created_at, updated_at)
                 VALUES (?, ?, ?, ?, 'Submitted', ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-            """, (case_id, entity_id, requirement_id, document_id,
-                  1 if override else 0,
-                  st.session_state.get('current_user_id', 'user_a')))
+            """, (case_id, entity_id, requirement_id, document_id, 1 if override else 0, st.session_state.get('current_user_id', 'user_a')))
 
         context_store.conn.commit()
         logging.info("DEBUG: Database update successful, returning True.")
         return True
 
     except Exception as e:
-        logging.error(
-            f"Error assigning document {document_id} to requirement {requirement_id}: {e}"
-        )
+        logging.error(f"Error assigning document {document_id} to requirement {requirement_id}: {e}")
         return False
-
-
-def render_document_assignment_interface():
+      
+      def render_document_assignment_interface():
     """
     Render the document assignment interface for processed documents.
     """
@@ -344,65 +307,55 @@ def render_document_assignment_interface():
     rerun_needed = False
 
     for i, doc_info in enumerate(documents_to_process):
-        with st.expander(f"📄 New document '{doc_info['filename']}' processed",
-                         expanded=True):
+        with st.expander(f"📄 New document '{doc_info['filename']}' processed", expanded=True):
             col1, col2 = st.columns([2, 1])
 
             with col1:
                 st.write(f"**Filename:** {doc_info['filename']}")
-                st.write(
-                    f"**AI-detected type:** {doc_info.get('document_type', 'Unknown')}"
-                )
+                st.write(f"**AI-detected type:** {doc_info.get('document_type', 'Unknown')}")
 
                 if doc_info.get('extracted_data'):
-                    confidence, document_type, has_heuristic_override = extract_confidence_from_document(
-                        {'extracted_data': doc_info['extracted_data']})
+                    confidence, document_type, has_heuristic_override = extract_confidence_from_document({'extracted_data': doc_info['extracted_data']})
                     st.markdown("**AI Classification Confidence:**")
-                    render_confidence_meter(confidence,
-                                            document_type,
-                                            compact=True)
+                    render_confidence_meter(confidence, document_type, compact=True)
 
-                options_with_placeholder = ["Select a requirement..."] + list(
-                    requirement_options.keys())
+                options_with_placeholder = ["Select a requirement..."] + list(requirement_options.keys())
                 selected_requirement = st.selectbox(
                     "Assign to requirement:",
                     options=options_with_placeholder,
                     key=f"req_select_{i}",
-                    index=0)
+                    index=0
+                )
 
                 if selected_requirement == "Select a requirement...":
                     selected_requirement = None
 
             with col2:
-                if st.button("✅ Assign Document",
-                              key=f"assign_btn_{i}",
-                              type="primary"):
+                if st.button("✅ Assign Document", key=f"assign_btn_{i}", type="primary"):
                     if selected_requirement:
-                        requirement_id = requirement_options[
-                            selected_requirement]
+                        requirement_id = requirement_options[selected_requirement]
 
                         validation_result = validate_document_assignment(
-                            doc_info.get('document_type', 'Unknown'),
-                            selected_requirement)
+                            doc_info.get('document_type', 'Unknown'), 
+                            selected_requirement
+                        )
 
                         is_override = not validation_result['is_valid']
                         override_reason = ""
 
                         if is_override:
                             override_reason = f"User override: {doc_info.get('document_type', 'Unknown')} → {selected_requirement}"
-                            st.warning(
-                                f"⚠️ {validation_result['warning_message']}")
+                            st.warning(f"⚠️ {validation_result['warning_message']}")
 
                         success = assign_document_to_requirement(
                             doc_info['document_id'],
                             requirement_id,
                             override=is_override,
-                            override_reason=override_reason)
+                            override_reason=override_reason
+                        )
 
                         if success:
-                            st.success(
-                                f"✅ Document assigned to '{selected_requirement}'"
-                                + (" (Override)" if is_override else ""))
+                            st.success(f"✅ Document assigned to '{selected_requirement}'" + (" (Override)" if is_override else ""))
                             documents_to_remove.append(doc_info)
                             rerun_needed = True
                         else:
@@ -417,6 +370,7 @@ def render_document_assignment_interface():
 
     if rerun_needed:
         st.rerun()
+
 
 def get_current_user_id():
     """
@@ -449,11 +403,7 @@ def get_user_entities(user_id, search_term: str = None):
 
         cursor.execute(query, params)
         entities = cursor.fetchall()
-        return [{
-            'id': row[0],
-            'name': row[1],
-            'created': row[2]
-        } for row in entities]
+        return [{'id': row[0], 'name': row[1], 'created': row[2]} for row in entities]
 
     except Exception as e:
         logging.error(f"Error loading user entities: {e}")
@@ -469,8 +419,7 @@ def create_new_entity(entity_name, user_id):
         context_store = ContextStore(db_path)
         cursor = context_store.conn.cursor()
 
-        cursor.execute(
-            """
+        cursor.execute("""
             INSERT INTO entities (entity_name, user_id, creation_timestamp, last_modified_timestamp)
             VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
         """, (entity_name, user_id))
@@ -478,9 +427,7 @@ def create_new_entity(entity_name, user_id):
         entity_id = cursor.lastrowid
         context_store.conn.commit()
 
-        logging.info(
-            f"Created new entity '{entity_name}' (ID: {entity_id}) for user {user_id}"
-        )
+        logging.info(f"Created new entity '{entity_name}' (ID: {entity_id}) for user {user_id}")
         return entity_id
 
     except Exception as e:
@@ -497,8 +444,7 @@ def create_new_case(entity_id, user_id):
         context_store = ContextStore(db_path)
         cursor = context_store.conn.cursor()
 
-        cursor.execute("SELECT entity_name FROM entities WHERE id = ?",
-                       (entity_id, ))
+        cursor.execute("SELECT entity_name FROM entities WHERE id = ?", (entity_id,))
         entity_result = cursor.fetchone()
         if not entity_result:
             return None
@@ -514,16 +460,13 @@ def create_new_case(entity_id, user_id):
         checklist_items = cursor.fetchall()
 
         for item in checklist_items:
-            cursor.execute(
-                """
+            cursor.execute("""
                 INSERT INTO case_documents (case_id, entity_id, checklist_item_id, status, user_id, created_at, updated_at)
                 VALUES (?, ?, ?, 'Pending', ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             """, (case_id, entity_id, item[0], user_id))
 
         context_store.conn.commit()
-        logging.info(
-            f"Created new case '{case_id}' for entity {entity_id} (user {user_id})"
-        )
+        logging.info(f"Created new case '{case_id}' for entity {entity_id} (user {user_id})")
         return case_id
 
     except Exception as e:
@@ -541,14 +484,13 @@ def get_case_dashboard_data():
         context_store = ContextStore(db_path)
         cursor = context_store.conn.cursor()
 
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT DISTINCT cd.case_id, cd.entity_id, e.entity_name
             FROM case_documents cd
             JOIN entities e ON cd.entity_id = e.id
             WHERE cd.user_id = ?
             ORDER BY cd.case_id
-        """, (current_user, ))
+        """, (current_user,))
 
         cases_raw = cursor.fetchall()
         cases_data = []
@@ -561,33 +503,23 @@ def get_case_dashboard_data():
             """)
             total_requirements = cursor.fetchone()[0]
 
-            cursor.execute(
-                """
+            cursor.execute("""
                 SELECT COUNT(*) 
                 FROM case_documents 
                 WHERE case_id = ? AND status = 'Submitted'
             """, (case_id, ))
             submitted_count = cursor.fetchone()[0]
 
-            progress_percentage = (submitted_count / total_requirements
-                                   ) * 100 if total_requirements > 0 else 0
+            progress_percentage = (submitted_count / total_requirements) * 100 if total_requirements > 0 else 0
 
             cases_data.append({
-                'case_id':
-                case_id,
-                'entity_id':
-                entity_id,
-                'entity_name':
-                entity_name,
-                'total_requirements':
-                total_requirements,
-                'submitted_count':
-                submitted_count,
-                'progress_percentage':
-                progress_percentage,
-                'status':
-                'Complete'
-                if submitted_count == total_requirements else 'In Progress'
+                'case_id': case_id,
+                'entity_id': entity_id,
+                'entity_name': entity_name,
+                'total_requirements': total_requirements,
+                'submitted_count': submitted_count,
+                'progress_percentage': progress_percentage,
+                'status': 'Complete' if submitted_count == total_requirements else 'In Progress'
             })
 
         return cases_data
@@ -601,31 +533,23 @@ def render_home_page():
     """
     Render the Case Manager Home Dashboard with KPIs and navigation.
     """
-    # This function would fetch real data in a production setting
-    # For now, we use dummy data as planned
     current_user = get_current_user_id()
 
     st.title("🏠 Case Manager Home Dashboard")
     st.markdown("---")
-    st.markdown(
-        f"**Welcome, {current_user}** - Your comprehensive case management overview"
-    )
+    st.markdown(f"**Welcome, {current_user}** - Your comprehensive case management overview")
 
     # Quick Actions Section - MOVED TO TOP
     st.subheader("🚀 Quick Actions")
     col1, col2 = st.columns(2)
 
     with col1:
-        if st.button("📋 View All Active Cases",
-                      type="primary",
-                      use_container_width=True):
+        if st.button("📋 View All Active Cases", type="primary", use_container_width=True):
             st.session_state.medicaid_view = 'active_cases'
             st.rerun()
 
     with col2:
-        if st.button("➕ Start New Application",
-                      type="secondary",
-                      use_container_width=True):
+        if st.button("➕ Start New Application", type="secondary", use_container_width=True):
             st.session_state.medicaid_view = 'new_application'
             st.rerun()
 
@@ -683,14 +607,10 @@ def render_active_cases_view():
                 st.markdown(f"**👤 {case['entity_name']}**")
                 st.caption(f"Case ID: {case['case_id']}")
                 st.markdown(f"**Status:** {case['status']}")
-                st.markdown(
-                    f"**Documents Submitted:** {case['submitted_count']} / {case['total_requirements']}"
-                )
+                st.markdown(f"**Documents Submitted:** {case['submitted_count']} / {case['total_requirements']}")
                 st.progress(case['progress_percentage'] / 100)
 
-                if st.button(f"📝 View Case Details",
-                             key=f"view_case_{case['case_id']}",
-                             use_container_width=True):
+                if st.button(f"📝 View Case Details", key=f"view_case_{case['case_id']}", use_container_width=True):
                     # Clear document viewer state when switching to a different case
                     if 'document_to_view' in st.session_state:
                         del st.session_state.document_to_view
@@ -699,6 +619,7 @@ def render_active_cases_view():
                     st.session_state.medicaid_view = 'case_detail'
                     st.rerun()
                 st.markdown("---")
+
 
 def get_documents_for_case(case_id: str):
     """
@@ -714,159 +635,12 @@ def get_documents_for_case(case_id: str):
             JOIN case_documents cd ON d.id = cd.document_id
             WHERE cd.case_id = ?
         """
-        cursor.execute(query, (case_id, ))
+        cursor.execute(query, (case_id,))
         docs = cursor.fetchall()
         return [{"id": row[0], "filename": row[1]} for row in docs]
     except Exception as e:
         logging.error(f"Error retrieving documents for case {case_id}: {e}")
         return []
-
-def render_persistent_ai_analysis(doc_id: str, case_id: str):
-    """
-    Render persistent AI analysis for a document that stays visible without opening the PDF viewer.
-    """
-    try:
-        db_path = st.session_state.get('database_path', 'production_idis.db')
-        context_store = ContextStore(db_path)
-        retrieved_doc = context_store.get_document_details_by_id(doc_id, user_id=None)
-        
-        if not retrieved_doc:
-            st.error("Could not retrieve document details")
-            return
-        
-        # Container for AI analysis
-        with st.container(border=True):
-            st.markdown("### 🤖 AI Analysis")
-            
-            # Document Classification
-            if retrieved_doc.get('document_type'):
-                confidence = retrieved_doc.get('classification_confidence', 0)
-                confidence_color = "green" if confidence and confidence > 0.7 else "orange" if confidence and confidence > 0.4 else "red"
-                st.markdown(f"**Document Type:** ::{confidence_color}[{retrieved_doc['document_type']}]")
-                if confidence:
-                    st.progress(confidence, f"Confidence: {confidence:.1%}")
-            
-            # Key Information in columns
-            col1, col2 = st.columns(2)
-            with col1:
-                # Enhanced issuer detection with priority to AI-extracted data
-                issuer_to_display = None
-                if retrieved_doc.get('extracted_data'):
-                    try:
-                        import json
-                        extracted = json.loads(retrieved_doc['extracted_data'])
-                        
-                        # Check AI-extracted issuer from multiple sources
-                        if extracted.get('issuer_info', {}).get('organization_name'):
-                            issuer_to_display = extracted['issuer_info']['organization_name']
-                        elif extracted.get('content', {}).get('issuer'):
-                            issuer_to_display = extracted['content']['issuer']
-                        elif extracted.get('sender', {}).get('organization'):
-                            issuer_to_display = extracted['sender']['organization']
-                        elif extracted.get('sender', {}).get('name'):
-                            issuer_to_display = extracted['sender']['name']
-                        elif extracted.get('issuer'):
-                            issuer_to_display = extracted['issuer']
-                        
-                        # Check for issuer in the summary text
-                        if not issuer_to_display and extracted.get('content', {}).get('summary'):
-                            summary = extracted['content']['summary']
-                            # Look for "FNB Alaska" or similar patterns in the summary
-                            if "FNB Alaska" in summary:
-                                issuer_to_display = "FNB Alaska"
-                            elif "Alaska" in summary and "bank" in summary.lower():
-                                # Extract bank name from summary
-                                words = summary.split()
-                                for i, word in enumerate(words):
-                                    if "alaska" in word.lower() and i > 0:
-                                        prev_word = words[i-1]
-                                        if any(bank_term in prev_word.lower() for bank_term in ["fnb", "bank", "first"]):
-                                            issuer_to_display = f"{prev_word} {word}"
-                                            break
-                    except (json.JSONDecodeError, TypeError):
-                        pass
-                
-                # Fallback to raw OCR but filter out postal instructions
-                if not issuer_to_display and retrieved_doc.get('issuer_source'):
-                    raw_issuer = retrieved_doc['issuer_source']
-                    postal_instructions = [
-                        'RETURN SERVICE REQUESTED',
-                        'RETURN RECEIPT REQUESTED', 
-                        'FORWARDING SERVICE REQUESTED',
-                        'ADDRESS SERVICE REQUESTED',
-                        'DO NOT FORWARD',
-                        'PRESORTED FIRST-CLASS'
-                    ]
-                    if raw_issuer.upper() not in postal_instructions:
-                        issuer_to_display = raw_issuer
-                
-                if issuer_to_display:
-                    st.markdown(f"**Issuer:** {issuer_to_display}")
-                
-                # Recipient information
-                if retrieved_doc.get('recipient'):
-                    st.markdown(f"**Recipient:** {retrieved_doc['recipient']}")
-            
-            with col2:
-                if retrieved_doc.get('document_dates'):
-                    st.markdown(f"**Document Dates:** {retrieved_doc['document_dates']}")
-                if retrieved_doc.get('processing_status'):
-                    status_color = "green" if retrieved_doc['processing_status'] == 'filed' else "blue"
-                    st.markdown(f"**Status:** ::{status_color}[{retrieved_doc['processing_status']}]")
-            
-            # Human-readable summary from AI analysis
-            if retrieved_doc.get('extracted_data'):
-                try:
-                    import json
-                    extracted = json.loads(retrieved_doc['extracted_data'])
-                    
-                    # Show the AI-generated summary
-                    if extracted.get('content', {}).get('summary'):
-                        st.markdown("**AI Summary:**")
-                        st.markdown(extracted['content']['summary'])
-                    
-                    # Financial Information (if available)
-                    if extracted.get('financials'):
-                        financials = extracted['financials']
-                        financial_info = []
-                        
-                        if financials.get('total_amount'):
-                            currency = financials.get('currency', 'USD')
-                            total = financials['total_amount']
-                            financial_info.append(f"Total Amount: ${total:,.2f} {currency}")
-                        
-                        if financial_info:
-                            st.markdown("**Financial Details:** " + " | ".join(financial_info))
-                    
-                    # Key Dates (if available)
-                    if extracted.get('key_dates'):
-                        dates = extracted['key_dates']
-                        date_info = []
-                        
-                        if dates.get('primary_date'):
-                            date_type = dates.get('date_type', 'Document Date')
-                            date_info.append(f"{date_type.replace('_', ' ').title()}: {dates['primary_date']}")
-                        
-                        if date_info:
-                            st.markdown("**Important Dates:** " + " | ".join(date_info))
-                
-                except (json.JSONDecodeError, TypeError):
-                    pass
-            
-            # Tags (if available)
-            if retrieved_doc.get('tags_extracted'):
-                try:
-                    import json
-                    tags = json.loads(retrieved_doc['tags_extracted'])
-                    if isinstance(tags, list) and tags:
-                        tag_display = " • ".join(tags)
-                        st.markdown(f"**Tags:** {tag_display}")
-                except (json.JSONDecodeError, TypeError):
-                    pass
-    
-    except Exception as e:
-        st.error(f"Error rendering AI analysis: {e}")
-        logging.error(f"Error rendering AI analysis for doc {doc_id}: {e}")
 
 
 def render_case_detail_view():
@@ -884,8 +658,7 @@ def render_case_detail_view():
         db_path = st.session_state.get('database_path', 'production_idis.db')
         context_store = ContextStore(db_path)
         cursor = context_store.conn.cursor()
-        cursor.execute("SELECT entity_name FROM entities WHERE id = ?",
-                       (entity_id, ))
+        cursor.execute("SELECT entity_name FROM entities WHERE id = ?", (entity_id,))
         entity_result = cursor.fetchone()
         entity_name = entity_result[0] if entity_result else "Unknown Entity"
     except Exception as e:
@@ -897,8 +670,7 @@ def render_case_detail_view():
     st.markdown(f"**Case ID:** {case_id}")
 
     st.header("1. Application Checklist")
-    checklist_df = load_application_checklist_with_status_for_case(
-        case_id, entity_id)
+    checklist_df = load_application_checklist_with_status_for_case(case_id, entity_id)
 
     if not checklist_df.empty:
         st.table(checklist_df)
@@ -946,6 +718,7 @@ def render_case_detail_view():
             # Add spacing between documents
             st.markdown("---")
 
+    # Document viewer (if a document is selected for viewing)
     if 'document_to_view' in st.session_state and st.session_state.document_to_view:
         doc_id = st.session_state.document_to_view
         user_id = get_current_user_id()
@@ -975,8 +748,6 @@ def render_case_detail_view():
             
             st.markdown("---")
             
-            # TODO: Add OAuth-based user validation here when authentication is implemented
-            # For MVP demo: bypassing user access checks
             retrieved_doc = context_store.get_document_details_by_id(doc_id, user_id=None)
 
             if retrieved_doc:
@@ -1056,180 +827,9 @@ def render_case_detail_view():
                 
                 st.markdown("---")
                 st.info("💡 AI Analysis is now shown persistently above. This viewer is for the original document only.")
-                
-                # Control buttons (only refresh now, close button is at top)
-                if st.button("🔄 Refresh Document", use_container_width=True):
-                    st.rerun()
-                
-                # Document Classification
-                if retrieved_doc.get('document_type'):
-                    confidence = retrieved_doc.get('classification_confidence', 0)
-                    confidence_color = "green" if confidence and confidence > 0.7 else "orange" if confidence and confidence > 0.4 else "red"
-                    st.markdown(f"**Document Type:** ::{confidence_color}[{retrieved_doc['document_type']}]")
-                    if confidence:
-                        st.progress(confidence, f"Confidence: {confidence:.1%}")
-                
-                # Key Information (Structured Data) - Prioritize AI-extracted data
-                col1, col2 = st.columns(2)
-                with col1:
-                    # Smart issuer detection - prioritize AI-extracted data over raw OCR
-                    issuer_to_display = None
-                    if retrieved_doc.get('extracted_data'):
-                        try:
-                            import json
-                            extracted = json.loads(retrieved_doc['extracted_data'])
-                            
-                            # Check for AI-extracted issuer in various locations
-                            if extracted.get('issuer_info', {}).get('organization_name'):
-                                issuer_to_display = extracted['issuer_info']['organization_name']
-                            elif extracted.get('content', {}).get('issuer'):
-                                issuer_to_display = extracted['content']['issuer']
-                            elif extracted.get('sender', {}).get('organization'):
-                                issuer_to_display = extracted['sender']['organization']
-                            elif extracted.get('sender', {}).get('name'):
-                                issuer_to_display = extracted['sender']['name']
-                        except (json.JSONDecodeError, TypeError):
-                            pass
-                    
-                    # Fallback to raw OCR but filter out postal instructions
-                    if not issuer_to_display and retrieved_doc.get('issuer_source'):
-                        raw_issuer = retrieved_doc['issuer_source']
-                        # Filter out common postal/shipping instructions
-                        postal_instructions = [
-                            'RETURN SERVICE REQUESTED',
-                            'RETURN RECEIPT REQUESTED', 
-                            'FORWARDING SERVICE REQUESTED',
-                            'ADDRESS SERVICE REQUESTED',
-                            'DO NOT FORWARD',
-                            'PRESORTED FIRST-CLASS'
-                        ]
-                        if raw_issuer.upper() not in postal_instructions:
-                            issuer_to_display = raw_issuer
-                    
-                    if issuer_to_display:
-                        st.markdown(f"**Issuer:** {issuer_to_display}")
-                    
-                    # Recipient information
-                    if retrieved_doc.get('recipient'):
-                        st.markdown(f"**Recipient:** {retrieved_doc['recipient']}")
-                
-                with col2:
-                    if retrieved_doc.get('document_dates'):
-                        st.markdown(f"**Document Dates:** {retrieved_doc['document_dates']}")
-                    if retrieved_doc.get('processing_status'):
-                        status_color = "green" if retrieved_doc['processing_status'] == 'filed' else "blue"
-                        st.markdown(f"**Status:** ::{status_color}[{retrieved_doc['processing_status']}]")
-                
-                # Human-readable document information
-                if retrieved_doc.get('extracted_data'):
-                    st.markdown("### 📋 Document Summary")
-                    try:
-                        import json
-                        extracted = json.loads(retrieved_doc['extracted_data'])
-                        
-                        # Show the AI-generated summary first (most readable)
-                        if extracted.get('content', {}).get('summary'):
-                            st.markdown(f"**Summary:** {extracted['content']['summary']}")
-                            st.markdown("---")
-                        
-                        # Document Type with confidence
-                        if extracted.get('document_type'):
-                            doc_type = extracted['document_type']
-                            if isinstance(doc_type, dict):
-                                confidence = doc_type.get('confidence_score', 0)
-                                doc_class = doc_type.get('predicted_class', 'Unknown')
-                                confidence_pct = f"({confidence:.0%} confidence)" if confidence else ""
-                                st.markdown(f"**Document Type:** {doc_class} {confidence_pct}")
-                        
-                        # Financial Information (human-readable)
-                        if extracted.get('financials'):
-                            financials = extracted['financials']
-                            financial_info = []
-                            
-                            if financials.get('total_amount'):
-                                currency = financials.get('currency', 'USD')
-                                total = financials['total_amount']
-                                financial_info.append(f"Total Amount: ${total:,.2f} {currency}")
-                            
-                            if financials.get('subtotal'):
-                                financial_info.append(f"Subtotal: ${financials['subtotal']:,.2f}")
-                            
-                            if financials.get('tax_total'):
-                                financial_info.append(f"Tax: ${financials['tax_total']:,.2f}")
-                            
-                            if financial_info:
-                                st.markdown("**Financial Details:** " + " | ".join(financial_info))
-                        
-                        # Key Dates (human-readable)
-                        if extracted.get('key_dates'):
-                            dates = extracted['key_dates']
-                            date_info = []
-                            
-                            if dates.get('primary_date'):
-                                date_type = dates.get('date_type', 'Document Date')
-                                date_info.append(f"{date_type.replace('_', ' ').title()}: {dates['primary_date']}")
-                            
-                            if dates.get('due_date'):
-                                date_info.append(f"Due Date: {dates['due_date']}")
-                            
-                            if date_info:
-                                st.markdown("**Important Dates:** " + " | ".join(date_info))
-                        
-                        # Payment Information
-                        if extracted.get('payment_details'):
-                            payment = extracted['payment_details']
-                            if payment.get('method'):
-                                method_info = f"Payment Method: {payment['method']}"
-                                if payment.get('card_last4'):
-                                    method_info += f" (ending {payment['card_last4']})"
-                                st.markdown(f"**{method_info}**")
-                        
-                        # Account Information
-                        if extracted.get('recipient', {}).get('account_number'):
-                            account = extracted['recipient']['account_number']
-                            st.markdown(f"**Account Number:** {account}")
-                    
-                    except (json.JSONDecodeError, TypeError):
-                        st.text(retrieved_doc['extracted_data'])
-                
-                # Tags (human-readable)
-                if retrieved_doc.get('tags_extracted'):
-                    st.markdown("### 🏷️ Document Tags")
-                    try:
-                        import json
-                        tags = json.loads(retrieved_doc['tags_extracted'])
-                        if isinstance(tags, list) and tags:
-                            # Display tags in a more readable format
-                            tag_display = " • ".join(tags)
-                            st.markdown(f"**Tags:** {tag_display}")
-                        else:
-                            st.text(tags)
-                    except (json.JSONDecodeError, TypeError):
-                        st.text(retrieved_doc['tags_extracted'])
-                
-                # Advanced options (collapsed by default)
-                with st.expander("⚙️ Advanced Options", expanded=False):
-                    st.markdown("### Raw Text Content")
-                    st.caption("⚠️ This is the raw extracted text and may contain OCR errors")
-                    if retrieved_doc.get('full_text'):
-                        st.text_area(
-                            "Full Text",
-                            value=retrieved_doc['full_text'],
-                            height=200,
-                            disabled=True,
-                            help="Raw OCR text extraction - may contain errors"
-                        )
-                    else:
-                        st.info("No text content available")
-                
-                # Control buttons (only refresh now, close button is at top)
-                if st.button("🔄 Refresh Analysis", use_container_width=True):
-                    st.rerun()
                         
             else:
-                st.error(
-                    "Could not retrieve document or you do not have permission."
-                )
+                st.error("Could not retrieve document or you do not have permission.")
 
     st.header("3. Upload & Assign Documents")
 
@@ -1263,14 +863,10 @@ def render_start_new_application():
     with col1:
         with st.form("create_entity_form"):
             st.markdown("#### Option 1: Create New Entity")
-            entity_name = st.text_input(
-                "New Entity Name",
-                help="Enter the full name of the person applying.")
-            if st.form_submit_button("Create Entity & Start Case",
-                                     type="primary"):
+            entity_name = st.text_input("New Entity Name", help="Enter the full name of the person applying.")
+            if st.form_submit_button("Create Entity & Start Case", type="primary"):
                 if entity_name.strip():
-                    entity_id = create_new_entity(entity_name.strip(),
-                                                  current_user)
+                    entity_id = create_new_entity(entity_name.strip(), current_user)
                     if entity_id:
                         case_id = create_new_case(entity_id, current_user)
                         if case_id:
@@ -1293,31 +889,24 @@ def render_start_new_application():
         with st.form("select_entity_form"):
             st.markdown("#### Option 2: Use Existing Entity")
 
-            search_term = st.text_input("Search for Existing Entity by Name:",
-                                        key="entity_search_term")
+            search_term = st.text_input("Search for Existing Entity by Name:", key="entity_search_term")
 
             if st.form_submit_button("Search Entities"):
                 if search_term.strip():
-                    st.session_state.entity_search_results = get_user_entities(
-                        current_user, search_term.strip())
+                    st.session_state.entity_search_results = get_user_entities(current_user, search_term.strip())
                 else:
                     st.session_state.entity_search_results = []
 
             if 'entity_search_results' in st.session_state and st.session_state.entity_search_results:
                 results = st.session_state.entity_search_results
-                entity_options = {
-                    f"{entity['name']} (ID: {entity['id']})": entity['id']
-                    for entity in results
-                }
+                entity_options = {f"{entity['name']} (ID: {entity['id']})": entity['id'] for entity in results}
 
                 selected_entity_display = st.radio(
                     "Select an entity from search results:",
                     options=list(entity_options.keys()))
 
-                if st.form_submit_button("Start New Case for Selected Entity",
-                                         type="primary"):
-                    selected_entity_id = entity_options[
-                        selected_entity_display]
+                if st.form_submit_button("Start New Case for Selected Entity", type="primary"):
+                    selected_entity_id = entity_options[selected_entity_display]
                     case_id = create_new_case(selected_entity_id, current_user)
                     if case_id:
                         st.success(f"✅ Created new case '{case_id}'")
@@ -1327,19 +916,15 @@ def render_start_new_application():
                         st.session_state.current_case_id = case_id
                         st.session_state.current_entity_id = selected_entity_id
                         st.session_state.medicaid_view = 'case_detail'
-                        st.session_state.entity_search_results = [
-                        ]  # Clear results after use
+                        st.session_state.entity_search_results = []  # Clear results after use
                         st.rerun()
                     else:
                         st.error("Failed to create a case.")
             elif 'entity_search_results' in st.session_state:  # Searched but no results
                 st.info("No matching entities found.")
 
-
     st.markdown("---")
-    st.markdown(
-        "**Privacy Notice:** You can only see and create cases for your own entities."
-    )
+    st.markdown("**Privacy Notice:** You can only see and create cases for your own entities.")
 
 
 def render_navigator_ui():

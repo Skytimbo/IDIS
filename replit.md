@@ -58,11 +58,24 @@ The primary workflow implemented in the MVP is the Case Management system for th
 
 ## 6. Getting Started / Deployment
 
-The application is containerized and designed for a one-step launch.
+The application supports both Docker and native deployment options:
 
-1.  Ensure Docker is installed and running.
-2.  Set the `OPENAI_API_KEY` in your environment.
-3.  Run the deployment script: `./deploy.sh`
+### Native Replit Deployment (Recommended)
+1. Set the `OPENAI_API_KEY` in your environment
+2. Run the native deployment script: `./deploy-native.sh`
+3. Access the application at the URL provided by Replit
+
+### Docker Deployment (Alternative)
+1. Ensure Docker is installed and running
+2. Set the `OPENAI_API_KEY` in your environment  
+3. Run the Docker deployment script: `./deploy.sh`
+
+The native deployment script (`deploy-native.sh`) is optimized for Replit's environment and includes:
+- Automatic directory structure creation
+- Database initialization with proper schema
+- Smart dependency management
+- Conflict detection for running services
+- Integrated watcher service management
 
 ## 7. Recent Technical Fixes
 
