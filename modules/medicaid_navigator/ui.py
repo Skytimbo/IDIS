@@ -423,7 +423,7 @@ def get_current_user_id():
     Get the current user ID (simulated for demo purposes).
     In a real application, this would come from an authentication system.
     """
-    return st.session_state.get('current_user_id', 'user_a')
+    return st.session_state.get('current_user_id', 'caseworker_demo')
 
 
 def get_user_entities(user_id, search_term: str = None):
