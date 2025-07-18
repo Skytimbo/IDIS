@@ -635,12 +635,19 @@ def render_home_page():
     st.subheader("📊 Key Performance Indicators")
     col1, col2, col3 = st.columns(3)
 
+    # Get real metrics from database
+    cases_data = get_case_dashboard_data()
+    total_cases = len(cases_data)
+    total_entities = len(set(case['entity_id'] for case in cases_data)) if cases_data else 0
+
     with col1:
-        st.metric("Active Cases", "42", "2 New")
+        st.metric("Active Cases", str(total_cases))
     with col2:
-        st.metric("Clients Managed", "65")
+        st.metric("Clients Managed", str(total_entities))
     with col3:
-        st.metric("Deadlines This Week", "3", "-1 vs last week")
+        completed_docs = sum(case['submitted_count'] for case in cases_data)
+        total_docs = sum(case['total_requirements'] for case in cases_data)
+        st.metric("Documents Processed", f"{completed_docs}/{total_docs}")
 
     st.markdown("---")
 
